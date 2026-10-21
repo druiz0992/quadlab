@@ -69,17 +69,21 @@ def run(args: GazeboConfig, command_source=None):
         raise ValueError("Choose keyboard or a programmatic command source")
     if command_source is not None and args.control_mode != "rotor-thrust":
         raise ValueError("A command source requires rotor-thrust mode")
-    keyboard = None
-    try:
-        # Generate-only deliberately never opens a keyboard window.
-        if args.keyboard and not args.generate_only:
-            from ..visualization.keyboard import KeyboardWindow
+    windows = []
 
-            keyboard = KeyboardWindow()
-        return _run(args, keyboard, command_source)
+    def open_keyboard():
+        from ..visualization.keyboard import KeyboardWindow
+
+        windows.append(KeyboardWindow())
+        return windows[-1]
+
+    try:
+        # _run opens the window only once the run is validated (never for
+        # generate-only), so option errors need no desktop.
+        return _run(args, open_keyboard if args.keyboard else None, command_source)
     finally:
-        if keyboard is not None:
-            keyboard.close()
+        for window in windows:
+            window.close()
 
 
 def _step_ns(settings: dict) -> int:
@@ -102,6 +106,15 @@ def _scheduled_periods_ns(settings: dict, pipeline: SensorPipeline) -> dict[str,
     if pipeline.esc_telemetry.enabled:
         periods["esc"] = float(_step_ns(settings))
     return periods
+
+
+def _require_gz() -> None:
+    """Raise ValueError when the ``gz`` command is not on PATH."""
+    if shutil.which("gz") is None:
+        raise ValueError(
+            "gz not found. Install Gazebo Harmonic and source "
+            "/opt/ros/jazzy/setup.bash if using ROS Jazzy."
+        )
 
 
 def _edit_world(world) -> None:
@@ -131,7 +144,7 @@ def _ground_height(settings, terrain):
     return 0.0 if terrain is None else float(terrain.height(x, y))
 
 
-def _run(args, keyboard, command_source):
+def _run(args, open_keyboard, command_source):
     from ..simulation.gazebo.actuators import RotorThrustControl
 
     from ..simulation.gazebo.config import load_drone_config
@@ -149,8 +162,6 @@ def _run(args, keyboard, command_source):
     settings = config.data
 
     sensors = settings["sensors"]
-    if keyboard is not None:
-        keyboard.pilot_rates = settings["pilot"]
     mode = validate_run(args, settings, command_source is not None)
     rotor_mode, lockstep = mode.rotor_mode, mode.lockstep
     barrier = lockstep_barrier(settings)
@@ -168,26 +179,15 @@ def _run(args, keyboard, command_source):
     if args.generate_only:
         print(world)
         return
-    if shutil.which("gz") is None:
-        raise ValueError(
-            "gz not found. Install Gazebo Harmonic and source /opt/ros/jazzy/setup.bash if using ROS Jazzy."
-        )
     if args.edit:
         if args.headless:
             raise ValueError("--edit needs a desktop window; omit --headless")
+        _require_gz()
         _edit_world(world)
         return
 
-    try:
-        from ..visualization.gazebo_rerun import GazeboRerunRecorder
-        from gz.transport13 import Node
-        from gz.msgs10.twist_pb2 import Twist
-    except ImportError as error:
-        raise ValueError(
-            f"{error}. Install .[gazebo] and source the Gazebo/ROS environment."
-        )
-
-    # Reject mode conflicts before the recorder exists: it opens the Rerun viewer.
+    # Reject mode conflicts before checking for Gazebo or opening windows
+    # (the keyboard window, and the recorder's Rerun viewer).
     powertrain = Powertrain(
         config.properties,
         settings["battery"],
@@ -206,6 +206,18 @@ def _run(args, keyboard, command_source):
         )
     if settings["fixed_wing"]["enabled"] and not rotor_mode:
         raise ValueError("fixed_wing needs rotor-thrust mode")
+    _require_gz()
+    try:
+        from ..visualization.gazebo_rerun import GazeboRerunRecorder
+        from gz.transport13 import Node
+        from gz.msgs10.twist_pb2 import Twist
+    except ImportError as error:
+        raise ValueError(
+            f"{error}. Install .[gazebo] and source the Gazebo/ROS environment."
+        )
+    keyboard = open_keyboard() if open_keyboard is not None else None
+    if keyboard is not None:
+        keyboard.pilot_rates = settings["pilot"]
 
     live_ekf = None
     estimate_reader = None

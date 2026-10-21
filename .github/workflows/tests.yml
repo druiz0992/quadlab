@@ -1,0 +1,41 @@
+# Unit tests, formatting, and world generation on every push and pull request.
+#
+# Runs without Gazebo, ROS, or a display: the opt-in Gazebo and GUI suites
+# (DRONELAB_TEST_GAZEBO=1, DRONELAB_TEST_GUI=1) skip themselves here and
+# stay local (see AGENTS.md section 6). Python 3.12 matches the ROS Jazzy
+# interpreter the Gazebo bindings need.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install
+        # black is pinned to the local version so formatting cannot drift.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]" "black==26.10.1"
+      - name: Formatting (black)
+        run: black --check src tests
+      - name: Unit tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q
+      - name: World generation
+        run: python -m dronelab --generate-only --output "$RUNNER_TEMP/dronelab-world-check"

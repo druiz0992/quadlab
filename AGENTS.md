@@ -101,6 +101,10 @@ in [README.md](README.md); design, behavior, and reference material are in
   python -m dronelab --generate-only --output /tmp/dronelab-world-check
   ```
 
+- CI (`.github/workflows/tests.yml`) repeats these checks plus `black
+  --check` on Python 3.12 without Gazebo, ROS, or a display, so unit tests
+  must not need them (validate options before checking for `gz` or opening
+  windows). Gazebo and GUI suites are not run in CI.
 - Documentation-only changes need command checks where relevant, not tests.
 - Never claim a GUI or Gazebo mission was verified from world generation alone.
 - For timing-sensitive Gazebo checks (control tuning, determinism), layer

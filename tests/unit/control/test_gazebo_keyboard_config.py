@@ -14,8 +14,9 @@ def test_headless_keyboard_allowed(monkeypatch):
     window = Window()
     monkeypatch.setattr(keyboard, "KeyboardWindow", lambda: window)
     seen = []
+    # _run opens the window itself, after validation, through the opener.
     monkeypatch.setattr(
-        gazebo, "_run", lambda args, keys, source: seen.append((args, keys))
+        gazebo, "_run", lambda args, opener, source: seen.append((args, opener()))
     )
     gazebo.run(gazebo.GazeboConfig(keyboard=True, headless=True))
     assert seen[0][0].headless and seen[0][1] is window

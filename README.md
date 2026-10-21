@@ -297,6 +297,10 @@ python -m dronelab --generate-only --output /tmp/dronelab-world-check   # world 
 ```
 
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` avoids third-party ROS pytest plugins.
+GitHub Actions (`.github/workflows/tests.yml`) runs `black --check`, these
+unit tests, and the world generation check on Python 3.12 for every push
+to `main` and every pull request, without Gazebo, ROS, or a display; the
+Gazebo and GUI suites below stay local.
 Tests needing real Gazebo or a desktop are skipped unless enabled:
 
 ```bash
