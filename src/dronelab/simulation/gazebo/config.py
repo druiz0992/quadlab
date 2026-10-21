@@ -335,6 +335,26 @@ DEFAULTS = {
             # Point-dipole anomalies (structures, pipes); see
             # sensors/magnetic_anomalies.py. Scene obstacles may add their own.
             "dipoles": [],
+            # Calibration the autopilot applies and filters use (not truth);
+            # produced by `dronelab-magcal`. See
+            # estimation/magnetometer_calibration.py. Local field: Gazebo's
+            # table for the default site (as a geomagnetic model would give).
+            "calibration": {
+                "enabled": False,
+                "hard_iron_offset_ut": [0.0, 0.0, 0.0],
+                "soft_iron_correction": [
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, 1.0],
+                ],
+                "current_compensation_ut_per_a": [0.0, 0.0, 0.0],
+                "thrust_compensation_ut_per_n": [0.0, 0.0, 0.0],
+                "field_strength_ut": 45.1,
+                "inclination_deg": 55.4,
+                "declination_deg": 0.0,
+                "field_tolerance_ut": 5.0,
+                "heading_std_deg": 3.0,
+            },
         },
         # Downward single-ray Gazebo lidar (requires rendering).
         # Synthetic pitot-static airspeed along body +x; see sensors/airspeed.py.
@@ -677,6 +697,8 @@ LENS_TYPES = (
 )
 # Keys allowing any sign.
 SIGNED_SCALAR_KEYS = {
+    "inclination_deg",
+    "declination_deg",
     "offset_pa",
     "mount_yaw_deg",
     "timestamp_offset_s",
@@ -773,6 +795,7 @@ def validate_length_schedule(events, name):
 
 MATRIX_KEYS = {
     "soft_iron",
+    "soft_iron_correction",
     "accel_cross_coupling",
     "gyro_cross_coupling",
     "gyro_g_sensitivity_rad_s_per_mps2",

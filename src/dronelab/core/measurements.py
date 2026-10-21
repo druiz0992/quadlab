@@ -132,12 +132,21 @@ class BaroReading:
 
 @dataclass(frozen=True)
 class MagnetometerReading:
-    """Magnetic field in sensor axes, µT."""
+    """Magnetic field in sensor axes, µT: raw, and corrected with the
+    configured calibration (as an autopilot driver applies it) when one is
+    enabled."""
 
     field_ut: np.ndarray
+    calibrated_field_ut: np.ndarray | None = None
 
     def __post_init__(self):
         object.__setattr__(self, "field_ut", readonly_array(self.field_ut, (3,)))
+        if self.calibrated_field_ut is not None:
+            object.__setattr__(
+                self,
+                "calibrated_field_ut",
+                readonly_array(self.calibrated_field_ut, (3,)),
+            )
 
 
 @dataclass(frozen=True)

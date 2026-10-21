@@ -17,6 +17,7 @@ gazebo = ["rerun-sdk==0.24.1", "protobuf>=4.25,<6"]
 dronelab = "dronelab.cli.gazebo:main"
 dronelab-gazebo = "dronelab.cli.gazebo:main"
 dronelab-batch = "dronelab.cli.batch:main"
+dronelab-magcal = "dronelab.cli.magcal:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

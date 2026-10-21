@@ -82,12 +82,14 @@ def build_context(
                 ).as_quat()
             )
             position = tuple(mount["position_m"])
+        calibration = section.get("calibration")
         descriptions[kind] = SensorDescription(
             kind,
             STREAMS[kind][1],
             section.get("rate_hz"),
             position,
             quaternion,
+            calibration if calibration and calibration.get("enabled") else None,
         )
     return AlgorithmContext(gps_reference, vehicle, descriptions)
 

@@ -35,7 +35,8 @@ truth; it is used only to synthesize measurements and to score runs.
 
 ```text
 src/dronelab/
-├── cli/                    # Argument parsing: `dronelab` (gazebo.py), `dronelab-batch` (batch.py)
+├── cli/                    # Argument parsing: `dronelab` (gazebo.py), `dronelab-batch`
+│                           #   (batch.py), `dronelab-magcal` (magcal.py)
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
 │                           #   measurement samples, rotor commands
 ├── sensors/                # Synthetic models, Gazebo decoding, geodesy, in-process
@@ -49,6 +50,7 @@ src/dronelab/
 │                           #   magnetic anomalies, lidar returns
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
+│   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
 │   ├── dead_reckoning.py   # Retained IMU dead-reckoning baseline
 │   └── gps_imu_ekf/
 │       ├── ekf.py          # Numerical prediction and correction
@@ -91,6 +93,7 @@ src/dronelab/
 │   ├── mission.py          # Mission clock and reference sampling
 │   ├── run_evaluation.py   # Per-run metrics (metrics.json)
 │   ├── batch.py            # Seed/parameter sweeps, aggregation, baselines
+│   ├── magnetometer_calibration.py  # Automated calibration run (dronelab-magcal)
 │   └── live_ekf.py         # Bounded live IMU/GPS ordering and EKF composition
 └── visualization/
     ├── gazebo_rerun.py     # Gazebo-message-to-Rerun recording adapter

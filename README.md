@@ -183,6 +183,11 @@ dronelab --headless --rerun --control-mode rotor-thrust --scene worlds/airfield.
   --drone configs/vehicles/kite_quadplane.json --drone configs/algorithms/quadplane_autopilot.json \
   --drone configs/control/lockstep.json --duration 160 --output outputs/quadplane
 
+# Magnetometer calibration (compass dance + throttle sweep in Gazebo), then fly with it
+dronelab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal
+dronelab --headless --control-mode rotor-thrust --drone configs/sensors/magnetometer.json \
+  --drone outputs/magcal/magnetometer-calibration.json --duration 20 --output outputs/calibrated
+
 # Worlds: generate only, edit paused in Gazebo, fly a saved world
 dronelab --generate-only --output outputs/world-preview
 dronelab --edit --scene worlds/circuit.json --output outputs/circuit-editor

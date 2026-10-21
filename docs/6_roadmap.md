@@ -20,7 +20,8 @@ document and update the status below.
 | Barometer fusion in the EKF (altitude update plus baro-offset state) | Future, with EKF robustness work |
 | Magnetometer, downward rangefinder, synthetic optical flow, multi-channel 3D lidar | Implemented ([3 Configuration](3_configuration.md#magnetometer-sensorsmagnetometer)) |
 | EKF fusion of magnetometer (heading), rangefinder and optical flow (GPS-denied) | Future, with EKF robustness work |
-| Magnetometer calibration (hard/soft iron estimation) | Future |
+| Magnetometer calibration (hard/soft iron, current/throttle compensation; automated procedure; calibration for filters) | Implemented ([3 Configuration](3_configuration.md#magnetometer-calibration-sensorsmagnetometercalibration)) |
+| Online (in-filter) magnetometer offset estimation to follow drift | Future, with EKF robustness work |
 | Vehicle presets (micro, racing 5-inch, camera 10-inch, heavy-lift), FPV camera layer | Implemented ([3 Configuration](3_configuration.md#vehicle-presets)) |
 | Battery monitor sensor; Rerun sensor markers and status indicators | Implemented ([3 Configuration](3_configuration.md#battery-monitor-sensorsbattery_monitor), [2 Simulation](2_simulation.md#viewing)) |
 | Acro (rate-mode) controller for racing and freestyle handling (flips, rolls) | Future |

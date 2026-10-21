@@ -70,6 +70,7 @@ from ..sensors.gps_receiver import (
 )
 from ..sensors.imu_imperfections import ImuImperfections, ImuSaturation, ImuTiming
 from ..sensors.magnetometer import MagnetometerErrorModel
+from ..estimation.magnetometer_calibration import MagnetometerCalibration
 from ..sensors.magnetic_anomalies import MagneticAnomalies, scene_dipoles
 from ..sensors.optical_flow import OpticalFlowModel
 from ..sensors.battery_monitor import BatteryMonitor
@@ -158,7 +159,9 @@ def _log_sensor_status(
         recorder.log_status("rangefinder_valid", t, float(valid))
 
 
-def _submit_to_bus(bus, kind, message, gps_dropped, camera_effects, gps_status):
+def _submit_to_bus(
+    bus, kind, message, gps_dropped, camera_effects, gps_status, calibrated_field_ut
+):
     """Submit a processed transported measurement to the sensor bus.
 
     Lidar (with effects), delayed camera frames, and synthetic sensors are
@@ -174,6 +177,8 @@ def _submit_to_bus(bus, kind, message, gps_dropped, camera_effects, gps_status):
     payload = bus_payload(kind, message)
     if kind == "gps":
         payload = replace(payload, status=gps_status)
+    if kind == "magnetometer" and calibrated_field_ut is not None:
+        payload = replace(payload, calibrated_field_ut=calibrated_field_ut)
     if payload is not None:
         bus.submit(kind, payload, timestamp_ns(message))
 
@@ -190,6 +195,26 @@ def _control_state(estimate_source, runner, now_ns, elapsed_s, max_age_s, truth)
     if state is None and elapsed_s > max_age_s:
         raise StaleEstimate("No state estimate available for control")
     return state
+
+
+def _calibrate_magnetometer(calibration, message, battery_reading, thrust_n, recorder):
+    """Driver-side correction with the configured calibration (µT), or None.
+
+    Uses only what an autopilot knows: the measured battery current (battery
+    monitor; 0 without one) and its own total thrust command.
+    """
+    if calibration is None:
+        return None
+    raw = np.asarray(vector(message.field_tesla)) * 1e6
+    current = battery_reading.current_a if battery_reading is not None else 0.0
+    corrected = calibration.apply(raw, current, thrust_n)
+    recorder.log_vector("magnetometer/calibrated_ut", corrected, ["x", "y", "z"])
+    recorder.log_vector(
+        "magnetometer/calibrated_level_heading_deg",
+        [float(np.degrees(np.arctan2(corrected[0], corrected[1])))],
+        ["value"],
+    )
+    return corrected
 
 
 def _anomaly_in_sensor(anomalies, position, attitude, mount):
@@ -450,6 +475,13 @@ def _run(args, keyboard, command_source):
     )
     baro_errors = BaroErrorModel(sensors["baro"]["error_model"])
     magnetometer_errors = MagnetometerErrorModel(sensors["magnetometer"]["error_model"])
+    mag_settings = sensors["magnetometer"]["calibration"]
+    mag_calibration = (
+        MagnetometerCalibration.from_config(mag_settings)
+        if mag_settings["enabled"]
+        else None
+    )
+    calibrated_mag = None
     anomalies = MagneticAnomalies(
         list(sensors["magnetometer"]["dipoles"]) + scene_dipoles(scene)
     )
@@ -956,6 +988,13 @@ def _run(args, keyboard, command_source):
                         total_thrust_n,
                         battery.current_a if battery is not None else 0.0,
                     )
+                    calibrated_mag = _calibrate_magnetometer(
+                        mag_calibration,
+                        message,
+                        last_battery_reading,
+                        total_thrust_n,
+                        recorder,
+                    )
                 elif kind == "baro":
                     message = baro_datum_message(message, elevation_m)
                     # Downwash from the latest total commanded thrust (momentum
@@ -1072,6 +1111,7 @@ def _run(args, keyboard, command_source):
                         gps_dropped,
                         camera_effects,
                         gps_status.status,
+                        calibrated_mag if kind == "magnetometer" else None,
                     )
                     if kind not in ("poses", "contacts"):
                         bus_now_ns = max(bus_now_ns, timestamp_ns(message))

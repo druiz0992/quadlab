@@ -11,6 +11,7 @@ algorithm should have.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any
 from types import MappingProxyType
 
 from .measurements import GpsReading
@@ -29,6 +30,9 @@ class SensorDescription:
     rate_hz: float | None
     mount_position_m: tuple[float, float, float] = (0.0, 0.0, 0.0)
     mount_quaternion_xyzw: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+    # Sensor calibration as from a calibration file (e.g. the magnetometer's
+    # offsets, correction, and local field), or None.
+    calibration: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)

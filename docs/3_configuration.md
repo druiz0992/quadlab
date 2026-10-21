@@ -1127,10 +1127,86 @@ vertical dipole 2 m beside a hover changed the measured z field by
 Rerun's **Magnetometer** tab shows the field and a level-compass yaw
 `atan2(m_x, m_y)` (valid only near level, ignoring declination). With
 `configs/sensors/magnetometer.json` in a hover the compass read 16.6° for a
-true heading of about 0°, typical of an uncalibrated compass. Not modelled:
+true heading of about 0°, typical of an uncalibrated compass (0.02° after calibration, below). Not modelled:
 induced (soft-iron) magnetization of structures, which is a fixed moment
 here, and anomalies with extent (fields of large bodies are approximated by
 one dipole).
+
+### Magnetometer calibration (`sensors.magnetometer.calibration`)
+
+Calibration removes the vehicle's own predictable distortions. It does not
+remove noise, drift after calibration, changes to the vehicle (payload,
+wiring), or anomalies in the environment, so filters should still treat the
+compass as imperfect. Real autopilots split the work three ways, and so does
+DroneLab:
+
+**1. Procedure: `dronelab-magcal`** (`experiments/magnetometer_calibration.py`),
+the simulated ground-station compass calibration:
+
+```bash
+dronelab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal
+dronelab ... --drone configs/sensors/magnetometer.json --drone outputs/magcal/magnetometer-calibration.json
+```
+
+- **Orientation dance:** Gazebo runs the configured vehicle with gravity
+  off. The drone is turned through `--orientations` (120) seeded random
+  orientations with the `set_pose` service, standing in for hand rotation,
+  and `--samples` readings are taken at each.
+- **Throttle sweep ("compassmot"):** held level, the total thrust command
+  steps from zero to maximum.
+- **Raw readings:** Gazebo supplies the Earth field; the mission's error,
+  battery, and battery-monitor models turn it into raw readings, exactly as
+  in flight. The interference regressor is the battery monitor's measured
+  current when the vehicle has one, else the commanded thrust.
+- **Evaluation:** every fifth orientation is held out and compared with the
+  true field.
+- **Outputs:** `magnetometer-calibration.json`, a layer to pass with
+  `--drone`, and `calibration-report.json` with fit quality, before/after
+  errors, and the injected truth.
+
+**2. Fitting** (`estimation/magnetometer_calibration.py`, transport-free):
+- **Hard and soft iron:** an ellipsoid fit by total least squares on a
+  general quadric. The centre is the hard-iron offset; the symmetric square
+  root of the shape, scaled to the local field strength, is the soft-iron
+  correction. A pure rotation is indistinguishable from the sensor mount.
+- **Interference:** a per-axis linear regression of readings on current or
+  thrust.
+
+**3. Use.** Corrected field b̂ = C (m − o − k_I·I − k_T·T):
+
+| Key | Units | Meaning |
+| --- | --- | --- |
+| `enabled` | | Apply the calibration and expose it to filters |
+| `hard_iron_offset_ut` | µT | Offset o |
+| `soft_iron_correction` | 3×3 | Correction matrix C |
+| `current_compensation_ut_per_a`, `thrust_compensation_ut_per_n` | µT/A, µT/N | Interference coefficients k_I, k_T |
+| `field_strength_ut`, `inclination_deg`, `declination_deg` | µT, deg | Local Earth field (defaults: Gazebo's field at the default site, as a geomagnetic model would give) |
+| `field_tolerance_ut` | µT | How far \|b̂\| may differ from the field strength before a reading is suspect |
+| `heading_std_deg` | deg | Residual heading uncertainty (set from the held-out evaluation) |
+
+When enabled, the autopilot side applies it like a driver:
+- **Corrected readings:** it uses the battery monitor's measured current
+  and the commanded total thrust, never true values. `MagnetometerReading`
+  on the sensor bus then carries `calibrated_field_ut` next to the raw
+  `field_ut`.
+- **Rerun:** logs `magnetometer/calibrated_ut` and
+  `magnetometer/calibrated_level_heading_deg`.
+- **Filters:** estimators receive the whole section, including field
+  strength, inclination, declination, tolerance, and heading uncertainty,
+  as `context.sensors["magnetometer"].calibration`.
+
+Verified with `configs/sensors/magnetometer.json` (default quad, no battery,
+so thrust regression):
+- **Speed:** the run took 20 s.
+- **Recovered values:**
+  - hard iron (4.04, −2.54, 1.49) µT against injected (4.0, −2.5, 1.5);
+  - soft iron to within 0.2 % (correction × distortion = identity);
+  - motor interference (0.145, −0.050, 0.099) µT/N against
+    (0.15, −0.05, 0.10).
+- **Held-out heading error:** 6.7° RMS (12.2° max) before, 0.84° RMS
+  (2.3° max) after. Field-magnitude error dropped from 2.5 to 0.28 µT.
+- **In a hover pointed at 0°:** the raw level compass read 16.6°, the
+  calibrated one 0.02° ± 0.64°.
 
 ## Rangefinder (`sensors.rangefinder`)
 
