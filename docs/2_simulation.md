@@ -16,6 +16,27 @@ simplified 1.54 kg rigid body with a 0.48 × 0.48 × 0.12 m box contact model
 (no propeller/arm collision geometry), and four `MulticopterMotorModel`
 rotors. It is not calibrated against a real vehicle.
 
+### Simulator environment audit
+
+What Gazebo (gz-sim 8.15, gz-physics 7.8, Jazzy) actually uses, compared
+with the Python models, measured on 2026-10-21 in a lockstep hover with
+the barometer and magnetometer on and their error models off. The
+regression test `test_gazebo_environment_matches_python_models` pins the
+measured values.
+
+| Item | Gazebo | Python side | Status |
+| --- | --- | --- | --- |
+| Gravity | `<gravity>0 0 -9.81</gravity>` | 9.81 m/s² everywhere | Consistent (project convention; normal gravity at the 40.4° N, 650 m site is ≈ 9.800 m/s², 0.1 % lower) |
+| Site | WGS84, 40.4168° N, 3.7038° W, 650 m, ENU, heading 0 | Live EKF requires exactly this frame form | Consistent |
+| GPS | NavSat converts with gz-math `LOCAL2` → WGS84 and adds the 650 m elevation | `sensors/geodesy.py` (exact ECEF → ENU) | Agrees to < 1 mm out to 28 km; GPS altitude = 650 m + z to 1 mm |
+| Barometer | Standard atmosphere (101 325 Pa, 288.15 K, 6.5 K/km) at 650 m + z | `sensors/barometer.py`, same model | Pressure agrees to 0.001 Pa; pressure altitude = GPS altitude to 1 mm |
+| Magnetic field | Internal table from latitude/longitude (world `<magnetic_field>` ignored): 25.613 µT north, 37.152 µT down | `sensors.magnetometer.calibration` defaults 45.1 µT, inclination 55.4°, declination 0° | Consistent with Gazebo; the real field here has about +1° declination |
+| Air density | Not used: rotor thrust is `motorConstant · ω²` | `aerodynamics.air_density_kg_m3` = 1.225 kg/m³ (sea level, 15 °C) | **Inconsistent with the site:** 1.150 kg/m³ at 650 m in the standard atmosphere, 1.095 kg/m³ at the 25 °C ambient. Python drag, fixed-wing, and rotor aerodynamic effects are 6–12 % stronger than at the site |
+| Temperature | Barometer uses the standard atmosphere (10.8 °C at 650 m) | `environment.ambient_temperature_c` = 25 °C for battery and IMU models | Two independent temperatures; nothing relates them |
+| Physics engine | DART (`gz-physics-dartsim-plugin`, observed in the `-v 4` log); collision detector and LCP solver are gz-physics defaults (ODE detector, Dantzig, according to its source; not observed) | — | Not set explicitly in the SDF |
+| Contacts | No `<surface>` parameters: SDF defaults (friction μ = 1, no restitution); DART contacts are rigid | Health checks only read contacts | Not tuned; touchdown and sliding are not calibrated |
+| Sensor timing | Sensors fire on the first physics step at or after their period, so a period that is not a multiple of the 2 ms step jitters: the 200 Hz IMU alternates 4 ms and 6 ms intervals (5 ms mean) | Estimators integrate with real timestamps; the IMU noise model scales white noise with the configured rate | Mean rate correct; per-sample noise is about ±10 % off its nominal level |
+
 ## Mission lifecycle
 
 `cli.gazebo` builds a `GazeboConfig` and calls `experiments.gazebo.run`. It

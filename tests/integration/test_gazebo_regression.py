@@ -369,3 +369,50 @@ def test_replay_reproduces_live_estimates(tmp_path):
     ).read_bytes()
     replayed = json.loads((tmp_path / "replay" / "metrics.json").read_text())
     assert replayed["estimation"] == live["metrics"]["estimation"]
+
+
+def test_gazebo_environment_matches_python_models(tmp_path, monkeypatch):
+    # Audited 2026-10-21 (docs/2_simulation.md#simulator-environment-audit):
+    # Gazebo's barometer and NavSat include the 650 m site elevation and
+    # agree with the Python atmosphere and geodesy models; the magnetic
+    # table gives 45.1 µT, inclination 55.4°, zero declination at Madrid;
+    # a 200 Hz IMU on 2 ms physics steps alternates 4 and 6 ms intervals.
+    from dronelab.sensors.barometer import pressure_to_altitude
+
+    stamp = lambda message: message.header.stamp  # noqa: E731
+    ns = lambda s: s.sec * 1_000_000_000 + s.nsec  # noqa: E731
+    baro = capture(monkeypatch, "log", "baro", lambda m, t: (t, m.pressure))
+    gps = capture(monkeypatch, "log", "gps", lambda m, t: (t, m.altitude))
+    field = capture(
+        monkeypatch,
+        "log",
+        "magnetometer",
+        lambda m, t: [m.field_tesla.x, m.field_tesla.y, m.field_tesla.z],
+    )
+    imu = capture(monkeypatch, "log", "imu", lambda m, t: ns(stamp(m)))
+    no_errors = {"error_model": {"enabled": False}}
+    fly(
+        tmp_path,
+        [
+            HOLD_1M,
+            "configs/sensors/baro.json",
+            "configs/sensors/magnetometer.json",
+            {"sensors": {"baro": no_errors, "magnetometer": no_errors}},
+        ],
+        4,
+    )
+    telemetry = jsonl(tmp_path / "run" / "telemetry.jsonl")
+    heights = {round(r["time"], 3): r["position"][2] for r in telemetry}
+    t, pressure = baro[-1]
+    assert pressure_to_altitude(pressure) == pytest.approx(
+        650 + heights[round(t, 3)], abs=0.01
+    )
+    t, altitude = gps[-1]
+    assert altitude == pytest.approx(650 + heights[round(t, 3)], abs=0.01)
+    # Level, facing east: sensor axes are world east/north/up.
+    np.testing.assert_allclose(
+        np.asarray(field[-1]) * 1e6, [0.0, 25.613, -37.152], atol=0.01
+    )
+    intervals_ms = set(np.diff(imu) // 1_000_000)
+    assert intervals_ms == {4, 6}
+    assert np.mean(np.diff(imu)) == pytest.approx(5e6, rel=0.01)
