@@ -139,7 +139,9 @@ rotors, a pusher, and `fixed_wing` surfaces, through a whole mission, so
 the airframe can be exercised. It is a baseline to replace with your own
 controllers, not a tuned autopilot. `configs/algorithms/quadplane_autopilot.json`
 selects it with a 300 m square route at 40 m. The mission reference
-position (`mission.center_m`) is home.
+position (`mission.center_m`) is home; the autopilot ignores the rest of
+the mission, so with `mission.type: none` home would be the start position
+instead (a different flight).
 
 | Mode | What flies |
 | --- | --- |
@@ -155,6 +157,22 @@ Its acceleration limit is 5 m/s²: in transition the wing already lifts
 about 42 N at α = 0, and with the default 2 m/s² limit the integral-free
 hover controller could not hold altitude.
 `summary.json.algorithms.controller_summary` records the mode log.
+
+**Tracking score.** The autopilot defines `tracking_reference`
+([7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms)): the
+closest point on the path segment of the current mode (vertical line above
+home in `hover` and `land`, home to the first waypoint in `transition`, the
+route leg in `cruise`, the straight line home in `return`; altitude only in
+`back_transition`). Tracking error is therefore cross-track distance, not
+distance from the mission's hold point (which made every run report
+`tracking_lost` with ~430 m errors), and velocity error counts only motion
+off the path; yaw is not scored. Measured on the default route (lockstep,
+site air density): within 0.2 m in the hover climb and 5 m in transition;
+in cruise mean 30 m and up to 65 m off the square, because L1 guidance at
+22 m/s and 35° roll (about 70 m minimum turn radius) swings wide of each
+90° corner; up to 17 m above cruise altitude while braking in
+`back_transition`. Overall tracking RMSE 20.7 m, and the 2 m
+`tracking_lost` check fires (from 44 s): a real finding for this baseline.
 
 ## Rotor-thrust command API
 

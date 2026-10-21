@@ -390,6 +390,8 @@ def _run(args, keyboard, command_source):
         mission,
         recorder.log_vector,
         true_biases,
+        # Controllers that fly their own route score against it instead.
+        tracking_reference=getattr(stack.controller, "tracking_reference", None),
     )
     # Flying past the ground plane's edge means nothing collides below.
     ground_half_m = scene.get("ground_size_m", 100.0) / 2

@@ -63,3 +63,12 @@ class RotorController(Protocol):
     # Optional: ``surface_commands() -> dict[str, float]`` returning aileron,
     # elevator, and rudder deflections (rad) for vehicles with ``fixed_wing``;
     # read after each attitude update and sent to the servos.
+    #
+    # Optional: ``tracking_reference(position_m, velocity_world_mps,
+    # quaternion_xyzw) -> ReferencePoint | None`` for controllers that fly
+    # their own route instead of the mission reference. Evaluation only
+    # (metrics.json control tracking and the tracking_lost health check):
+    # called with the true state at each odometry sample, it returns the
+    # point the controller is trying to be at (or None: not scored). It must
+    # not change the controller's state. Without it, tracking is scored
+    # against the mission reference.

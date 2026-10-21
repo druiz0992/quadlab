@@ -157,3 +157,41 @@ def test_plugin_errors_propagate_unchanged():
     # EstimatedState itself refuses NaN, so the plug-in's own call fails.
     with pytest.raises(ValueError, match="finite"):
         check_estimator(GoodEstimator, {"bad": "nan"}, duration_s=1)
+
+
+class RouteController(TemplateController):
+    """Template plus a tracking_reference hook (good or broken)."""
+
+    def __init__(self, context, options):
+        self.mode = options.pop("reference")
+        self._offset = 0.0
+        super().__init__(context, options)
+
+    def update_attitude(self, state):
+        return super().update_attitude(state) + self._offset
+
+    def tracking_reference(self, position_m, velocity_world_mps, quaternion_xyzw):
+        from dronelab.control.references import ReferencePoint
+
+        if self.mode == "none":
+            return None
+        if self.mode == "mutating":
+            self._offset += 1e-3  # changes the next command
+        value = np.nan if self.mode == "nan" else 0.0
+        return ReferencePoint(
+            np.asarray(position_m) + value, np.zeros(3), np.zeros(3), 0.0
+        )
+
+
+@pytest.mark.parametrize("mode", ["good", "none"])
+def test_valid_tracking_reference_passes(mode):
+    check_controller(RouteController, {"reference": mode})
+
+
+@pytest.mark.parametrize(
+    "mode, message",
+    [("nan", "finite 3-vectors"), ("mutating", "tracking_reference that changes")],
+)
+def test_broken_tracking_reference_is_caught(mode, message):
+    with pytest.raises(PluginContractError, match=message):
+        check_controller(RouteController, {"reference": mode})

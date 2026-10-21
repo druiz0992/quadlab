@@ -340,15 +340,21 @@ def test_quadplane_full_mission(tmp_path):
     )
     # Verified: lands within centimetres of home after the planned touchdown
     # (about 150 s at the site air density, 152 s at 1.225 kg/m³).
-    # tracking_lost (from 0.96 s, ~430 m) is expected: the preset's "hold at
-    # the origin" mission is what tracking is scored against, while the
-    # autopilot flies its own airfield route (same finding at both densities).
+    # Tracking is scored against the autopilot's own path (cross-track,
+    # tracking_reference): the baseline L1 guidance swings up to 65 m wide
+    # of the 300 m square's corners (~70 m minimum turn radius at 22 m/s and
+    # 35° roll), so tracking_lost is a real finding (from 44 s, transition).
     assert summary["completed"]
     assert summary["health"]["verdict"] == "warning", summary["health"]
     assert {f["kind"] for f in summary["health"]["findings"]} == {
         "ground_contact",
         "tracking_lost",
     }
+    control = summary["metrics"]["control"]
+    assert control["tracking_reference"] == "controller"
+    position = control["tracking"]["position_m"]
+    assert position["rmse"] == pytest.approx(20.7, abs=0.5)
+    assert position["max"] == pytest.approx(65.1, abs=1.0)
     x, y, z = summary["final_position"]
     assert np.hypot(x, y) < 1.0 and z < 0.5
 

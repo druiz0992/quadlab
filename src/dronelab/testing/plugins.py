@@ -27,7 +27,9 @@ noise) and checks the ``StateEstimator`` contract (estimation/interface.py):
 finite, non-negative, one per rotor, within the rotor limit unless
 ``saturated`` is set, sum to the weight within ``weight_tolerance``, and
 repeat exactly on a second run; ``setpoint_m`` is None or three finite
-numbers; ``allow_landing`` can be called.
+numbers; an optional ``tracking_reference`` returns None or a finite
+``ReferencePoint`` without changing the controller's output; ``allow_landing``
+can be called.
 
 Both raise ``PluginContractError`` (an AssertionError) with the reason,
 and return a report for further assertions. The data are synthetic and
@@ -326,10 +328,13 @@ def check_controller(
 ) -> ControllerReport:
     """Run the controller contract checks at hover (see module docs)."""
     first = _run_controller(factory, options or {}, vehicle, seconds)
-    second = _run_controller(factory, options or {}, vehicle, seconds)
+    second = _run_controller(
+        factory, options or {}, vehicle, seconds, probe_reference=True
+    )
     _fail(
         all(np.array_equal(a, b) for a, b in zip(first[1], second[1])),
-        "thrusts differ between two identical runs (hidden randomness or state)",
+        "thrusts differ between two identical runs (hidden randomness or "
+        "state, or a tracking_reference that changes the controller)",
     )
     report = first[0]
     _fail(
@@ -341,7 +346,7 @@ def check_controller(
     return report
 
 
-def _run_controller(factory, options, vehicle, seconds):
+def _run_controller(factory, options, vehicle, seconds, probe_reference=False):
     context = synthetic_context(vehicle=vehicle)
     controller = factory(context, dict(options))
     properties = context.vehicle
@@ -357,6 +362,8 @@ def _run_controller(factory, options, vehicle, seconds):
             np.zeros(3),
         )
         controller.update_position(state, reference, 0.02)
+        if probe_reference:
+            _check_tracking_reference(controller, state)
         thrust = np.asarray(controller.update_attitude(state), dtype=float)
         _check_thrust(thrust, properties, controller)
         history.append(thrust)
@@ -375,6 +382,32 @@ def _run_controller(factory, options, vehicle, seconds):
         bool(controller.saturated),
     )
     return report, history
+
+
+def _check_tracking_reference(controller: Any, state: ControlState) -> None:
+    """Optional evaluation hook: None or a finite ReferencePoint. (Called
+    every tick of the second run only, so a hook that changes controller
+    state fails the two-run comparison.)"""
+    method = getattr(controller, "tracking_reference", None)
+    if method is None:
+        return
+    reference = method(
+        state.position_m, state.velocity_world_mps, state.quaternion_xyzw
+    )
+    if reference is None:
+        return
+    _fail(
+        isinstance(reference, ReferencePoint),
+        "tracking_reference must return a ReferencePoint or None",
+    )
+    values = [
+        np.shape(reference.position_m) == (3,),
+        np.shape(reference.velocity_mps) == (3,),
+        bool(np.all(np.isfinite(reference.position_m))),
+        bool(np.all(np.isfinite(reference.velocity_mps))),
+        bool(np.isfinite(reference.yaw_rad)),
+    ]
+    _fail(all(values), "tracking_reference must give finite 3-vectors and yaw")
 
 
 def _check_thrust(thrust: np.ndarray, properties: DroneProperties, controller) -> None:

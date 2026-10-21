@@ -17,7 +17,14 @@ from ..estimation.interface import Innovation
 from ..evaluation.control import ControlMetrics
 from ..evaluation.estimation import BiasSource, EstimationMetrics
 from ..evaluation.truth import TruthHistory
+from ..control.references import ReferencePoint
 from .mission import MissionRunner
+
+# A controller's tracking_reference(position, velocity, quaternion) method.
+TrackingReference = Callable[
+    [NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]],
+    ReferencePoint | None,
+]
 
 AXIS = {"x": 0, "y": 1, "z": 2}
 
@@ -27,6 +34,10 @@ class RunEvaluation:
 
     ``log_vector(name, values, labels)`` records to Rerun (or a fake);
     ``true_biases`` gives the simulator's current IMU biases in body axes.
+    ``tracking_reference(position, velocity, quaternion)``, when given (a
+    controller's optional method, see control/interface.py), replaces the
+    mission reference for tracking errors; ``metrics.json`` records which
+    one was used under ``control.tracking_reference``.
     """
 
     def __init__(
@@ -36,6 +47,7 @@ class RunEvaluation:
         mission: MissionRunner,
         log_vector: Callable[..., None],
         true_biases: BiasSource | None = None,
+        tracking_reference: TrackingReference | None = None,
     ) -> None:
         algorithms = settings["algorithms"]
         self.truth = TruthHistory()
@@ -47,6 +59,7 @@ class RunEvaluation:
         )
         self.control = ControlMetrics(weight_n)
         self._mission = mission
+        self._tracking_reference = tracking_reference
         self._settings = settings
         self._log = log_vector
         self._first_ns: int | None = None
@@ -77,7 +90,7 @@ class RunEvaluation:
                 position_m,
                 velocity_mps,
                 quaternion_xyzw,
-                self._mission.sample(elapsed),
+                self._reference(elapsed, position_m, velocity_mps, quaternion_xyzw),
             )
             if errors is not None:
                 self._log("evaluation/tracking", list(errors.values()), list(errors))
@@ -85,6 +98,19 @@ class RunEvaluation:
             values = {k: v for k, v in scored.items() if k != "sim_time_s"}
             self._log("evaluation/estimation", list(values.values()), list(values))
         return errors
+
+    def _reference(
+        self,
+        elapsed_s: float,
+        position_m: NDArray[np.float64],
+        velocity_mps: NDArray[np.float64],
+        quaternion_xyzw: NDArray[np.float64],
+    ) -> ReferencePoint | None:
+        """The controller's own tracking reference if it has one, else the
+        mission reference (None before the mission starts)."""
+        if self._tracking_reference is not None:
+            return self._tracking_reference(position_m, velocity_mps, quaternion_xyzw)
+        return self._mission.sample(elapsed_s)
 
     def on_estimate(self, sample: Sample[EstimatedState]) -> None:
         self.estimates += 1
@@ -105,7 +131,12 @@ class RunEvaluation:
     def summary(self) -> dict[str, Any]:
         return dict(
             estimation=self.estimation.summary() if self.estimates else None,
-            control=self.control.summary(),
+            control=dict(
+                self.control.summary(),
+                tracking_reference=(
+                    "mission" if self._tracking_reference is None else "controller"
+                ),
+            ),
             step_response=self._step_response(),
         )
 

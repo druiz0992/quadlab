@@ -104,6 +104,14 @@ class MyController:
   after each attitude update and sent to the servos. The quadplane baseline
   autopilot ([4 Control](4_control.md#quadplane-baseline-autopilot)) is the
   example.
+- Controllers that fly their own route (not the mission reference) may
+  define `tracking_reference(position_m, velocity_world_mps,
+  quaternion_xyzw)` returning the `ReferencePoint` they are trying to be at,
+  or None. Evaluation then scores tracking (and `tracking_lost`) against it
+  instead of the mission, with the true state, and `metrics.json` records
+  `control.tracking_reference: "controller"` (otherwise `"mission"`). It
+  must only read state; the contract kit checks that. The quadplane
+  autopilot is the example (cross-track error to its current path segment).
 
 The built-ins (`ManualRotorController`, `GpsImuEkfEstimator`) follow
 exactly these contracts and are the reference examples.
@@ -165,7 +173,10 @@ def test_my_controller():
 - **`check_controller`** runs the hover reference on the nominal vehicle
   and checks: one finite, non-negative thrust per rotor, within the limit
   unless `saturated` is set; total thrust within 10 % of the weight;
-  a valid `setpoint_m`; `allow_landing()`; identical results on a rerun.
+  a valid `setpoint_m`; `allow_landing()`; identical results on a rerun
+  (the rerun also calls an optional `tracking_reference` every tick, which
+  must return None or a finite `ReferencePoint` and leave the output
+  unchanged).
 
 Failures raise `PluginContractError` (an `AssertionError`) with the reason;
 exceptions from the plug-in itself propagate unchanged. Passing means the
@@ -268,7 +279,9 @@ before comparing:
 
 **Control** (`evaluation/control.py`):
 - **Tracking error** against the reference at the same time: position,
-  horizontal, vertical, velocity, and yaw.
+  horizontal, vertical, velocity, and yaw. The reference is the mission's,
+  or the controller's own `tracking_reference` when it defines one
+  (`control.tracking_reference` says which).
 - **Maximum tilt.**
 - **Effort:** mean thrust-to-weight, RMS thrust deviation from weight, and
   mean rotor-thrust slew in N/s.
@@ -319,7 +332,7 @@ value seen), `subject` (e.g. the obstacle's model), and a `message`.
 | `incomplete` | failed | the run ended on an error before its duration (e.g. a stale estimate) |
 | `interrupted` | warning | Ctrl-C or SIGTERM (closing the keyboard window is a normal end) |
 | `ground_contact` | warning | a touchdown after at least `touchdown_gap_s` without contact; resting on the ground from the start is not one |
-| `tracking_lost` | warning | mission position error above `tracking_lost_m` for `tracking_lost_s`; a warning on purpose, so poor tracking stays in batch aggregates as a result |
+| `tracking_lost` | warning | tracking position error (mission or controller reference, see Metrics) above `tracking_lost_m` for `tracking_lost_s`; a warning on purpose, so poor tracking stays in batch aggregates as a result |
 | `left_ground_area` | warning | flew past the ground plane's edge (also `left_ground_area_s`) |
 | `saturated` | warning | more than `saturated_fraction` of non-warm-up commands saturated |
 | `dropped_messages` | warning | more than `max_dropped_messages` messages dropped (ingress queues plus command events) |

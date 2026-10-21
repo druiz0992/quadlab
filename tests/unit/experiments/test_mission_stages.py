@@ -289,3 +289,39 @@ def test_calibration_session_fails_fast_when_gazebo_exits(tmp_path):
     session.process = SimpleNamespace(poll=lambda: 1, returncode=1)
     with pytest.raises(RuntimeError, match="Gazebo exited"):
         session.fresh(3, timeout_s=3600)
+
+
+# run_evaluation ------------------------------------------------------------------
+
+
+def test_controller_tracking_reference_replaces_the_mission():
+    from dronelab.control.references import ReferencePoint
+    from dronelab.experiments.mission import MissionRunner
+    from dronelab.experiments.run_evaluation import RunEvaluation
+
+    data = settings()
+    calls = []
+
+    def reference(position, velocity, quaternion):
+        calls.append(position.copy())
+        return ReferencePoint(position + [0, 0, 1.0], velocity, np.zeros(3), 0.0)
+
+    q = np.array([0, 0, 0, 1.0])
+    for source, expected in ((reference, "controller"), (None, "mission")):
+        evaluation = RunEvaluation(
+            data,
+            15.0,
+            MissionRunner(data["mission"]),
+            lambda *a, **k: None,
+            tracking_reference=source,
+        )
+        errors = evaluation.on_truth(
+            0, np.array([1.0, 2, 3]), np.zeros(3), q, controlled=True
+        )
+        summary = evaluation.summary()["control"]
+        assert summary["tracking_reference"] == expected
+        if source is not None:
+            assert errors["position_m"] == pytest.approx(1.0)
+        else:
+            assert errors is None  # mission not started yet
+    assert len(calls) == 1

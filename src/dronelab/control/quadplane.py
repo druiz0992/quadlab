@@ -25,6 +25,16 @@ Modes (``mode``), advanced from the controller's own state:
 5. ``return`` then ``land``: hover back over home at cruise altitude, then
    descend at ``land_speed_mps`` to the ground.
 
+Tracking (evaluation only, ``tracking_reference``): the closest point on the
+path segment of the current mode, so the error is the distance off the
+path, not a lag behind a moving setpoint. Segments: the vertical line above
+home (hover, land), home to the first waypoint at cruise altitude
+(transition), the current route leg (cruise), and the straight line from
+where the return began to home (return). Back-transition brakes wherever it
+is, so only altitude is scored there. Reference velocity is the vehicle's
+own velocity along the segment (only off-path velocity counts) and yaw is
+not scored.
+
 Angles: roll φ about body +x (right wing down positive); "nose-up pitch"
 θ = −(FLU pitch). Surface signs follow simulation/fixed_wing.py (positive
 elevator is nose down, positive aileron rolls right wing down, positive
@@ -110,6 +120,7 @@ class QuadplaneController:
         self._hover_target: NDArray[np.float64] | None = None
         self._cruise_start: float | None = None
         self._pitch_integral = 0.0
+        self._return_start: NDArray[np.float64] | None = None
 
     # -- RotorController contract -------------------------------------------------
 
@@ -199,6 +210,7 @@ class QuadplaneController:
             self.mode == "back_transition"
             and np.linalg.norm(state.velocity_world_mps) < 1.0
         ):
+            self._return_start = p[:2].copy()
             self._set_mode("return")
         elif self.mode == "return" and np.linalg.norm(p[:2] - self._home[:2]) < 1.0:
             self.hover.allow_landing()
@@ -361,6 +373,60 @@ class QuadplaneController:
             "elevator": float(elevator),
             "rudder": float(rudder),
         }
+
+    # -- evaluation ---------------------------------------------------------------
+
+    def tracking_reference(
+        self,
+        position_m: NDArray[np.float64],
+        velocity_world_mps: NDArray[np.float64],
+        quaternion_xyzw: NDArray[np.float64],
+    ) -> ReferencePoint | None:
+        """Closest point on the current path segment (see module docs);
+        None before the first position update. Reads state only."""
+        if self._home is None:
+            return None
+        p = np.asarray(position_m, float)
+        v = np.asarray(velocity_world_mps, float)
+        yaw = float(Rotation.from_quat(quaternion_xyzw).as_euler("ZYX")[0])
+        segment = self._path_segment()
+        if segment is None:  # altitude hold only
+            altitude = self._home[2] + self.o["cruise_altitude_m"]
+            return ReferencePoint(
+                np.array([p[0], p[1], altitude]),
+                np.array([v[0], v[1], 0.0]),
+                np.zeros(3),
+                yaw,
+            )
+        start, end = segment
+        leg = end - start
+        length = float(np.linalg.norm(leg))
+        unit = leg / length if length > 1e-9 else np.zeros(3)
+        along = float(np.clip((p - start) @ unit, 0.0, length))
+        return ReferencePoint(start + unit * along, (v @ unit) * unit, np.zeros(3), yaw)
+
+    def _path_segment(
+        self,
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]] | None:
+        """(start, end) of the segment flown now, or None (altitude hold)."""
+        home = self._home
+        altitude = home[2] + self.o["cruise_altitude_m"]
+
+        def at_altitude(xy: NDArray[np.float64]) -> NDArray[np.float64]:
+            return np.array([xy[0], xy[1], altitude])
+
+        if self.mode in ("hover", "land"):
+            return home.copy(), at_altitude(home[:2])
+        if self.mode == "transition":
+            return at_altitude(home[:2]), at_altitude(self._route[0])
+        if self.mode == "cruise" and self._waypoint < len(self._route):
+            return (
+                at_altitude(self._previous_wp),
+                at_altitude(self._route[self._waypoint]),
+            )
+        if self.mode == "return" and self._return_start is not None:
+            return at_altitude(self._return_start), at_altitude(home[:2])
+        return None
 
     def summary(self) -> dict[str, Any]:
         return dict(

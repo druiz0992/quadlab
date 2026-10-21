@@ -91,3 +91,32 @@ def test_l1_turns_around_for_a_target_behind():
     c._previous_wp = np.array([0.0, 0.0])
     c.update_position(state(0, [0, 0, 40], [22, 0, 0], airspeed=22), HOME, 0.02)
     assert c._roll_cmd == pytest.approx(-math.radians(c.o["max_roll_deg"]))
+
+
+def test_tracking_reference_is_the_closest_point_on_the_current_segment():
+    q = Rotation.identity().as_quat()
+    c = controller(cruise_altitude_m=40.0, route_m=[[300, 0], [300, 300]])
+    assert c.tracking_reference(np.zeros(3), np.zeros(3), q) is None  # no home yet
+    c.update_position(state(0, [0, 0, 2]), HOME, 0.02)
+    # Hover climb: vertical line above home; only horizontal offset counts.
+    ref = c.tracking_reference(np.array([0.5, 0, 10]), np.array([0, 0, 2.0]), q)
+    np.testing.assert_allclose(ref.position_m, [0, 0, 10])
+    np.testing.assert_allclose(ref.velocity_mps, [0, 0, 2])
+    # Cruise on the first leg, 3 m north of it and 1 m low: projection.
+    c.mode, c._previous_wp, c._waypoint = "cruise", np.array([100.0, 0]), 0
+    ref = c.tracking_reference(np.array([150, 3, 39]), np.array([22, 1, 0.0]), q)
+    np.testing.assert_allclose(ref.position_m, [150, 0, 40])
+    np.testing.assert_allclose(ref.velocity_mps, [22, 0, 0])  # along-leg only
+    # Past the end of the leg the reference stays at the waypoint.
+    ref = c.tracking_reference(np.array([320, 0, 40]), np.zeros(3), q)
+    np.testing.assert_allclose(ref.position_m, [300, 0, 40])
+    # Back-transition: altitude only.
+    c.mode = "back_transition"
+    ref = c.tracking_reference(np.array([5, 6, 38]), np.array([3, 4, 1.0]), q)
+    np.testing.assert_allclose(ref.position_m, [5, 6, 40])
+    np.testing.assert_allclose(ref.velocity_mps, [3, 4, 0])
+    # Return: straight line from where it began to home.
+    c.mode, c._return_start = "return", np.array([0.0, 300])
+    ref = c.tracking_reference(np.array([2, 150, 40]), np.zeros(3), q)
+    np.testing.assert_allclose(ref.position_m, [0, 150, 40])
+    assert c.mode == "return" and c._waypoint == 0  # state untouched
