@@ -108,7 +108,16 @@ class GazeboRerunRecorder:
 
         layout = blueprint.Blueprint(
             blueprint.Horizontal(
-                blueprint.Spatial3DView(origin="world", name="World and drone"),
+                # The ground is the view's line grid, not logged geometry:
+                # Rerun frames the initial camera on the scene's bounds, and a
+                # 100 m ground box made it start zoomed far out.
+                blueprint.Spatial3DView(
+                    origin="world",
+                    name="World and drone",
+                    line_grid=blueprint.LineGrid3D(
+                        visible=True, spacing=1.0, color=[100, 120, 100, 160]
+                    ),
+                ),
                 blueprint.Vertical(
                     blueprint.Spatial2DView(origin="camera", name="Drone camera"),
                     blueprint.Tabs(
@@ -171,15 +180,6 @@ class GazeboRerunRecorder:
                 ),
                 static=True,
             )
-        rr.log(
-            "world/ground",
-            rr.Boxes3D(
-                centers=[[0, 0, -0.05]],
-                half_sizes=[[50, 50, 0.05]],
-                colors=[100, 120, 100],
-            ),
-            static=True,
-        )
         # Read geometry from the actual SDF, including saved edits. World pose
         # messages update these entities if they are moved while the run is live.
         sdf = ET.parse(world)

@@ -298,7 +298,9 @@ Select the `sim_time` timeline in Rerun. Rerun shows the blue truth vehicle
 and path, the magenta EKF vehicle and path with `--ekf`, forward arrows for
 body +X, an **EKF vs truth** tab, and a **Rotor thrust targets (N)** tab in
 thrust modes. Displayed paths keep at most 2,000 vertices; files keep every
-sample. Scalar time series are buffered and sent in batches covering 0.1 s
+sample. The ground is drawn as the 3D view's 1 m line grid rather than a
+logged 100 m box, so the initial camera frames the drone and nearby
+obstacles instead of the whole ground. Scalar time series are buffered and sent in batches covering 0.1 s
 of simulation time (every sample and timestamp is kept), so a live viewer
 shows them up to that much later than 3D poses. Rerun loads box visuals from the world at startup and tracks model
 poses; objects added or removed during flight, meshes, non-box shapes, and
