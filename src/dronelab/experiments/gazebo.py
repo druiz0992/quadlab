@@ -1200,7 +1200,15 @@ def _run(args, keyboard, command_source):
                     evaluation.on_innovations(innovations)
                 if live_ekf is not None:
                     live_ekf.ingest(
-                        kind, message, received_at=received_at, gps_dropped=gps_dropped
+                        kind,
+                        message,
+                        received_at=received_at,
+                        gps_dropped=gps_dropped,
+                        calibrated=(
+                            calibrated_imu[:2]
+                            if kind == "imu" and calibrated_imu is not None
+                            else None
+                        ),
                     )
                     drain_estimates()
                 if kind == "odometry":

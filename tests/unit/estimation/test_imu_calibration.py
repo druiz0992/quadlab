@@ -141,3 +141,56 @@ def test_static_calibration_world_and_gravity(tmp_path):
     root = ET.parse(write_static_world(config, tmp_path)).getroot()
     assert root.find(".//model[@name='drone']").findtext("static") == "true"
     assert root.find("world").findtext("gravity") == "0 0 -9.81"
+
+
+def test_calibration_priors_override_ekf_defaults_only_when_enabled():
+    from dronelab.estimation.gps_imu_ekf.plugin import with_calibrated_priors
+
+    ekf = load_drone_config().data["ekf"]
+    calibration = dict(filter_accel_bias_std_mps2=0.05, filter_gyro_bias_std_rad_s=4e-4)
+    tightened = with_calibrated_priors(ekf, calibration)
+    assert tightened["initial_accel_bias_std_mps2"] == 0.05
+    assert tightened["initial_gyro_bias_std_rad_s"] == 4e-4
+    assert ekf["initial_accel_bias_std_mps2"] == 0.2  # input untouched
+    assert with_calibrated_priors(ekf, None) == ekf  # bypassed: defaults
+    partial = with_calibrated_priors(
+        ekf, dict(filter_accel_bias_std_mps2=None, filter_gyro_bias_std_rad_s=1e-3)
+    )
+    assert partial["initial_accel_bias_std_mps2"] == 0.2
+
+
+def test_live_ekf_uses_calibrated_imu_values():
+    from types import SimpleNamespace as NS
+
+    from dronelab.core.measurements import GpsReading
+    from dronelab.experiments.live_ekf import LiveEkf
+
+    settings = load_drone_config().data
+    live = LiveEkf(settings, GpsReading(40.4168, -3.7038, 650.0), monotonic=lambda: 0.0)
+    received = []
+    live.node.on_imu = lambda sample: received.append(sample.payload)
+    stamp = NS(sec=0, nsec=5_000_000)
+    message = NS(
+        header=NS(stamp=stamp),
+        linear_acceleration=NS(x=1.0, y=0.0, z=9.0),
+        angular_velocity=NS(x=0.1, y=0.0, z=0.0),
+    )
+    live.ingest(
+        "imu", message, received_at=0.0, calibrated=([0.0, 0.0, 9.81], [0.0, 0.0, 0.0])
+    )
+    live.ingest(
+        "gps",
+        NS(
+            header=NS(stamp=NS(sec=0, nsec=6_000_000)),
+            latitude_deg=40.4168,
+            longitude_deg=-3.7038,
+            altitude=650.0,
+        ),
+        received_at=0.0,
+    )
+    assert received and received[0].best_specific_force_mps2.tolist() == [
+        0.0,
+        0.0,
+        9.81,
+    ]
+    assert received[0].specific_force_mps2.tolist() == [1.0, 0.0, 9.0]

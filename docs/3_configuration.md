@@ -436,6 +436,7 @@ otherwise they are zero.
 | `gyro_offset_rad_s`, `gyro_g_sensitivity` | rad/s, (rad/s)/(m/s²) | b_g and G |
 | `reference_temperature_c` | °C | T_ref |
 | `startup_gyro_calibration_s` | s | Average the corrected gyro this long after power-up (0: off). Needs `simulation.start_on_ground`; take-off waits, with motors off |
+| `filter_accel_bias_std_mps2`, `filter_gyro_bias_std_rad_s` | m/s², rad/s | Remaining bias uncertainty after calibration (1-σ), for filters' initial bias covariance; null: filter defaults |
 | `fingerprint` | | Settings the calibration was made for (below) |
 
 When enabled, the autopilot side applies it like a driver:
@@ -445,8 +446,17 @@ When enabled, the autopilot side applies it like a driver:
   `calibrated_specific_force_mps2`, `calibrated_angular_rate_rad_s`, and
   `temperature_c` next to the raw values. `best_specific_force_mps2` and
   `best_angular_rate_rad_s` return the calibrated values when present.
-- **Consumers:** the built-in EKF and estimate-driven body rates use the
-  calibrated values.
+- **Consumers:** the built-in EKF, both as a plug-in and through `--ekf`,
+  and estimate-driven body rates use the calibrated values.
+- **EKF priors:** the EKF's bias states then track only the residual, so
+  its initial bias uncertainty is taken from `filter_*_bias_std` instead of
+  the `ekf` section. `dronelab-imucal` writes these as
+  √(residual² + turn-on repeatability² + bias instability²) per instrument.
+  The repeatability and instability are datasheet values, read from the
+  error model by the tool, never by the filter. The gyro omits turn-on
+  repeatability when the startup calibration removes it. Bypassing the
+  calibration restores the `ekf` defaults, and the summary's estimator
+  section shows the priors used.
 - **Rerun:** logs `imu/calibrated/*`; `summary.json` records the measured
   startup gyro bias.
 
@@ -460,9 +470,12 @@ procedure took 17 s:
 - **Static errors:** accelerometer 0.21 → 0.009 m/s², gyro
   0.0051 → 0.0007 rad/s.
 - **In a 30 s lockstep flight from the ground, with the EKF scored:**
-  - attitude RMSE 8.7° bypassed → 2.35° calibrated,
-  - gyro bias error 0.0074 → 0.0021 rad/s,
-  - accelerometer bias error 0.24 → 0.034 m/s².
+  - attitude RMSE 8.7° bypassed → 2.35° calibrated with default priors →
+    0.49° with the calibration's priors (0.050 m/s², 0.0004 rad/s against
+    defaults 0.2 and 0.02),
+  - gyro bias error 0.0074 → 0.0021 → 0.0003 rad/s,
+  - accelerometer bias error 0.24 → 0.034 → 0.030 m/s²,
+  - the `--ekf` path, now also calibrated, matched it (0.49°).
 
   Position stayed about 1.8 m, dominated by the correlated GPS error of
   `sensor_errors.json`.

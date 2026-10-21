@@ -17,11 +17,20 @@ The simulated counterpart of an autopilot's accelerometer calibration
    specific force per pose (nominal mount, as an operator knows it).
 
 Outputs: ``imu-calibration.json`` (a config layer with
-``sensors.imu.calibration`` and the settings fingerprint) and
+``sensors.imu.calibration``, the settings fingerprint, and filter priors) and
 ``calibration-report.json`` (fit residuals, before/after static errors, and
 the injected truth for comparison). Stored offsets include this run's
 turn-on biases; enable ``startup_gyro_calibration_s`` to refresh the gyro
 bias at every mission start.
+
+**Filter priors.** The remaining bias uncertainty a filter should start
+with is, per instrument and axis, √(r² + t² + i²): r the calibration's
+static residual (evaluation, per axis), t the turn-on bias repeatability
+and i the bias instability from the IMU's datasheet (here the configured
+error model; the procedure plays the operator, the filter only sees the
+result). For the gyro, t is left out when the startup calibration is on,
+which removes the turn-on bias at every power-up. Written as
+``filter_accel_bias_std_mps2`` and ``filter_gyro_bias_std_rad_s``.
 """
 
 from collections.abc import Sequence
@@ -154,8 +163,10 @@ def run_imu_calibration(
     calibration = ImuCalibration.fit_static(
         data["accel"], data["gyro"], data["force"], data["temperature"]
     ).with_startup(startup_gyro_s)
+    evaluation = _evaluate(data, calibration)
     section = calibration.to_config()
     section["fingerprint"] = sensor_fingerprint(sensors, "imu")
+    section.update(_filter_priors(sensors["imu"], evaluation["after"], startup_gyro_s))
     (output / "imu-calibration.json").write_text(
         json.dumps({"sensors": {"imu": {"calibration": section}}}, indent=2) + "\n"
     )
@@ -163,7 +174,11 @@ def run_imu_calibration(
         fit=calibration.fit,
         poses=len(poses),
         ambient_temperatures_c=[a for a in ambients if a is not None],
-        evaluation=_evaluate(data, calibration),
+        evaluation=evaluation,
+        filter_priors={
+            k: section[k]
+            for k in ("filter_accel_bias_std_mps2", "filter_gyro_bias_std_rad_s")
+        },
         injected_truth=_truth(sensors, pipeline),
     )
     (output / "calibration-report.json").write_text(json.dumps(report, indent=2) + "\n")
@@ -188,6 +203,34 @@ def _collect(
             # Known specific force in sensor axes (fixture orientation, nominal mount).
             rows["force"].append((pose * mount).inv().apply([0.0, 0.0, GRAVITY_MPS2]))
     return {k: np.asarray(v, float) for k, v in rows.items()}
+
+
+def _filter_priors(
+    imu: dict, residual: dict, startup_gyro_s: float
+) -> dict[str, float]:
+    """Initial bias uncertainty after calibration (see module docs)."""
+    errors, imperfections = imu["error_model"], imu["imperfections"]
+
+    def datasheet(key: str, section: dict) -> float:
+        return float(np.max(section[key])) if section["enabled"] else 0.0
+
+    accel = np.sqrt(
+        (residual["accel_error_rms_mps2"] / np.sqrt(3)) ** 2
+        + datasheet("accel_turn_on_bias_std_mps2", errors) ** 2
+        + datasheet("accel_bias_instability_mps2", imperfections) ** 2
+    )
+    turn_on = (
+        0.0 if startup_gyro_s > 0 else datasheet("gyro_turn_on_bias_std_rad_s", errors)
+    )
+    gyro = np.sqrt(
+        (residual["gyro_error_rms_rad_s"] / np.sqrt(3)) ** 2
+        + turn_on**2
+        + datasheet("gyro_bias_instability_rad_s", imperfections) ** 2
+    )
+    return dict(
+        filter_accel_bias_std_mps2=float(max(accel, 1e-4)),
+        filter_gyro_bias_std_rad_s=float(max(gyro, 1e-5)),
+    )
 
 
 def _evaluate(data, calibration) -> dict[str, Any]:

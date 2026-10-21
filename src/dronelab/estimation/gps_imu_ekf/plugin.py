@@ -20,6 +20,22 @@ from .ekf import GpsImuEkf
 from .node import GpsImuEkfNode
 
 
+def with_calibrated_priors(
+    options: Mapping[str, Any], imu_calibration: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """EKF options with the initial bias uncertainty an enabled IMU
+    calibration declares (``filter_*_bias_std``); unchanged without one."""
+    result = dict(options)
+    if imu_calibration:
+        for source, target in (
+            ("filter_accel_bias_std_mps2", "initial_accel_bias_std_mps2"),
+            ("filter_gyro_bias_std_rad_s", "initial_gyro_bias_std_rad_s"),
+        ):
+            if imu_calibration.get(source) is not None:
+                result[target] = imu_calibration[source]
+    return result
+
+
 def make_ekf(options: Mapping[str, Any]) -> GpsImuEkf:
     """Construct the filter from declared priors (never simulator truth)."""
     e = options
@@ -60,6 +76,13 @@ class GpsImuEkfEstimator:
             if kind not in context.sensors:
                 raise ValueError(f"gps_imu_ekf needs the {kind} sensor enabled")
         imu, gps = context.sensors["imu"], context.sensors["gps"]
+        # A calibrated IMU has smaller remaining biases: tighter priors.
+        options = with_calibrated_priors(options, imu.calibration)
+        self.priors = dict(
+            accel_bias_std_mps2=options["initial_accel_bias_std_mps2"],
+            gyro_bias_std_rad_s=options["initial_gyro_bias_std_rad_s"],
+            calibrated_imu=imu.calibration is not None,
+        )
         if any(imu.mount_position_m):
             raise ValueError(
                 "gps_imu_ekf requires a body-origin IMU (rotation allowed)"
@@ -108,4 +131,5 @@ class GpsImuEkfEstimator:
             gps_outliers=ekf.rejected_gps,
             rejected_gps_timing=self.node.rejected_gps_timing,
             initialization="declared ekf priors; no simulator truth",
+            priors=self.priors,
         )

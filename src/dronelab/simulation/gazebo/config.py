@@ -215,6 +215,10 @@ DEFAULTS = {
                 # Average the gyro this long after power-up (vehicle still on
                 # the ground; take-off waits). 0: off.
                 "startup_gyro_calibration_s": 0.0,
+                # Remaining bias uncertainty after this calibration, for
+                # filters' initial bias covariance (1-σ); null: filter default.
+                "filter_accel_bias_std_mps2": None,
+                "filter_gyro_bias_std_rad_s": None,
                 # Settings the calibration was made for (sensor_fingerprint).
                 "fingerprint": "",
             },

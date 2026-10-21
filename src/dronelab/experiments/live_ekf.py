@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation
 
 from ..core.measurements import GpsReading, ImuReading
 from ..estimation.gps_imu_ekf import GpsImuEkfNode
-from ..estimation.gps_imu_ekf.plugin import make_ekf
+from ..estimation.gps_imu_ekf.plugin import make_ekf, with_calibrated_priors
 from ..sensors.streams import Publisher
 from ..simulation.gazebo.messages import timestamp_ns, vector
 
@@ -53,7 +53,10 @@ class LiveEkf:
 
     def __init__(self, settings, reference, *, monotonic=time.monotonic):
         validate_live_settings(settings)
-        self.settings = settings["ekf"]
+        calibration = settings["sensors"]["imu"]["calibration"]
+        self.settings = with_calibrated_priors(
+            settings["ekf"], calibration if calibration["enabled"] else None
+        )
         self._now = monotonic
         imu, gps = settings["sensors"]["imu"], settings["sensors"]["gps"]
         ekf = make_ekf(self.settings)
@@ -83,11 +86,15 @@ class LiveEkf:
         self._closed = False
         self.stats = Counter()
 
-    def ingest(self, kind, message, *, received_at=None, gps_dropped=False):
+    def ingest(
+        self, kind, message, *, received_at=None, gps_dropped=False, calibrated=None
+    ):
         """Accept raw arrival timing; a modeled lost GPS fix supplies no payload.
 
         Dropped-fix timing advances the reorder watermark and transport health
         only. The estimator continues IMU prediction without GPS correction.
+        ``calibrated`` (specific force, angular rate) are driver-calibrated
+        IMU values, used instead of the raw message when given.
         """
         if self._closed:
             raise RuntimeError("Live EKF closed")
@@ -99,8 +106,18 @@ class LiveEkf:
         if kind == "gps" and gps_dropped:
             sample = None
         elif kind == "imu":
-            payload = ImuReading(
-                vector(message.linear_acceleration), vector(message.angular_velocity)
+            raw = (
+                vector(message.linear_acceleration),
+                vector(message.angular_velocity),
+            )
+            payload = (
+                ImuReading(*raw)
+                if calibrated is None
+                else ImuReading(
+                    *raw,
+                    calibrated_specific_force_mps2=calibrated[0],
+                    calibrated_angular_rate_rad_s=calibrated[1],
+                )
             )
         else:
             payload = GpsReading(
@@ -161,6 +178,10 @@ class LiveEkf:
             rejected_gps_timing=self.node.rejected_gps_timing,
             pending_at_close=len(self._pending),
             initialization="declared ekf priors; no simulator truth",
+            priors=dict(
+                accel_bias_std_mps2=self.settings["initial_accel_bias_std_mps2"],
+                gyro_bias_std_rad_s=self.settings["initial_gyro_bias_std_rad_s"],
+            ),
             control_feedback="simulator ground truth",
         )
 
