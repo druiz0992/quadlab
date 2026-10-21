@@ -175,7 +175,7 @@ class EstimateStateSource:
     def on_delivered(self, kind: str, sample: Sample) -> None:
         if kind == "imu":
             self._gyro_body = self._imu_rotation.apply(
-                sample.payload.angular_rate_rad_s
+                sample.payload.best_angular_rate_rad_s
             )
         elif kind == "airspeed":
             self._airspeed = sample.payload.indicated_airspeed_mps

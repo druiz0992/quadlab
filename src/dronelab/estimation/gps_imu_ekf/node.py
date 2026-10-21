@@ -120,8 +120,9 @@ class GpsImuEkfNode:
             if previous is not None and sample.sim_time_ns - previous[2] > 100_000_000:
                 raise ValueError("IMU interval exceeds 0.1 seconds")
             current = (
-                self.imu_rotation.apply(sample.payload.specific_force_mps2),
-                self.imu_rotation.apply(sample.payload.angular_rate_rad_s),
+                # Driver-calibrated values when the IMU has a calibration.
+                self.imu_rotation.apply(sample.payload.best_specific_force_mps2),
+                self.imu_rotation.apply(sample.payload.best_angular_rate_rad_s),
             )
             if self._time is not None:
                 dt = (sample.sim_time_ns - self._time) * 1e-9

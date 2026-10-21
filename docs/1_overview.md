@@ -36,7 +36,7 @@ truth; it is used only to synthesize measurements and to score runs.
 ```text
 src/dronelab/
 ├── cli/                    # Argument parsing: `dronelab` (gazebo.py), `dronelab-batch`
-│                           #   (batch.py), `dronelab-magcal` (magcal.py)
+│                           #   (batch.py), `dronelab-magcal` (magcal.py), `dronelab-imucal`
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
 │                           #   measurement samples, rotor commands
 ├── sensors/                # Synthetic models, Gazebo decoding, geodesy, in-process
@@ -51,13 +51,14 @@ src/dronelab/
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
+│   ├── imu_calibration.py  # Static IMU fit and calibration driver
 │   ├── dead_reckoning.py   # Retained IMU dead-reckoning baseline
 │   └── gps_imu_ekf/
 │       ├── ekf.py          # Numerical prediction and correction
 │       ├── node.py         # Timestamp/frame adaptation and EKF state channel
 │       └── plugin.py       # The EKF as an estimator plug-in
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,
-│                           #   truth interpolation
+│                           #   truth interpolation, effective IMU bias
 ├── control/
 │   ├── interface.py        # RotorController plug-in contract, ControlState
 │   ├── references.py       # Mission reference trajectories (analytic derivatives)
@@ -94,6 +95,8 @@ src/dronelab/
 │   ├── run_evaluation.py   # Per-run metrics (metrics.json)
 │   ├── batch.py            # Seed/parameter sweeps, aggregation, baselines
 │   ├── magnetometer_calibration.py  # Automated calibration run (dronelab-magcal)
+│   ├── imu_calibration.py  # Automated IMU calibration run (dronelab-imucal)
+│   ├── calibration_session.py  # Shared Gazebo pose/sensor session for calibrations
 │   └── live_ekf.py         # Bounded live IMU/GPS ordering and EKF composition
 └── visualization/
     ├── gazebo_rerun.py     # Gazebo-message-to-Rerun recording adapter
@@ -163,7 +166,8 @@ must be an explicit, recorded experiment decision.
 ## Conventions
 
 - **Units and frames:** SI units; right-handed z-up world; gravity
-  (0, 0, -9.81) m/s². Body frame: +X forward, +Y left, +Z up.
+  (0, 0, -9.81) m/s², set explicitly in generated worlds (Gazebo's own
+  default is 9.8). Body frame: +X forward, +Y left, +Z up.
 - **Attitude:** quaternions (x, y, z, w) rotate body vectors into world.
 - **IMU:** gyros report body/sensor angular velocity; accelerometers measure
   specific force Rᵀ(a − g), so a level hover reads about +9.81 m/s² on z.

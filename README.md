@@ -188,6 +188,13 @@ dronelab-magcal --drone configs/sensors/magnetometer.json --output outputs/magca
 dronelab --headless --control-mode rotor-thrust --drone configs/sensors/magnetometer.json \
   --drone outputs/magcal/magnetometer-calibration.json --duration 20 --output outputs/calibrated
 
+# IMU calibration once (static poses at 5/25/45 °C, startup gyro bias), then reuse the layer;
+# configs/sensors/no_calibration.json (last) bypasses all calibrations
+dronelab-imucal --drone configs/sensors/imu_consumer_mems.json --startup-gyro-s 2 --output outputs/imucal
+dronelab --headless --control-mode rotor-thrust --drone configs/sensors/imu_consumer_mems.json \
+  --drone configs/scenarios/ground_start.json --drone outputs/imucal/imu-calibration.json \
+  --duration 20 --output outputs/imu-calibrated
+
 # Worlds: generate only, edit paused in Gazebo, fly a saved world
 dronelab --generate-only --output outputs/world-preview
 dronelab --edit --scene worlds/circuit.json --output outputs/circuit-editor

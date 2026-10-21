@@ -383,6 +383,107 @@ attitude error (0.18° → 0.36° RMSE) and raised NEES from 11 to 281. The
 EKF does not model these errors, so it becomes inconsistent. 7 of
 6,004 samples were lost.
 
+### IMU calibration (`sensors.imu.calibration`)
+
+The IMU counterpart of the magnetometer calibration. On real drones it
+follows the same pattern:
+- **Factory or six-position calibration:** done once, for accelerometer
+  offset, scale, and misalignment.
+- **Optional thermal calibration:** for temperature drift.
+- **Gyro bias at every power-up:** averaged while the vehicle is still,
+  because the turn-on bias changes each time.
+- **In flight:** the EKF estimates what is left.
+
+**1. Procedure: `dronelab-imucal`** (`experiments/imu_calibration.py`):
+
+```bash
+dronelab-imucal --drone configs/sensors/imu_consumer_mems.json --startup-gyro-s 2 --output outputs/imucal
+```
+
+The configured vehicle is made static, as if held by a fixture, with
+gravity on. It is set into the six axis-aligned orientations plus
+`--extra-poses` (12) seeded tilted ones, and `--samples` (40) readings are
+averaged per pose. With `sensors.imu.temperature` enabled, the whole set is
+repeated at 5, 25, and 45 °C ambient, a fridge-to-warm-room sweep, using the
+die temperature the IMU reports.
+
+Readings go through the mission's IMU models (imperfections, Allan errors,
+temperature, saturation). Motors are off, so vibration and scheduled faults
+are left out. The known specific force per pose uses the nominal mount, as
+an operator knows it.
+
+Outputs: `imu-calibration.json`, a layer for `--drone`, and
+`calibration-report.json` with fit residuals, before/after static errors,
+and the injected truth for comparison. Rate-table quantities, meaning gyro
+scale and misalignment, need a turntable and are not calibrated.
+
+**2. Fitting** (`estimation/imu_calibration.py`): per axis, a linear least
+squares on static samples:
+- accelerometer: a = A·f + b + k·(T − T_ref),
+- gyro: ω = G·f + b + k·(T − T_ref).
+
+The temperature slopes are only identifiable when temperatures vary;
+otherwise they are zero.
+
+**3. Use.** f̂ = A⁻¹(a − b_a − k_a ΔT) and
+ω̂ = ω − b_g − k_g ΔT − G f̂ − b_startup:
+
+| Key | Units | Meaning |
+| --- | --- | --- |
+| `enabled` | | Apply the calibration |
+| `accel_offset_mps2`, `accel_correction` | m/s², 3×3 | b_a and A⁻¹ |
+| `accel_temperature_mps2_per_c`, `gyro_temperature_rad_s_per_c` | per °C | Temperature slopes k |
+| `gyro_offset_rad_s`, `gyro_g_sensitivity` | rad/s, (rad/s)/(m/s²) | b_g and G |
+| `reference_temperature_c` | °C | T_ref |
+| `startup_gyro_calibration_s` | s | Average the corrected gyro this long after power-up (0: off). Needs `simulation.start_on_ground`; take-off waits, with motors off |
+| `fingerprint` | | Settings the calibration was made for (below) |
+
+When enabled, the autopilot side applies it like a driver:
+- **Inputs:** it uses the die temperature the IMU reports (when the
+  temperature model is on).
+- **Sensor bus:** `ImuReading` then carries
+  `calibrated_specific_force_mps2`, `calibrated_angular_rate_rad_s`, and
+  `temperature_c` next to the raw values. `best_specific_force_mps2` and
+  `best_angular_rate_rad_s` return the calibrated values when present.
+- **Consumers:** the built-in EKF and estimate-driven body rates use the
+  calibrated values.
+- **Rerun:** logs `imu/calibrated/*`; `summary.json` records the measured
+  startup gyro bias.
+
+Verified with the consumer-MEMS, Allan-error, and cold-weather layers. The
+procedure took 17 s:
+- **Accelerometer:** scale and misalignment recovered to within 0.014 %
+  (correction × distortion = identity); temperature slopes 0.0064/−0.0038/
+  0.0080 m/s²/°C against 0.006/−0.004/0.008.
+- **Gyro:** temperature slopes and offsets recovered to within a few
+  percent; g-sensitivity 4.3–5.7e-5 against 5e-5.
+- **Static errors:** accelerometer 0.21 → 0.009 m/s², gyro
+  0.0051 → 0.0007 rad/s.
+- **In a 30 s lockstep flight from the ground, with the EKF scored:**
+  - attitude RMSE 8.7° bypassed → 2.35° calibrated,
+  - gyro bias error 0.0074 → 0.0021 rad/s,
+  - accelerometer bias error 0.24 → 0.034 m/s².
+
+  Position stayed about 1.8 m, dominated by the correlated GPS error of
+  `sensor_errors.json`.
+
+### Using and bypassing calibrations
+
+Calibrations are made once and reused. Pass the produced layer with
+`--drone` on every run; the simulated errors are deterministic for a given
+configuration, so the calibration stays valid.
+- **Bypass:** `configs/sensors/no_calibration.json` switches both IMU and
+  magnetometer calibration off, so sensors stay raw and filters receive no
+  calibration. Put it last on the command line, or set `calibration.enabled`
+  to false, or leave the calibration layer out.
+- **Staleness:** each calibration stores a `fingerprint` of the sensor
+  settings it was made for: mount, native noise, error model,
+  imperfections, and temperature for the IMU; mount, native noise, and error
+  model for the magnetometer. Seeds are excluded, because turn-on biases
+  change at every power-up anyway. When a run's settings differ, it prints a
+  warning and lists it in `summary.json.calibration_warnings`, so
+  recalibration is needed only when the hardware model really changed.
+
 ### GPS (`sensors.gps.error_model`)
 
 `sensors/gps_errors.py` adds a local east/north/up position error to each

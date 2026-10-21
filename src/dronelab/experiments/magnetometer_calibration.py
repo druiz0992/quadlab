@@ -29,13 +29,8 @@ truth for comparison).
 from collections.abc import Sequence
 from copy import deepcopy
 import json
-import os
 from pathlib import Path
-from queue import Empty, Queue
-import subprocess
-import time
 from typing import Any
-import uuid
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -49,14 +44,15 @@ from ..estimation.magnetometer_calibration import (
 )
 from ..sensors.battery_monitor import BatteryMonitor
 from ..sensors.magnetometer import MagnetometerErrorModel
-from ..simulation.gazebo.config import DroneConfig, load_drone_config
-from ..simulation.gazebo.environment import gazebo_environment
+from ..simulation.gazebo.config import (
+    DroneConfig,
+    load_drone_config,
+    sensor_fingerprint,
+)
+from .calibration_session import HOLD_POSITION_M, CalibrationSession
 from ..simulation.gazebo.messages import timestamp_ns, vector
 from ..simulation.gazebo.world import build_world
 from ..simulation.powertrain import Powertrain
-
-HOLD_POSITION_M = (0.0, 0.0, 10.0)
-SET_POSE_SERVICE = "/world/dronelab/set_pose"
 
 
 def calibration_config(paths: Sequence[str] | None) -> DroneConfig:
@@ -88,83 +84,6 @@ def write_world(config: DroneConfig, output: Path) -> Path:
     world.insert(0, gravity)
     tree.write(path, encoding="unicode", xml_declaration=True)
     return path
-
-
-class _Session:
-    """Gazebo process with magnetometer and odometry subscriptions."""
-
-    def __init__(self, world: Path, log: Path) -> None:
-        from gz.msgs10.boolean_pb2 import Boolean
-        from gz.msgs10.magnetometer_pb2 import Magnetometer
-        from gz.msgs10.odometry_pb2 import Odometry
-        from gz.msgs10.pose_pb2 import Pose
-        from gz.transport13 import Node
-
-        os.environ["GZ_PARTITION"] = "dronelab_magcal_" + uuid.uuid4().hex
-        os.environ.setdefault("GZ_IP", "127.0.0.1")
-        self._pose_type, self._boolean = Pose, Boolean
-        self.node = Node()
-        self.fields: Queue = Queue()
-        self.attitude = None
-        self.node.subscribe(
-            Magnetometer, "/dronelab/magnetometer", lambda m: self.fields.put(m)
-        )
-        self.node.subscribe(Odometry, "/dronelab/odometry", self._on_odometry)
-        self._log = log.open("w")
-        self.process = subprocess.Popen(
-            ["gz", "sim", "-s", "-r", "-v", "2", str(world)],
-            stdout=self._log,
-            stderr=subprocess.STDOUT,
-            env=gazebo_environment(),
-        )
-
-    def _on_odometry(self, message) -> None:
-        q = message.pose.orientation
-        self.attitude = np.array([q.x, q.y, q.z, q.w])
-
-    def set_attitude(self, rotation: Rotation, timeout_s: float = 10.0) -> None:
-        """Teleport the drone and wait until odometry reports the attitude."""
-        request = self._pose_type()
-        request.name = "drone"
-        request.position.x, request.position.y, request.position.z = HOLD_POSITION_M
-        x, y, z, w = rotation.as_quat()
-        request.orientation.x, request.orientation.y = x, y
-        request.orientation.z, request.orientation.w = z, w
-        deadline = time.monotonic() + timeout_s
-        while time.monotonic() < deadline:
-            # Replies from Python are unreliable; odometry is the evidence.
-            self.node.request(
-                SET_POSE_SERVICE, request, self._pose_type, self._boolean, 100
-            )
-            time.sleep(0.05)
-            if (
-                self.attitude is not None
-                and abs(np.dot(self.attitude, rotation.as_quat())) > 0.99999
-            ):
-                return
-        raise RuntimeError("Gazebo did not apply the calibration pose; see gazebo log")
-
-    def fresh_fields(self, count: int, timeout_s: float = 10.0) -> list:
-        """``count`` magnetometer messages published after this call."""
-        while not self.fields.empty():
-            self.fields.get_nowait()
-        self.fields.get(timeout=timeout_s)  # may predate the pose: discard
-        messages = []
-        while len(messages) < count:
-            try:
-                messages.append(self.fields.get(timeout=timeout_s))
-            except Empty:
-                raise RuntimeError("No magnetometer data; see gazebo log") from None
-        return messages
-
-    def close(self) -> None:
-        self.process.terminate()
-        try:
-            self.process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait()
-        self._log.close()
 
 
 class _Instruments:
@@ -227,7 +146,11 @@ def run_calibration(
     instruments = _Instruments(config)
     rotations = Rotation.random(orientations, random_state=seed)
     mount = Rotation.from_euler("xyz", settings["mount"]["rotation_deg"], degrees=True)
-    session = _Session(world, output / "gazebo.log")
+    from gz.msgs10.magnetometer_pb2 import Magnetometer
+
+    session = CalibrationSession(
+        world, output / "gazebo.log", "/dronelab/magnetometer", Magnetometer
+    )
     try:
         dance = _dance(session, instruments, rotations, samples)
         sweep = _sweep(session, instruments, config, sweep_steps)
@@ -254,7 +177,9 @@ def run_calibration(
             ),
         )
     )
-    layer = {"sensors": {"magnetometer": {"calibration": calibration.to_config()}}}
+    section = calibration.to_config()
+    section["fingerprint"] = sensor_fingerprint(config.data["sensors"], "magnetometer")
+    layer = {"sensors": {"magnetometer": {"calibration": section}}}
     (output / "magnetometer-calibration.json").write_text(
         json.dumps(layer, indent=2) + "\n"
     )
@@ -269,7 +194,7 @@ def _dance(session, instruments, rotations, samples) -> dict[str, list]:
     raw, true, regressor, index = [], [], [], []
     for i, rotation in enumerate(rotations):
         session.set_attitude(rotation)
-        for message in session.fresh_fields(samples):
+        for message in session.fresh(samples):
             r, t, u = instruments.read(message, 0.0)
             raw.append(r), true.append(t), regressor.append(u), index.append(i)
     return dict(
@@ -286,7 +211,7 @@ def _sweep(session, instruments, config, steps) -> dict[str, np.ndarray]:
     lift = len(config.properties.lift_rotors)
     raw, regressor = [], []
     for thrust in np.linspace(0.0, lift * config.properties.max_rotor_thrust, steps):
-        for message in session.fresh_fields(10):
+        for message in session.fresh(10):
             r, _, u = instruments.read(message, float(thrust))
             raw.append(r), regressor.append(u)
     return dict(raw=np.array(raw), regressor=np.array(regressor))

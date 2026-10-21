@@ -1,24 +1,24 @@
 {
   "wind.velocity_enu_mps=[0, 0, 0]": {
-    "control.tracking.position_m.rmse": 0.3847757186812027,
+    "control.tracking.position_m.rmse": 0.3857412740715562,
     "step_response.rise_time_s": 3.44,
     "step_response.overshoot_pct": 0.0,
-    "step_response.steady_state_error_m": 0.007519215247434438,
-    "estimation.errors.position_m.rmse": 2.428627842082936,
-    "estimation.errors.attitude_deg.rmse": 2.235705644261148,
-    "estimation.nees.mean": 137.20635575285087,
-    "estimation.nis.gps.mean": 0.2729111108453916,
+    "step_response.steady_state_error_m": 0.007500856128138079,
+    "estimation.errors.position_m.rmse": 2.4303638124763434,
+    "estimation.errors.attitude_deg.rmse": 2.234568219077103,
+    "estimation.nees.mean": 137.06666300929456,
+    "estimation.nis.gps.mean": 0.2728735296972104,
     "summary.completed": 1.0
   },
   "wind.velocity_enu_mps=[3, 0, 0]": {
-    "control.tracking.position_m.rmse": 0.4768515980095646,
-    "step_response.rise_time_s": 1.3399999999999999,
-    "step_response.overshoot_pct": 58.79653895837574,
-    "step_response.steady_state_error_m": -0.5835012900307409,
-    "estimation.errors.position_m.rmse": 2.428818250890257,
-    "estimation.errors.attitude_deg.rmse": 2.144736418575215,
-    "estimation.nees.mean": 137.18743066921573,
-    "estimation.nis.gps.mean": 0.27293069953974486,
+    "control.tracking.position_m.rmse": 0.477626423543883,
+    "step_response.rise_time_s": 1.3200000000000003,
+    "step_response.overshoot_pct": 58.851782390287646,
+    "step_response.steady_state_error_m": -0.5840637392885232,
+    "estimation.errors.position_m.rmse": 2.4305690637765083,
+    "estimation.errors.attitude_deg.rmse": 2.143747080318244,
+    "estimation.nees.mean": 137.04790988677493,
+    "estimation.nis.gps.mean": 0.27289445933871653,
     "summary.completed": 1.0
   }
 }

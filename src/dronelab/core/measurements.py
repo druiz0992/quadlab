@@ -18,12 +18,39 @@ def readonly_array(values, shape):
 
 @dataclass(frozen=True)
 class ImuReading:
+    """Raw IMU sample (sensor axes); with an enabled calibration also the
+    driver-corrected values, and the die temperature the IMU reports."""
+
     specific_force_mps2: np.ndarray
     angular_rate_rad_s: np.ndarray
+    calibrated_specific_force_mps2: np.ndarray | None = None
+    calibrated_angular_rate_rad_s: np.ndarray | None = None
+    temperature_c: float | None = None
 
     def __post_init__(self):
-        for field in ("specific_force_mps2", "angular_rate_rad_s"):
-            object.__setattr__(self, field, readonly_array(getattr(self, field), (3,)))
+        for field in (
+            "specific_force_mps2",
+            "angular_rate_rad_s",
+            "calibrated_specific_force_mps2",
+            "calibrated_angular_rate_rad_s",
+        ):
+            value = getattr(self, field)
+            if value is not None:
+                object.__setattr__(self, field, readonly_array(value, (3,)))
+
+    @property
+    def best_specific_force_mps2(self) -> np.ndarray:
+        """Calibrated specific force when available, else raw."""
+        if self.calibrated_specific_force_mps2 is None:
+            return self.specific_force_mps2
+        return self.calibrated_specific_force_mps2
+
+    @property
+    def best_angular_rate_rad_s(self) -> np.ndarray:
+        """Calibrated angular rate when available, else raw."""
+        if self.calibrated_angular_rate_rad_s is None:
+            return self.angular_rate_rad_s
+        return self.calibrated_angular_rate_rad_s
 
 
 @dataclass(frozen=True)

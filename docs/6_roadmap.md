@@ -22,6 +22,8 @@ document and update the status below.
 | EKF fusion of magnetometer (heading), rangefinder and optical flow (GPS-denied) | Future, with EKF robustness work |
 | Magnetometer calibration (hard/soft iron, current/throttle compensation; automated procedure; calibration for filters) | Implemented ([3 Configuration](3_configuration.md#magnetometer-calibration-sensorsmagnetometercalibration)) |
 | Online (in-filter) magnetometer offset estimation to follow drift | Future, with EKF robustness work |
+| IMU calibration (six-position plus thermal, startup gyro bias, bypass layer, staleness fingerprints) | Implemented ([3 Configuration](3_configuration.md#imu-calibration-sensorsimucalibration)) |
+| Gyro scale/misalignment calibration on a simulated rate table | Future |
 | Vehicle presets (micro, racing 5-inch, camera 10-inch, heavy-lift), FPV camera layer | Implemented ([3 Configuration](3_configuration.md#vehicle-presets)) |
 | Battery monitor sensor; Rerun sensor markers and status indicators | Implemented ([3 Configuration](3_configuration.md#battery-monitor-sensorsbattery_monitor), [2 Simulation](2_simulation.md#viewing)) |
 | Acro (rate-mode) controller for racing and freestyle handling (flips, rolls) | Future |

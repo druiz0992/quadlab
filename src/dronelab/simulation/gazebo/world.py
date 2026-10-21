@@ -139,6 +139,8 @@ def build_world(
     config = config or load_drone_config(render_sensors=render_sensors)
     root = ET.Element("sdf", version="1.9")
     world = element(root, "world", name="dronelab")
+    # Project convention (and the EKF): 9.81 m/s². Gazebo's default is 9.8.
+    element(world, "gravity", "0 0 -9.81")
     physics = element(world, "physics", name="fixed", type="ignored")
     element(physics, "max_step_size", config.data["simulation"]["step_s"])
     element(physics, "real_time_factor", config.data["simulation"]["real_time_factor"])

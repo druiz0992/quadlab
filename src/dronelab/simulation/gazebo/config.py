@@ -25,6 +25,34 @@ def noise(vector=False):
     }
 
 
+# Settings each calibration depends on (seeds excluded: turn-on biases change
+# at every power-up anyway, which the startup gyro calibration handles).
+FINGERPRINT_KEYS = {
+    "imu": (
+        "mount",
+        "acceleration_mps2",
+        "angular_rate_rad_s",
+        "error_model",
+        "imperfections",
+        "temperature",
+    ),
+    "magnetometer": ("mount", "field_ut", "error_model"),
+}
+
+
+def sensor_fingerprint(sensors, kind):
+    """Short hash of the sensor settings a calibration was made for."""
+    section = sensors[kind]
+    chosen = {}
+    for key in FINGERPRINT_KEYS[kind]:
+        value = deepcopy(section[key])
+        if isinstance(value, dict):
+            value.pop("seed", None)
+        chosen[key] = value
+    text = json.dumps(chosen, sort_keys=True)
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
 def stream_timing():
     """Per-stream delivery timing (sensors/bus.py), ideal by default."""
     return {"latency_s": 0.0, "jitter_s": 0.0, "timestamp_offset_s": 0.0}
@@ -164,6 +192,31 @@ DEFAULTS = {
                 "sample_drop_probability": 0.0,
                 "outages_s": [],
                 "timestamp_jitter_s": 0.0,
+            },
+            # Calibration the autopilot applies (not truth); produced by
+            # `dronelab-imucal`. See estimation/imu_calibration.py.
+            "calibration": {
+                "enabled": False,
+                "accel_offset_mps2": [0.0, 0.0, 0.0],
+                "accel_correction": [
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, 1.0],
+                ],
+                "accel_temperature_mps2_per_c": [0.0, 0.0, 0.0],
+                "gyro_offset_rad_s": [0.0, 0.0, 0.0],
+                "gyro_g_sensitivity": [
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                ],
+                "gyro_temperature_rad_s_per_c": [0.0, 0.0, 0.0],
+                "reference_temperature_c": 25.0,
+                # Average the gyro this long after power-up (vehicle still on
+                # the ground; take-off waits). 0: off.
+                "startup_gyro_calibration_s": 0.0,
+                # Settings the calibration was made for (sensor_fingerprint).
+                "fingerprint": "",
             },
             # Scheduled malfunctions; see sensors/imu_faults.py.
             "faults": {"seed": 0, "events": []},
@@ -354,6 +407,7 @@ DEFAULTS = {
                 "declination_deg": 0.0,
                 "field_tolerance_ut": 5.0,
                 "heading_std_deg": 3.0,
+                "fingerprint": "",
             },
         },
         # Downward single-ray Gazebo lidar (requires rendering).
@@ -697,6 +751,7 @@ LENS_TYPES = (
 )
 # Keys allowing any sign.
 SIGNED_SCALAR_KEYS = {
+    "reference_temperature_c",
     "inclination_deg",
     "declination_deg",
     "offset_pa",
@@ -718,6 +773,7 @@ SIGNED_SCALAR_KEYS = {
     "vertical_max_angle_deg",
 }
 NONNEGATIVE_SCALAR_KEYS = {
+    "startup_gyro_calibration_s",
     "noise_std_pa",
     "time_constant_s",
     "white_horizontal_std_mps",
@@ -794,6 +850,8 @@ def validate_length_schedule(events, name):
 
 
 MATRIX_KEYS = {
+    "accel_correction",
+    "gyro_g_sensitivity",
     "soft_iron",
     "soft_iron_correction",
     "accel_cross_coupling",
@@ -1408,6 +1466,14 @@ def load_drone_config(paths: ConfigPaths = None, *, render_sensors: bool = False
         raise ValueError("Choose sensors.gps.rtk or sensors.gps.error_model, not both")
     if gps["receiver"]["satellites"] < 4 + gps["receiver"]["satellite_variation"]:
         raise ValueError("gps receiver satellites must leave at least 4 in view")
+    if (
+        data["sensors"]["imu"]["calibration"]["startup_gyro_calibration_s"] > 0
+        and not data["simulation"]["start_on_ground"]
+    ):
+        raise ValueError(
+            "imu startup_gyro_calibration_s needs simulation.start_on_ground "
+            "(the vehicle must be still)"
+        )
     imperfections = data["sensors"]["imu"]["imperfections"]
     if imperfections["sample_drop_probability"] > 1:
         raise ValueError("imu imperfections sample_drop_probability must be <= 1")

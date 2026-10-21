@@ -71,6 +71,9 @@ from ..sensors.gps_receiver import (
 from ..sensors.imu_imperfections import ImuImperfections, ImuSaturation, ImuTiming
 from ..sensors.magnetometer import MagnetometerErrorModel
 from ..estimation.magnetometer_calibration import MagnetometerCalibration
+from ..estimation.imu_calibration import ImuCalibration, ImuCalibrationDriver
+from ..simulation.gazebo.config import sensor_fingerprint
+from ..evaluation.imu_bias import EffectiveImuBias
 from ..sensors.magnetic_anomalies import MagneticAnomalies, scene_dipoles
 from ..sensors.optical_flow import OpticalFlowModel
 from ..sensors.battery_monitor import BatteryMonitor
@@ -160,7 +163,14 @@ def _log_sensor_status(
 
 
 def _submit_to_bus(
-    bus, kind, message, gps_dropped, camera_effects, gps_status, calibrated_field_ut
+    bus,
+    kind,
+    message,
+    gps_dropped,
+    camera_effects,
+    gps_status,
+    calibrated_field_ut,
+    calibrated_imu,
 ):
     """Submit a processed transported measurement to the sensor bus.
 
@@ -179,6 +189,14 @@ def _submit_to_bus(
         payload = replace(payload, status=gps_status)
     if kind == "magnetometer" and calibrated_field_ut is not None:
         payload = replace(payload, calibrated_field_ut=calibrated_field_ut)
+    if kind == "imu" and calibrated_imu is not None:
+        force, rate, temperature = calibrated_imu
+        payload = replace(
+            payload,
+            calibrated_specific_force_mps2=force,
+            calibrated_angular_rate_rad_s=rate,
+            temperature_c=temperature,
+        )
     if payload is not None:
         bus.submit(kind, payload, timestamp_ns(message))
 
@@ -195,6 +213,44 @@ def _control_state(estimate_source, runner, now_ns, elapsed_s, max_age_s, truth)
     if state is None and elapsed_s > max_age_s:
         raise StaleEstimate("No state estimate available for control")
     return state
+
+
+def _calibrate_imu(driver, message, temperature_model, recorder):
+    """Driver-side IMU correction, or None without a calibration.
+
+    Uses the die temperature the IMU reports (the temperature model's value
+    when it is enabled; unknown otherwise).
+    """
+    if driver is None:
+        return None
+    temperature = temperature_model.temperature_c if temperature_model.enabled else None
+    force, rate = driver.apply(
+        vector(message.linear_acceleration),
+        vector(message.angular_velocity),
+        temperature,
+        timestamp_ns(message),
+    )
+    recorder.log_vector("imu/calibrated/accel", force)
+    recorder.log_vector("imu/calibrated/gyro", rate)
+    return force, rate, temperature
+
+
+def _calibration_warnings(sensors):
+    """Calibrations made for different sensor settings (stale)."""
+    warnings = []
+    for kind in ("imu", "magnetometer"):
+        calibration = sensors[kind]["calibration"]
+        stored = calibration["fingerprint"]
+        if (
+            calibration["enabled"]
+            and stored
+            and stored != sensor_fingerprint(sensors, kind)
+        ):
+            warnings.append(
+                f"{kind} calibration was made for different {kind} settings; "
+                "recalibrate or check the layers"
+            )
+    return warnings
 
 
 def _calibrate_magnetometer(calibration, message, battery_reading, thrust_n, recorder):
@@ -280,7 +336,7 @@ def _lockstep_stepper(node, settings):
 
 
 def _run(args, keyboard, command_source):
-    from ..control.manual import FlightCommand, ManualController
+    from ..control.manual import FlightCommand
     from ..control.drone import RotorThrustControl as ThrustCommands
     from ..simulation.gazebo.actuators import RotorThrustControl
 
@@ -482,6 +538,16 @@ def _run(args, keyboard, command_source):
         else None
     )
     calibrated_mag = None
+    calibrated_imu = None
+    imu_settings = sensors["imu"]["calibration"]
+    imu_driver = (
+        ImuCalibrationDriver(ImuCalibration.from_config(imu_settings))
+        if imu_settings["enabled"]
+        else None
+    )
+    calibration_warnings = _calibration_warnings(sensors)
+    for warning in calibration_warnings:
+        print(f"Warning: {warning}")
     anomalies = MagneticAnomalies(
         list(sensors["magnetometer"]["dipoles"]) + scene_dipoles(scene)
     )
@@ -743,26 +809,17 @@ def _run(args, keyboard, command_source):
         else None
     )
     controller = build_controller(settings, context) if rotor_mode else None
-    # True mount (randomization may misalign it), for evaluation only.
-    imu_body = Rotation.from_euler(
-        "xyz", true_config.data["sensors"]["imu"]["mount"]["rotation_deg"], degrees=True
-    )
-    native_bias = [
-        np.asarray(sensors["imu"][field]["bias"], float)
-        for field in ("acceleration_mps2", "angular_rate_rad_s")
-    ]
 
-    def true_biases():
-        """Simulator IMU biases in body axes, for evaluation only."""
-        (a1, g1), (a2, g2), (a3, g3) = (
-            imu_errors.current_biases(),
-            imu_temperature.current_biases(),
-            imu_imperfections.current_biases(),
-        )
-        return (
-            imu_body.apply(native_bias[0] + a1 + a2 + a3),
-            imu_body.apply(native_bias[1] + g1 + g2 + g3),
-        )
+    # Effective bias of the delivered IMU readings (evaluation only): true
+    # mount (randomization may misalign it) versus the nominal one.
+    def mount_rotation(data):
+        rotation = data["sensors"]["imu"]["mount"]["rotation_deg"]
+        return Rotation.from_euler("xyz", rotation, degrees=True)
+
+    imu_bias = EffectiveImuBias(
+        mount_rotation(settings), mount_rotation(true_config.data)
+    )
+    true_biases = imu_bias.current
 
     evaluation = RunEvaluation(
         settings,
@@ -962,6 +1019,7 @@ def _run(args, keyboard, command_source):
                     stamp = timestamp_ns(message)
                     if imu_timing.drop(stamp):
                         continue  # sample lost: never recorded or delivered
+                    ideal_imu = message  # error-free reading, evaluation only
                     message = imu_errors_message(message, imu_imperfections, stamp)
                     message = imu_errors_message(message, imu_errors, stamp)
                     message = imu_errors_message(message, imu_temperature, stamp)
@@ -970,6 +1028,23 @@ def _run(args, keyboard, command_source):
                     message = imu_errors_message(message, imu_faults, stamp)
                     if imu_timing.enabled:
                         message = with_timestamp_ns(message, imu_timing.stamp(stamp))
+                    calibrated_imu = _calibrate_imu(
+                        imu_driver, message, imu_temperature, recorder
+                    )
+                    delivered = (
+                        calibrated_imu[:2]
+                        if calibrated_imu is not None
+                        else (
+                            vector(message.linear_acceleration),
+                            vector(message.angular_velocity),
+                        )
+                    )
+                    imu_bias.update(
+                        stamp,
+                        vector(ideal_imu.linear_acceleration),
+                        vector(ideal_imu.angular_velocity),
+                        *delivered,
+                    )
                 elif kind == "magnetometer":
                     if anomalies.enabled and truth_position is not None:
                         message = magnetometer_anomaly_message(
@@ -1112,6 +1187,7 @@ def _run(args, keyboard, command_source):
                         camera_effects,
                         gps_status.status,
                         calibrated_mag if kind == "magnetometer" else None,
+                        calibrated_imu if kind == "imu" else None,
                     )
                     if kind not in ("poses", "contacts"):
                         bus_now_ns = max(bus_now_ns, timestamp_ns(message))
@@ -1295,8 +1371,11 @@ def _run(args, keyboard, command_source):
                                 airspeed_mps=float(air_body[0]),
                             ),
                         )
+                        if imu_driver is not None and not imu_driver.ready:
+                            state = None  # startup gyro calibration: motors off
                         if state is None:
-                            # Start-up: no estimate yet; no command this tick.
+                            # Start-up: no estimate yet, or the IMU is still
+                            # calibrating; no command this tick.
                             if stepper is not None:
                                 stepper.on_odometry(timestamp_ns(message))
                             continue
@@ -1543,6 +1622,13 @@ def _run(args, keyboard, command_source):
                 lockstep=stepper.summary() if stepper is not None else None,
                 final_position=positions[-1].tolist() if positions else None,
                 left_ground_area_s=left_ground_s,
+                calibration_warnings=calibration_warnings,
+                imu_startup_gyro_bias_rad_s=(
+                    imu_driver.startup_bias_rad_s.tolist()
+                    if imu_driver is not None
+                    and imu_driver.startup_bias_rad_s is not None
+                    else None
+                ),
             )
             (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
             recorder.close()

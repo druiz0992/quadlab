@@ -196,10 +196,13 @@ estimate's timestamp (linear for position and velocity, slerp for attitude)
 before comparing:
 - **Errors:** RMSE, mean, 95th percentile, maximum, and final value of the
   position (also horizontal and vertical), velocity, attitude, and yaw
-  errors, plus bias errors against the simulator's true IMU biases. True
-  biases are the Gazebo native bias plus the error-model turn-on bias and
-  random walk plus temperature drift, rotated into body axes; scheduled IMU
-  faults are not included.
+  errors, plus bias errors against the effective bias of the IMU readings
+  the estimator receives (`evaluation/imu_bias.py`). That bias is the
+  delivered reading minus the error-free Gazebo reading, in body axes, so
+  raw or calibrated depending on the active calibration, averaged over
+  1 s. It covers every error source that does not average out (offsets,
+  drift, temperature, scale and mount errors at the current motion), and it
+  stays correct whether or not a calibration is applied.
 - **NEES consistency:** NEES = eᵀP⁻¹e over the 15 states, with mean and
   fraction inside the two-sided 95 % χ² interval. A consistent filter has a
   mean equal to the degrees of freedom and about 95 % inside.

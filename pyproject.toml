@@ -18,6 +18,7 @@ dronelab = "dronelab.cli.gazebo:main"
 dronelab-gazebo = "dronelab.cli.gazebo:main"
 dronelab-batch = "dronelab.cli.batch:main"
 dronelab-magcal = "dronelab.cli.magcal:main"
+dronelab-imucal = "dronelab.cli.imucal:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

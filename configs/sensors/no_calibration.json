@@ -1,0 +1,6 @@
+{
+  "sensors": {
+    "imu": {"calibration": {"enabled": false}},
+    "magnetometer": {"calibration": {"enabled": false}}
+  }
+}
