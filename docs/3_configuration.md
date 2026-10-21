@@ -854,8 +854,22 @@ remaining charge (97.3 %) tracked the true state of charge (97.4 %).
 
 ## Aerodynamics (`aerodynamics`)
 
-All effects are off by default; `air_density_kg_m3` (default 1.225) is
-shared. Models are in `simulation/aerodynamics.py`.
+All effects are off by default. Models are in `simulation/aerodynamics.py`.
+
+**Air density (`air_density_kg_m3`).** Shared by body drag, translational
+lift, vortex ring, fixed-wing aerodynamics, pusher power, and the airspeed
+sensor (Gazebo's rotor thrust does not use it). The default `"site"`
+computes dry-air density ρ = p / (R_d T) once at start, from the
+standard-atmosphere pressure at the world's elevation (the model Gazebo's
+barometer uses; 650 m for generated worlds, a saved world's own
+`spherical_coordinates` elevation) and `environment.ambient_temperature_c`:
+**1.095 kg/m³** with the defaults. A number sets it explicitly. Changing
+the ambient temperature during keyboard flight does not change it.
+
+*Migration (2026-10-21):* the default was 1.225 kg/m³ (sea level, 15 °C),
+6–12 % denser than the 650 m site (see the
+[environment audit](2_simulation.md#simulator-environment-audit)). Set
+`"aerodynamics": {"air_density_kg_m3": 1.225}` to reproduce earlier results.
 
 ### Quadratic body drag (`aerodynamics.body_drag`)
 
@@ -868,8 +882,8 @@ are in world axes and **accumulate**, so each update publishes only the
 change. Works in every control mode; use lockstep with a high odometry rate
 for accurate force updates.
 
-Verified in lockstep with all motors stopped: falling from 60 m with
-Cd·A = 0.3 m², the drone fell 21.50 m in 3 s against 21.44 m for the exact
+Verified in lockstep with all motors stopped (ρ = 1.225 kg/m³): falling
+from 60 m with Cd·A = 0.3 m², the drone fell 21.50 m in 3 s against 21.44 m for the exact
 quadratic-drag solution, reaching 9.04 m/s (terminal velocity 9.07 m/s);
 without drag it matched free fall within 1.6 cm.
 
@@ -882,10 +896,11 @@ twice.
 A rotor moving edgewise meets clean air and produces more thrust at the
 same speed. Per rotor, `1 + max_gain · (1 − v_i / sqrt(v_i² + v_h²))` with
 v_h the edgewise airspeed and v_i the momentum-theory hover induced velocity
-`sqrt(T_hover / (2 ρ π R²))` (5.6 m/s for the default vehicle, 7.0 m/s for
-the racing preset). `max_gain` default 0.15. Applied like ground effect, by
+`sqrt(T_hover / (2 ρ π R²))` (5.9 m/s for the default vehicle, 7.4 m/s for
+the racing preset at the default site density; 5.6 and 7.0 m/s at
+1.225 kg/m³). `max_gain` default 0.15. Applied like ground effect, by
 scaling published motor speed (rotor-thrust and keyboard modes). In a 6 m/s
-racing burst the vehicle flew 4 cm higher than without it.
+racing burst (at 1.225 kg/m³) the vehicle flew 4 cm higher than without it.
 
 ### Vortex ring state (`aerodynamics.vortex_ring`)
 
@@ -1012,7 +1027,9 @@ c_m·k_t·ω³ model, so quad results are unchanged.
 A synthetic pitot-static sensor along body +x (`sensors/airspeed.py`); off
 by default. It measures Δp = `scale`·½ρu² + `offset_pa` + N(0,
 `noise_std_pa`²) and reports indicated airspeed √(2Δp/ρ₀) with ρ₀ =
-1.225 kg/m³. `outages_s` intervals model a blocked pitot (Δp reads only
+1.225 kg/m³. Δp uses the configured (site) density, so indicated airspeed
+reads √(ρ/ρ₀) ≈ 0.95 of true airspeed at the default site, as a real pitot
+at 650 m and 25 °C would. `outages_s` intervals model a blocked pitot (Δp reads only
 offset and noise).
 - **Logging:** Rerun shows `airspeed/measured`.
 - **Bus:** the sensor bus carries `airspeed`.

@@ -99,6 +99,27 @@ class DrydenTurbulence:
         )
 
 
+# Specific gas constant of dry air, J/(kg·K) (R / M = 8314.32 / 28.9644, the
+# values of the barometer's standard atmosphere).
+DRY_AIR_GAS_CONSTANT = 8314.32 / 28.9644
+
+
+def site_air_density_kg_m3(elevation_m: float, temperature_c: float) -> float:
+    """Dry-air density at a site: ``ρ = p / (R_d T)`` with ``p`` the
+    standard-atmosphere pressure at ``elevation_m`` (the model Gazebo's
+    barometer uses) and ``T`` the ambient temperature.
+
+    650 m and 25 °C give 1.095 kg/m³; sea level and 15 °C give the standard
+    1.225 kg/m³. Raises ValueError for a temperature at or below 0 K.
+    """
+    from ..sensors.barometer import altitude_to_pressure
+
+    temperature_k = temperature_c + 273.15
+    if not temperature_k > 0:
+        raise ValueError("temperature must be above absolute zero")
+    return altitude_to_pressure(elevation_m) / (DRY_AIR_GAS_CONSTANT * temperature_k)
+
+
 def quadratic_body_drag_world(
     velocity_world_mps: ArrayLike,
     wind_world_mps: ArrayLike,

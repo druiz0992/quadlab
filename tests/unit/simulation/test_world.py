@@ -78,3 +78,16 @@ def test_scene_reflectivity_becomes_laser_retro(tmp_path):
     path.write_text(json.dumps(scene))
     with pytest.raises(ValueError, match="reflectivity"):
         load_scene(path)
+
+
+def test_physics_engine_settings_are_explicit(tmp_path):
+    root = ET.parse(build_world({"obstacles": []}, tmp_path / "world.sdf"))
+    physics = root.find("./world/physics")
+    assert physics.get("type") == "dart"
+    assert physics.findtext("./dart/collision_detector") == "ode"
+    assert physics.findtext("./dart/solver/solver_type") == "dantzig"
+    engine = root.find(
+        './world/plugin[@name="gz::sim::systems::Physics"]/engine/filename'
+    )
+    assert engine.text == "gz-physics-dartsim-plugin"
+    assert root.findtext("./world/gravity") == "0 0 -9.81"

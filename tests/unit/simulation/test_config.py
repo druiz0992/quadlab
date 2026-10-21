@@ -847,3 +847,46 @@ def test_health_thresholds_validate_in_config(tmp_path):
         load_drone_config(layer)
     layer.write_text('{"health": {"flip_tilt_deg": 120, "max_dropped_messages": 5}}')
     assert load_drone_config(layer).data["health"]["flip_tilt_deg"] == 120
+
+
+def test_sample_timing_warnings_name_unaligned_gazebo_streams():
+    from dronelab.simulation.gazebo.config import sample_timing_warnings
+
+    data = load_drone_config().data
+    # Default: 200 Hz IMU on 2 ms steps; everything else aligned.
+    (warning,) = sample_timing_warnings(data)
+    assert warning.startswith("sensors.imu.rate_hz = 200 Hz")
+    assert "between 4 and 6 ms" in warning
+    data["sensors"]["imu"]["rate_hz"] = 250
+    assert sample_timing_warnings(data) == []
+    data["control"]["odometry_rate_hz"] = 300  # 3.33 ms
+    data["sensors"]["baro"].update(enabled=False, rate_hz=30)  # disabled: ignored
+    (warning,) = sample_timing_warnings(data)
+    assert warning.startswith("control.odometry_rate_hz = 300 Hz")
+
+
+def test_site_air_density_default_and_overrides(tmp_path):
+    from dronelab.simulation.aerodynamics import site_air_density_kg_m3
+
+    # Standard sea level gives the classic value; the 650 m site at 25 °C less.
+    assert site_air_density_kg_m3(0.0, 15.0) == pytest.approx(1.225, abs=5e-4)
+    assert site_air_density_kg_m3(650.0, 25.0) == pytest.approx(1.0953, abs=5e-4)
+    with pytest.raises(ValueError):
+        site_air_density_kg_m3(0.0, -300.0)
+
+    aero = load_drone_config().data["aerodynamics"]
+    assert aero["air_density_kg_m3"] == pytest.approx(1.0953, abs=5e-4)
+    sea = load_drone_config(site_elevation_m=0.0).data["aerodynamics"]
+    assert sea["air_density_kg_m3"] == pytest.approx(1.1839, abs=5e-4)  # 25 °C
+
+    def layer(value):
+        path = tmp_path / f"{value}.json"
+        path.write_text(json.dumps({"aerodynamics": {"air_density_kg_m3": value}}))
+        return path
+
+    explicit = load_drone_config(layer(1.225)).data["aerodynamics"]
+    assert explicit["air_density_kg_m3"] == 1.225  # migration: old default
+    with pytest.raises(ValueError):
+        load_drone_config(layer("sea"))
+    with pytest.raises(ValueError):
+        load_drone_config(layer(-1.0))

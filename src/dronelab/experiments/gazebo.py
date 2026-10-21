@@ -18,6 +18,7 @@ from .sensor_pipeline import SensorPipeline, TruthSnapshot
 from .vehicle_forces import ExternalForces
 from .keyboard_flight import keyboard_effects
 from .mission_loop import MissionLoop, MissionParts
+from ..simulation.gazebo.config import sample_timing_warnings
 from ..simulation.gazebo.process import GazeboProcess
 from ..simulation.gazebo.stepping import TrackedNode
 from ..simulation.gazebo.plugins import lockstep_barrier
@@ -38,7 +39,7 @@ from ..simulation.gazebo.payload import PayloadControl, Winch
 from ..simulation.powertrain import Powertrain
 from ..simulation.esc import EscModel
 from ..simulation.gazebo.environment import gazebo_environment
-from ..simulation.gazebo.world import world_elevation_m
+from ..simulation.gazebo.world import WORLD_ELEVATION_M, world_elevation_m
 
 
 @dataclass(frozen=True)
@@ -137,7 +138,14 @@ def _run(args, keyboard, command_source):
 
     if args.drone and args.world:
         raise ValueError("--drone/--config requires a generated world; omit --world")
-    config = load_drone_config(args.drone, render_sensors=args.render_sensors)
+    # A saved world keeps its own elevation (for the "site" air density).
+    config = load_drone_config(
+        args.drone,
+        render_sensors=args.render_sensors,
+        site_elevation_m=(
+            world_elevation_m(args.world) if args.world else WORLD_ELEVATION_M
+        ),
+    )
     settings = config.data
 
     sensors = settings["sensors"]
@@ -319,7 +327,7 @@ def _run(args, keyboard, command_source):
             degrees=True,
         ),
     )
-    for warning in pipeline.calibration_warnings:
+    for warning in pipeline.calibration_warnings + sample_timing_warnings(settings):
         print(f"Warning: {warning}")
     failsafe_settings = settings["failsafe"]["low_battery"]
     failsafe = (

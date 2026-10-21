@@ -681,7 +681,7 @@
     "avionics_power_w": 5.0
   },
   "aerodynamics": {
-    "air_density_kg_m3": 1.225,
+    "air_density_kg_m3": "site",
     "ground_effect": {
       "enabled": false
     },

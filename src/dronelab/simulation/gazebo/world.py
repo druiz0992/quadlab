@@ -12,11 +12,15 @@ from ..moving_obstacles import validate_moving_obstacle
 from ..terrain import Terrain, validate_terrain
 from .plugins import LOCKSTEP_FILENAME, LOCKSTEP_NAME, lockstep_barrier
 from .vehicle import add_payload, build_drone
-from .config import load_drone_config, wind_effects_enabled
+from .config import WORLD_ELEVATION_M, load_drone_config, wind_effects_enabled
 
-# Height of the world origin above sea level (spherical_coordinates). GPS
-# altitude and barometric altitude both use this sea-level datum.
-WORLD_ELEVATION_M = 650.0
+# Physics engine, written explicitly so a Gazebo upgrade cannot change it
+# silently. These are gz-sim 8 / gz-physics 7's own defaults (verified: an
+# unsupported detector logs "defaulting to [ode]"; lockstep outputs are
+# byte-identical with and without them). See docs/2_simulation.md.
+PHYSICS_ENGINE_PLUGIN = "gz-physics-dartsim-plugin"
+DART_COLLISION_DETECTOR = "ode"
+DART_SOLVER = "dantzig"
 
 
 def load_scene(path):
@@ -142,14 +146,18 @@ def build_world(
     world = element(root, "world", name="dronelab")
     # Project convention (and the EKF): 9.81 m/s². Gazebo's default is 9.8.
     element(world, "gravity", "0 0 -9.81")
-    physics = element(world, "physics", name="fixed", type="ignored")
+    physics = element(world, "physics", name="fixed", type="dart")
     element(physics, "max_step_size", config.data["simulation"]["step_s"])
     element(physics, "real_time_factor", config.data["simulation"]["real_time_factor"])
+    dart = element(physics, "dart")
+    element(dart, "collision_detector", DART_COLLISION_DETECTOR)
+    element(element(dart, "solver"), "solver_type", DART_SOLVER)
     if lockstep_barrier(config.data) == "plugin":
         # First system: its PreUpdate holds each step until Python grants it.
         element(world, "plugin", filename=LOCKSTEP_FILENAME, name=LOCKSTEP_NAME)
+    engine = element(plugin(world, "physics", "Physics"), "engine")
+    element(engine, "filename", PHYSICS_ENGINE_PLUGIN)
     for library, system in [
-        ("physics", "Physics"),
         ("user-commands", "UserCommands"),
         ("scene-broadcaster", "SceneBroadcaster"),
         ("contact", "Contact"),

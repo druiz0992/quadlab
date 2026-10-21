@@ -94,7 +94,7 @@ document and update the status below.
 | Plug-in contract test kit and templates; comparison reports for batches and multi-estimator replay | Implemented ([7 Experiments](7_experiments.md#writing-a-plug-in-templates-and-the-contract-test-kit)) |
 | Typed, validated plug-in options declared by each plug-in (templates reject unknown keys today) | Proposed |
 | Gazebo-side lockstep barrier (`DronelabLockstep` gz-sim plugin) so commands are read before each step | Implemented ([2 Simulation](2_simulation.md#lockstep-simulation)) |
-| Audit remaining Gazebo defaults (atmosphere, magnetic table, solver and contact settings) | Audited ([2 Simulation](2_simulation.md#simulator-environment-audit)); open: site-consistent air density, IMU rate vs physics step, explicit physics engine settings |
+| Audit remaining Gazebo defaults (atmosphere, magnetic table, solver and contact settings) | Done ([2 Simulation](2_simulation.md#simulator-environment-audit)): site air density by default, sample-timing warnings, explicit physics engine settings |
 | Lockstep performance on large worlds (pose-message volume) | Future (simulation robustness) |
 | Gazebo process cleanup and hang detection | Implemented ([2 Simulation](2_simulation.md#stopping-and-cleanup)); a simulator-side command timeout (for attaching to a running Gazebo) remains future |
 | Sensor delivery latency, jitter, clock offsets, cross-stream reordering | Implemented ([7 Experiments](7_experiments.md#sensor-bus-and-delivery-timing-sensor_timing)) |

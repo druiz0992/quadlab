@@ -17,6 +17,11 @@ import numpy as np
 
 from ...core.vehicle import DroneProperties
 
+# Height of the generated world's origin above sea level
+# (spherical_coordinates). GPS altitude, barometric altitude, and the "site"
+# air density all use this sea-level datum.
+WORLD_ELEVATION_M = 650.0
+
 
 def noise(vector=False):
     return {
@@ -568,7 +573,7 @@ DEFAULTS = {
         },
     },
     "aerodynamics": {
-        "air_density_kg_m3": 1.225,
+        "air_density_kg_m3": "site",
         # Uses vehicle.propeller_diameter_m and vehicle.rotor_height_m.
         "ground_effect": {"enabled": False},
         # Quadratic drag via Gazebo ApplyLinkWrench; Cd·A per body axis (m²).
@@ -1091,6 +1096,53 @@ def _validate_fault_parameter(event, kind, name):
 MAX_LATENCY_S = 0.5
 
 
+# Sensors whose samples Gazebo schedules on physics steps (the others are
+# sampled by Python on odometry ticks).
+GAZEBO_SCHEDULED_SENSORS = (
+    "imu",
+    "gps",
+    "contacts",
+    "baro",
+    "magnetometer",
+    "rangefinder",
+    "camera",
+    "lidar",
+)
+
+
+def sample_timing_warnings(data: dict) -> list[str]:
+    """Gazebo-scheduled streams whose period is not a whole number of
+    physics steps.
+
+    Gazebo publishes on the first step at or after each period, so such a
+    stream alternates between the neighbouring whole-step intervals: a
+    200 Hz IMU on 2 ms steps gives 4 and 6 ms (5 ms mean). Timestamps stay
+    exact and the mean rate is kept, but per-sample intervals jitter (see
+    docs/2_simulation.md#simulator-environment-audit). Returns one message
+    per affected stream (odometry included); [] when all are aligned.
+    """
+    step_s = data["simulation"]["step_s"]
+    streams = {"control.odometry_rate_hz": data["control"]["odometry_rate_hz"]}
+    for name in GAZEBO_SCHEDULED_SENSORS:
+        sensor = data["sensors"][name]
+        if sensor.get("enabled", True):
+            streams[f"sensors.{name}.rate_hz"] = sensor["rate_hz"]
+    warnings = []
+    for key, rate_hz in streams.items():
+        steps = 1 / (rate_hz * step_s)
+        if abs(steps - round(steps)) < 1e-6:
+            continue
+        low_ms, high_ms = (
+            1e3 * step_s * n for n in (math.floor(steps), math.ceil(steps))
+        )
+        warnings.append(
+            f"{key} = {rate_hz:g} Hz is not a multiple of the {1e3 * step_s:g} ms "
+            f"physics step: sample intervals alternate between {low_ms:g} and "
+            f"{high_ms:g} ms (mean rate kept)"
+        )
+    return warnings
+
+
 def wind_effects_enabled(wind):
     """Whether generated worlds need Gazebo WindEffects (wind or still-air drag)."""
     return wind["enabled"] or wind["still_air_drag"]
@@ -1185,6 +1237,10 @@ def validate_tree(value, template, path="config"):
         item, name = value[key], f"{path}.{key}"
         if key in FREE_FORM_KEYS:
             continue  # validated by the plug-in that receives it
+        if key == "air_density_kg_m3":
+            if item != "site":
+                number(item, name, positive=True)
+            continue
         if isinstance(default, dict):
             validate_tree(item, default, name)
         elif isinstance(default, str):
@@ -1447,13 +1503,24 @@ def _lookup(tree: dict, dotted: str):
     return tree
 
 
-def load_drone_config(paths: ConfigPaths = None, *, render_sensors: bool = False):
+def load_drone_config(
+    paths: ConfigPaths = None,
+    *,
+    render_sensors: bool = False,
+    site_elevation_m: float = WORLD_ELEVATION_M,
+):
     """Load built-in defaults overridden by zero or more layered JSON files.
 
     Files apply in order, later ones overriding earlier ones; each file's
     ``extends`` parents apply just before it. Objects merge key by key, while
     lists and scalars replace the earlier value whole. The merged result is
     validated once, so a layer need not be valid on its own.
+
+    ``aerodynamics.air_density_kg_m3: "site"`` (the default) is replaced by
+    the dry-air density at ``site_elevation_m`` (m above sea level; the
+    generated world's elevation unless a saved world says otherwise) and
+    ``environment.ambient_temperature_c``, so the returned settings always
+    hold a number.
     """
     layers = [layer for path in _as_paths(paths) for layer in _expand_layers(path)]
     # Copy: callers may modify the returned settings.
@@ -1482,6 +1549,12 @@ def load_drone_config(paths: ConfigPaths = None, *, render_sensors: bool = False
         raise ValueError("aerodynamics.vortex_ring.thrust_loss must be in [0, 1)")
     if not -40 <= data["environment"]["ambient_temperature_c"] <= 60:
         raise ValueError("environment.ambient_temperature_c must be in [-40, 60] °C")
+    if aero["air_density_kg_m3"] == "site":
+        from ..aerodynamics import site_air_density_kg_m3
+
+        aero["air_density_kg_m3"] = site_air_density_kg_m3(
+            site_elevation_m, data["environment"]["ambient_temperature_c"]
+        )
     from ...simulation.fixed_wing import DEFAULT_COEFFICIENTS
 
     coefficients = data["fixed_wing"]["coefficients"]

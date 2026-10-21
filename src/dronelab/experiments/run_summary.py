@@ -8,6 +8,8 @@ here, once, at the end of the run (see evaluation/health.py).
 import time
 from typing import Any
 
+from ..simulation.gazebo.config import sample_timing_warnings
+
 
 def final_exit_reason(completed: bool, exit_reason: str) -> str:
     """``exit_reason`` as reported: a run that neither completed nor was
@@ -110,6 +112,7 @@ def build_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
         final_position=loop.positions[-1].tolist() if loop.positions else None,
         left_ground_area_s=loop.left_ground_s,
         calibration_warnings=sensors["calibration_warnings"],
+        sample_timing_warnings=sample_timing_warnings(settings),
         imu_startup_gyro_bias_rad_s=sensors["imu_startup_gyro_bias_rad_s"],
     )
 

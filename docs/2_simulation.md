@@ -31,11 +31,11 @@ measured values.
 | GPS | NavSat converts with gz-math `LOCAL2` → WGS84 and adds the 650 m elevation | `sensors/geodesy.py` (exact ECEF → ENU) | Agrees to < 1 mm out to 28 km; GPS altitude = 650 m + z to 1 mm |
 | Barometer | Standard atmosphere (101 325 Pa, 288.15 K, 6.5 K/km) at 650 m + z | `sensors/barometer.py`, same model | Pressure agrees to 0.001 Pa; pressure altitude = GPS altitude to 1 mm |
 | Magnetic field | Internal table from latitude/longitude (world `<magnetic_field>` ignored): 25.613 µT north, 37.152 µT down | `sensors.magnetometer.calibration` defaults 45.1 µT, inclination 55.4°, declination 0° | Consistent with Gazebo; the real field here has about +1° declination |
-| Air density | Not used: rotor thrust is `motorConstant · ω²` | `aerodynamics.air_density_kg_m3` = 1.225 kg/m³ (sea level, 15 °C) | **Inconsistent with the site:** 1.150 kg/m³ at 650 m in the standard atmosphere, 1.095 kg/m³ at the 25 °C ambient. Python drag, fixed-wing, and rotor aerodynamic effects are 6–12 % stronger than at the site |
-| Temperature | Barometer uses the standard atmosphere (10.8 °C at 650 m) | `environment.ambient_temperature_c` = 25 °C for battery and IMU models | Two independent temperatures; nothing relates them |
-| Physics engine | DART (`gz-physics-dartsim-plugin`, observed in the `-v 4` log); collision detector and LCP solver are gz-physics defaults (ODE detector, Dantzig, according to its source; not observed) | — | Not set explicitly in the SDF |
+| Air density | Not used: rotor thrust is `motorConstant · ω²` | `aerodynamics.air_density_kg_m3` | Was 1.225 kg/m³ (sea level, 15 °C), 6–12 % denser than the site. **Now** `"site"` by default: 1.095 kg/m³ from the 650 m standard-atmosphere pressure and the 25 °C ambient ([3 Configuration](3_configuration.md#aerodynamics-aerodynamics)) |
+| Temperature | Barometer uses the standard atmosphere (10.8 °C at 650 m) | `environment.ambient_temperature_c` = 25 °C for battery, IMU, and air density | The barometer's pressure model keeps its own standard temperature; pressure is unaffected by ambient temperature |
+| Physics engine | DART with the ODE collision detector and the Dantzig LCP solver (gz-physics 7 defaults: an unsupported detector logs "defaulting to [ode]") | — | **Now explicit** in the generated SDF (`<physics type="dart">`, Physics `<engine>`); lockstep outputs were byte-identical before and after |
 | Contacts | No `<surface>` parameters: SDF defaults (friction μ = 1, no restitution); DART contacts are rigid | Health checks only read contacts | Not tuned; touchdown and sliding are not calibrated |
-| Sensor timing | Sensors fire on the first physics step at or after their period, so a period that is not a multiple of the 2 ms step jitters: the 200 Hz IMU alternates 4 ms and 6 ms intervals (5 ms mean) | Estimators integrate with real timestamps; the IMU noise model scales white noise with the configured rate | Mean rate correct; per-sample noise is about ±10 % off its nominal level |
+| Sensor timing | Sensors fire on the first physics step at or after their period, so a period that is not a multiple of the 2 ms step jitters: the 200 Hz IMU alternates 4 ms and 6 ms intervals (5 ms mean) | Estimators integrate with real timestamps; the IMU noise model scales white noise with the configured rate | Mean rate correct; per-sample noise is about ±10 % off its nominal level. Runs now print a warning for every such stream and list them in `summary.json.sample_timing_warnings`; the 200 Hz default is kept |
 
 ## Mission lifecycle
 
@@ -453,7 +453,7 @@ dronelab --headless --target 8 0 1 --duration 10 --output outputs/collision   # 
 | `replay.jsonl` | Bus deliveries and truth for `dronelab-replay` (`algorithms.record_bus`) |
 | `algorithm-debug.jsonl` | Plug-in debug series (`context.log`), only when a plug-in logs |
 | `camera-first.png` | First camera frame (rendered runs) |
-| `summary.json` | Lockstep `message_ordering`, health verdict and findings ([7 Experiments](7_experiments.md#run-health-verdict-health)), completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing, `control_timing` and `loop_timing` ([Real-time loop timing](#real-time-loop-timing)), EKF/dropout/vibration/sensor-error/fault diagnostics |
+| `summary.json` | Lockstep `message_ordering`, health verdict and findings ([7 Experiments](7_experiments.md#run-health-verdict-health)), completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing, `control_timing` and `loop_timing` ([Real-time loop timing](#real-time-loop-timing)), `sample_timing_warnings` ([audit](#simulator-environment-audit)), EKF/dropout/vibration/sensor-error/fault diagnostics |
 | `gazebo.log` | Gazebo process output |
 
 Reusing an output directory overwrites these files and can leave stale
