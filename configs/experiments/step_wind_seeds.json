@@ -1,0 +1,29 @@
+{
+  "name": "step_wind_seeds",
+  "scene": "worlds/training.json",
+  "drone": [
+    "configs/missions/step_x.json",
+    "configs/sensors/sensor_errors.json",
+    "configs/algorithms/ekf_observer.json",
+    "configs/control/lockstep.json"
+  ],
+  "control_mode": "rotor-thrust",
+  "duration_s": 12,
+  "seeds": [1, 2, 3],
+  "set": {"wind.enabled": true},
+  "parameters": {"wind.velocity_enu_mps": [[0, 0, 0], [3, 0, 0]]},
+  "metrics": [
+    "control.tracking.position_m.rmse",
+    "step_response.rise_time_s",
+    "step_response.overshoot_pct",
+    "step_response.steady_state_error_m",
+    "estimation.errors.position_m.rmse",
+    "estimation.errors.attitude_deg.rmse",
+    "estimation.nees.mean",
+    "estimation.nis.gps.mean",
+    "summary.completed"
+  ],
+  "parallel": 3,
+  "baseline": "baselines/step_wind_seeds.json",
+  "tolerances": {"default": {"relative": 0.02, "absolute": 1e-6, "direction": "both"}}
+}

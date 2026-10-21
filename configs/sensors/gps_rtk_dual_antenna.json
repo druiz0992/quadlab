@@ -1,0 +1,16 @@
+{
+  "sensors": {
+    "gps": {
+      "rtk": {"enabled": true, "seed": 3, "convergence_s": 10.0},
+      "heading": {"enabled": true, "seed": 4, "noise_std_deg": 0.2},
+      "velocity_error": {
+        "enabled": true,
+        "seed": 5,
+        "white_horizontal_std_mps": 0.03,
+        "white_vertical_std_mps": 0.05,
+        "correlated_std_mps": 0.02,
+        "correlation_time_s": 10.0
+      }
+    }
+  }
+}

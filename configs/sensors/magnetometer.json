@@ -1,0 +1,44 @@
+{
+  "sensors": {
+    "magnetometer": {
+      "enabled": true,
+      "rate_hz": 50,
+      "error_model": {
+        "enabled": true,
+        "seed": 51,
+        "hard_iron_ut": [
+          4.0,
+          -2.5,
+          1.5
+        ],
+        "soft_iron": [
+          [
+            1.03,
+            0.01,
+            0.0
+          ],
+          [
+            0.01,
+            0.98,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.01
+          ]
+        ],
+        "motor_interference_ut_per_n": [
+          0.15,
+          -0.05,
+          0.1
+        ],
+        "white_std_ut": [
+          0.3,
+          0.3,
+          0.3
+        ]
+      }
+    }
+  }
+}

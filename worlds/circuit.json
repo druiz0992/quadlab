@@ -1,0 +1,511 @@
+{
+  "obstacles": [
+    {
+      "name": "boundary_south",
+      "position": [
+        20,
+        -10,
+        1
+      ],
+      "size": [
+        61,
+        0.4,
+        2
+      ]
+    },
+    {
+      "name": "boundary_north",
+      "position": [
+        20,
+        30,
+        1
+      ],
+      "size": [
+        61,
+        0.4,
+        2
+      ]
+    },
+    {
+      "name": "boundary_west",
+      "position": [
+        -10,
+        10,
+        1
+      ],
+      "size": [
+        0.4,
+        40,
+        2
+      ]
+    },
+    {
+      "name": "boundary_east",
+      "position": [
+        50,
+        10,
+        1
+      ],
+      "size": [
+        0.4,
+        40,
+        2
+      ]
+    },
+    {
+      "name": "gate_01_left",
+      "position": [
+        8,
+        -2.2,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_01_right",
+      "position": [
+        8,
+        2.2,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_01_top",
+      "position": [
+        8,
+        0,
+        3.2
+      ],
+      "size": [
+        0.4,
+        4.8,
+        0.4
+      ]
+    },
+    {
+      "name": "gate_02_left",
+      "position": [
+        20,
+        -2.2,
+        2.1
+      ],
+      "size": [
+        0.4,
+        0.4,
+        4.2
+      ]
+    },
+    {
+      "name": "gate_02_right",
+      "position": [
+        20,
+        2.2,
+        2.1
+      ],
+      "size": [
+        0.4,
+        0.4,
+        4.2
+      ]
+    },
+    {
+      "name": "gate_02_top",
+      "position": [
+        20,
+        0,
+        4.0
+      ],
+      "size": [
+        0.4,
+        4.8,
+        0.4
+      ]
+    },
+    {
+      "name": "gate_02_sill",
+      "position": [
+        20,
+        0,
+        0.4
+      ],
+      "size": [
+        0.4,
+        4.8,
+        0.8
+      ]
+    },
+    {
+      "name": "gate_03_left",
+      "position": [
+        31.8,
+        8,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_03_right",
+      "position": [
+        36.2,
+        8,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_03_top",
+      "position": [
+        34,
+        8,
+        3.2
+      ],
+      "size": [
+        4.8,
+        0.4,
+        0.4
+      ]
+    },
+    {
+      "name": "gate_04_left",
+      "position": [
+        31.8,
+        20,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_04_right",
+      "position": [
+        36.2,
+        20,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_04_top",
+      "position": [
+        34,
+        20,
+        3.2
+      ],
+      "size": [
+        4.8,
+        0.4,
+        0.4
+      ]
+    },
+    {
+      "name": "gate_05_left",
+      "position": [
+        20,
+        21.8,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_05_right",
+      "position": [
+        20,
+        26.2,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_05_top",
+      "position": [
+        20,
+        24,
+        3.2
+      ],
+      "size": [
+        0.4,
+        4.8,
+        0.4
+      ]
+    },
+    {
+      "name": "gate_06_left",
+      "position": [
+        4,
+        21.8,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_06_right",
+      "position": [
+        4,
+        26.2,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_06_top",
+      "position": [
+        4,
+        24,
+        3.2
+      ],
+      "size": [
+        0.4,
+        4.8,
+        0.4
+      ]
+    },
+    {
+      "name": "gate_07_left",
+      "position": [
+        -6.2,
+        12,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_07_right",
+      "position": [
+        -1.7999999999999998,
+        12,
+        1.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        3.4
+      ]
+    },
+    {
+      "name": "gate_07_top",
+      "position": [
+        -4,
+        12,
+        3.2
+      ],
+      "size": [
+        4.8,
+        0.4,
+        0.4
+      ]
+    },
+    {
+      "name": "slalom_1",
+      "position": [
+        26,
+        -1.5,
+        1.75
+      ],
+      "size": [
+        0.8,
+        0.8,
+        3.5
+      ]
+    },
+    {
+      "name": "slalom_2",
+      "position": [
+        29,
+        1.5,
+        1.75
+      ],
+      "size": [
+        0.8,
+        0.8,
+        3.5
+      ]
+    },
+    {
+      "name": "slalom_3",
+      "position": [
+        32,
+        -1.5,
+        1.75
+      ],
+      "size": [
+        0.8,
+        0.8,
+        3.5
+      ]
+    },
+    {
+      "name": "low_hurdle",
+      "position": [
+        34,
+        14,
+        0.5
+      ],
+      "size": [
+        5,
+        0.5,
+        1
+      ]
+    },
+    {
+      "name": "island_south",
+      "position": [
+        16,
+        8,
+        1.5
+      ],
+      "size": [
+        18,
+        0.5,
+        3
+      ]
+    },
+    {
+      "name": "island_north",
+      "position": [
+        16,
+        16,
+        1.5
+      ],
+      "size": [
+        18,
+        0.5,
+        3
+      ]
+    },
+    {
+      "name": "island_west",
+      "position": [
+        7,
+        12,
+        1.5
+      ],
+      "size": [
+        0.5,
+        8,
+        3
+      ]
+    },
+    {
+      "name": "island_east",
+      "position": [
+        25,
+        12,
+        1.5
+      ],
+      "size": [
+        0.5,
+        8,
+        3
+      ]
+    },
+    {
+      "name": "island_tower_1",
+      "position": [
+        11,
+        11,
+        2.0
+      ],
+      "size": [
+        2,
+        2,
+        4
+      ]
+    },
+    {
+      "name": "island_tower_2",
+      "position": [
+        17,
+        13,
+        2.5
+      ],
+      "size": [
+        2,
+        2,
+        5
+      ]
+    },
+    {
+      "name": "island_tower_3",
+      "position": [
+        22,
+        11,
+        1.75
+      ],
+      "size": [
+        2,
+        2,
+        3.5
+      ]
+    },
+    {
+      "name": "return_chicane_south",
+      "position": [
+        13,
+        21.5,
+        1
+      ],
+      "size": [
+        0.5,
+        3,
+        2
+      ]
+    },
+    {
+      "name": "return_chicane_north",
+      "position": [
+        10,
+        26.5,
+        1
+      ],
+      "size": [
+        0.5,
+        3,
+        2
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "aerodynamics": {
+    "body_drag": {
+      "enabled": true,
+      "drag_area_m2": [
+        0.012,
+        0.012,
+        0.03
+      ]
+    },
+    "translational_lift": {
+      "enabled": true,
+      "max_gain": 0.15
+    },
+    "vortex_ring": {
+      "enabled": true,
+      "thrust_loss": 0.3,
+      "fluctuation_std": 0.1,
+      "seed": 71
+    }
+  }
+}

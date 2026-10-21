@@ -1,0 +1,11 @@
+{
+  "obstacles": [],
+  "moving_obstacles": [
+    {"name": "cart", "size": [1.0, 0.8, 0.8], "waypoints": [[6, -4, 0.4], [6, 4, 0.4]],
+     "speed_mps": 1.0, "mode": "pingpong"},
+    {"name": "flyer", "size": [0.5, 0.5, 0.3], "waypoints": [[-4, -4, 2.0], [4, -4, 3.0], [4, 4, 2.5], [-4, 4, 3.5]],
+     "speed_mps": 2.0, "mode": "loop"},
+    {"name": "crosser", "size": [0.4, 0.4, 0.4], "waypoints": [[-8, 0, 1.0], [8, 0, 1.0]],
+     "speed_mps": 1.5, "mode": "pingpong"}
+  ]
+}

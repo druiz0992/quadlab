@@ -1,0 +1,10 @@
+{
+  "control": {
+    "odometry_rate_hz": 250,
+    "control_rate_hz": 250,
+    "position_rate_hz": 50,
+    "publish_on_send": true,
+    "state_latency_s": 0.01,
+    "command_latency_s": 0.008
+  }
+}

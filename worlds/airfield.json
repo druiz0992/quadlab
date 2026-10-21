@@ -1,0 +1,53 @@
+{
+  "ground_size_m": 3000,
+  "ground_reflectivity": 0.25,
+  "obstacles": [
+    {
+      "name": "hangar",
+      "position": [
+        60,
+        40,
+        4
+      ],
+      "size": [
+        20,
+        15,
+        8
+      ],
+      "reflectivity": 0.4,
+      "magnetic_moment_am2": [
+        0,
+        0,
+        3000
+      ]
+    },
+    {
+      "name": "tower",
+      "position": [
+        -40,
+        25,
+        6
+      ],
+      "size": [
+        3,
+        3,
+        12
+      ],
+      "reflectivity": 0.6
+    },
+    {
+      "name": "tree_line",
+      "position": [
+        0,
+        -150,
+        5
+      ],
+      "size": [
+        300,
+        6,
+        10
+      ],
+      "reflectivity": 0.15
+    }
+  ]
+}

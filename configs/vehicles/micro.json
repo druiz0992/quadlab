@@ -1,0 +1,46 @@
+{
+  "vehicle": {
+    "body_mass_kg": 0.028,
+    "rotor_mass_kg": 0.0005,
+    "body_inertia_kg_m2": [
+      1.43e-05,
+      1.43e-05,
+      2.85e-05
+    ],
+    "rotor_inertia_kg_m2": 1e-09,
+    "body_size_m": [
+      0.092,
+      0.092,
+      0.03
+    ],
+    "arm_offset_m": 0.0304,
+    "rotor_height_m": 0.02,
+    "propeller_diameter_m": 0.046
+  },
+  "motors": {
+    "thrust_coefficient_n_s2": 2.3e-08,
+    "reaction_moment_ratio_m": 0.0339,
+    "max_speed_rad_s": 2500.0,
+    "time_constant_up_s": 0.072,
+    "time_constant_down_s": 0.072,
+    "rotor_drag_coefficient": 1e-06,
+    "rolling_moment_coefficient": 1e-09
+  },
+  "controller": {
+    "attitude_gain": [
+      0.0005148,
+      0.0005148,
+      0.0002565
+    ],
+    "angular_rate_gain": [
+      0.0001716,
+      0.0001716,
+      0.000171
+    ]
+  },
+  "pilot": {
+    "forward_mps": 0.5,
+    "yaw_rate_rad_s": 1.0,
+    "climb_mps": 0.3
+  }
+}

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dronelab"
+version = "0.1.0"
+description = "Drone simulation lab for testing estimation and control algorithms"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7", "rotorpy==3.0.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "black>=24"]
+gazebo = ["rerun-sdk==0.24.1", "protobuf>=4.25,<6"]
+
+[project.scripts]
+dronelab = "dronelab.cli.gazebo:main"
+dronelab-gazebo = "dronelab.cli.gazebo:main"
+dronelab-batch = "dronelab.cli.batch:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

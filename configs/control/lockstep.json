@@ -1,0 +1,4 @@
+{
+  "simulation": {"lockstep": true, "real_time_factor": 0},
+  "control": {"publish_on_send": true}
+}

@@ -1,0 +1,15 @@
+{
+  "mission": {
+    "type": "chirp",
+    "center_m": [
+      0,
+      -3,
+      1.5
+    ],
+    "axis": "x",
+    "amplitude_m": 0.3,
+    "frequency_start_hz": 0.1,
+    "frequency_end_hz": 1.5,
+    "duration_s": 30.0
+  }
+}

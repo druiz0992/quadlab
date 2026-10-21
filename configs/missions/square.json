@@ -1,0 +1,32 @@
+{
+  "mission": {
+    "type": "waypoints",
+    "waypoints_m": [
+      [
+        3,
+        -1,
+        1.5
+      ],
+      [
+        3,
+        -5,
+        1.5
+      ],
+      [
+        -2,
+        -5,
+        1.5
+      ],
+      [
+        -2,
+        -1,
+        1.5
+      ]
+    ],
+    "speed_mps": 1.5,
+    "dwell_s": 1.0,
+    "laps": 2,
+    "yaw_mode": "path",
+    "yaw_rate_dps": 60
+  }
+}

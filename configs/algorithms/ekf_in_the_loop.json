@@ -1,0 +1,6 @@
+{
+  "extends": "ekf_observer.json",
+  "algorithms": {
+    "control_state_source": "estimate"
+  }
+}

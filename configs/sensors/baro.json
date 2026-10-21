@@ -1,0 +1,16 @@
+{
+  "sensors": {
+    "baro": {
+      "enabled": true,
+      "rate_hz": 50,
+      "error_model": {
+        "enabled": true,
+        "seed": 31,
+        "offset_m": 1.5,
+        "drift_std_m": 0.5,
+        "drift_correlation_time_s": 300,
+        "white_std_m": 0.15
+      }
+    }
+  }
+}

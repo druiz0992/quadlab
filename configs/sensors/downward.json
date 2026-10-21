@@ -1,0 +1,15 @@
+{
+  "sensors": {
+    "rangefinder": {
+      "enabled": true,
+      "range_m": {
+        "noise_stddev": 0.02
+      }
+    },
+    "optical_flow": {
+      "enabled": true,
+      "noise_std_rad_s": 0.02,
+      "seed": 52
+    }
+  }
+}

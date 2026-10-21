@@ -1,0 +1,45 @@
+{
+  "sensors": {
+    "imu": {
+      "faults": {
+        "seed": 22,
+        "events": [
+          {
+            "type": "bias_step",
+            "instrument": "gyro",
+            "start_s": 15.0,
+            "end_s": null,
+            "value": [
+              0.0,
+              0.0,
+              0.02
+            ]
+          },
+          {
+            "type": "spikes",
+            "instrument": "accel",
+            "start_s": 18.0,
+            "end_s": 21.0,
+            "value": [
+              5.0,
+              5.0,
+              5.0
+            ],
+            "probability": 0.02
+          },
+          {
+            "type": "stuck",
+            "instrument": "accel",
+            "start_s": 23.0,
+            "end_s": 24.0,
+            "axes": [
+              true,
+              false,
+              false
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

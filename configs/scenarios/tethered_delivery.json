@@ -1,0 +1,19 @@
+{
+  "payload": {
+    "enabled": true,
+    "mass_kg": 0.05,
+    "tether": {
+      "enabled": true,
+      "initial_length_m": 1.0,
+      "max_length_m": 3.0,
+      "winch_speed_mps": 0.5
+    }
+  },
+  "simulation": {
+    "spawn_position_m": [
+      0,
+      0,
+      2.5
+    ]
+  }
+}

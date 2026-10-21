@@ -1,0 +1,17 @@
+{
+  "simulation": {
+    "spawn_position_m": [
+      0,
+      0,
+      0.12
+    ]
+  },
+  "controller": {
+    "min_altitude_m": 0.05
+  },
+  "aerodynamics": {
+    "ground_effect": {
+      "enabled": true
+    }
+  }
+}

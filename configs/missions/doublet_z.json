@@ -1,0 +1,14 @@
+{
+  "mission": {
+    "type": "doublet",
+    "center_m": [
+      0,
+      0,
+      1.5
+    ],
+    "axis": "z",
+    "amplitude_m": 0.5,
+    "pulse_s": 3.0,
+    "step_time_s": 3.0
+  }
+}

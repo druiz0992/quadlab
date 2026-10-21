@@ -1,0 +1,27 @@
+{
+  "motors": {
+    "time_constant_up_s": 0.04,
+    "time_constant_down_s": 0.06
+  },
+  "battery": {
+    "enabled": true,
+    "cells": 4,
+    "capacity_mah": 5000,
+    "internal_resistance_ohm": 0.02,
+    "initial_soc": 1.0,
+    "powertrain_efficiency": 0.7,
+    "avionics_power_w": 5
+  },
+  "wind": {
+    "still_air_drag": true,
+    "force_scale_per_s": 0.1
+  },
+  "aerodynamics": {
+    "ground_effect": {
+      "enabled": true
+    }
+  },
+  "vehicle": {
+    "propeller_diameter_m": 0.254
+  }
+}

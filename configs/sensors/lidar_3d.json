@@ -1,0 +1,13 @@
+{
+  "sensors": {
+    "lidar": {
+      "enabled": true,
+      "rate_hz": 10,
+      "samples": 360,
+      "vertical_samples": 16,
+      "vertical_min_angle_deg": -15,
+      "vertical_max_angle_deg": 15,
+      "max_range_m": 30
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "sensors": {
+    "imu": {
+      "error_model": {
+        "enabled": true,
+        "seed": 11,
+        "accel_noise_density_mps2_per_sqrt_hz": [
+          0.002,
+          0.002,
+          0.002
+        ],
+        "accel_bias_random_walk_mps2_per_sqrt_s": [
+          0.003,
+          0.003,
+          0.003
+        ],
+        "accel_turn_on_bias_std_mps2": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "gyro_noise_density_rad_s_per_sqrt_hz": [
+          0.00017,
+          0.00017,
+          0.00017
+        ],
+        "gyro_bias_random_walk_rad_s_per_sqrt_s": [
+          2e-05,
+          2e-05,
+          2e-05
+        ],
+        "gyro_turn_on_bias_std_rad_s": [
+          0.003,
+          0.003,
+          0.003
+        ]
+      }
+    },
+    "gps": {
+      "error_model": {
+        "enabled": true,
+        "seed": 12,
+        "horizontal_std_m": 1.0,
+        "vertical_std_m": 2.0,
+        "correlation_time_s": 60.0,
+        "white_horizontal_std_m": 0.3,
+        "white_vertical_std_m": 0.5
+      }
+    }
+  },
+  "ekf": {
+    "accel_std_mps2": 0.0283,
+    "gyro_std_rad_s": 0.0024,
+    "accel_bias_walk": 0.003,
+    "gyro_bias_walk": 2e-05,
+    "gps_std_m": [
+      1.1,
+      1.1,
+      2.1
+    ]
+  }
+}

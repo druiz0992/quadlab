@@ -1,0 +1,21 @@
+{
+  "name": "randomized_square",
+  "scene": "worlds/training.json",
+  "drone": [
+    "configs/missions/square.json",
+    "configs/vehicles/randomized.json",
+    "configs/control/lockstep.json"
+  ],
+  "control_mode": "rotor-thrust",
+  "duration_s": 40,
+  "seeds": [1, 2, 3, 4, 5, 6],
+  "metrics": [
+    "control.tracking.position_m.rmse",
+    "control.tracking.position_m.max",
+    "control.max_tilt_deg",
+    "control.effort.mean_thrust_to_weight",
+    "summary.randomization.mass_factor",
+    "summary.completed"
+  ],
+  "parallel": 3
+}

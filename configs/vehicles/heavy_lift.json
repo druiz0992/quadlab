@@ -1,0 +1,61 @@
+{
+  "vehicle": {
+    "body_mass_kg": 5.8,
+    "rotor_mass_kg": 0.05,
+    "body_inertia_kg_m2": [
+      0.085,
+      0.085,
+      0.165
+    ],
+    "rotor_inertia_kg_m2": 0.0003,
+    "body_size_m": [
+      0.5,
+      0.5,
+      0.2
+    ],
+    "arm_offset_m": 0.2475,
+    "rotor_height_m": 0.1,
+    "propeller_diameter_m": 0.381
+  },
+  "motors": {
+    "thrust_coefficient_n_s2": 7.34e-05,
+    "reaction_moment_ratio_m": 0.02,
+    "max_speed_rad_s": 650.0,
+    "time_constant_up_s": 0.08,
+    "time_constant_down_s": 0.12,
+    "rotor_drag_coefficient": 0.0002,
+    "rolling_moment_coefficient": 1e-05
+  },
+  "battery": {
+    "enabled": true,
+    "cells": 6,
+    "capacity_mah": 16000,
+    "internal_resistance_ohm": 0.01,
+    "initial_soc": 1.0,
+    "powertrain_efficiency": 0.7,
+    "avionics_power_w": 15.0
+  },
+  "wind": {
+    "still_air_drag": true,
+    "force_scale_per_s": 0.1
+  },
+  "controller": {
+    "position_gain": 1.0,
+    "velocity_gain": 1.8,
+    "attitude_gain": [
+      2.125,
+      2.125,
+      1.485
+    ],
+    "angular_rate_gain": [
+      0.595,
+      0.595,
+      0.693
+    ]
+  },
+  "pilot": {
+    "forward_mps": 2.0,
+    "yaw_rate_rad_s": 0.5,
+    "climb_mps": 1.0
+  }
+}

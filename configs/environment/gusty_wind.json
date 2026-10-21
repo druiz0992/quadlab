@@ -1,0 +1,36 @@
+{
+  "wind": {
+    "enabled": true,
+    "velocity_enu_mps": [
+      3,
+      0,
+      0
+    ],
+    "force_scale_per_s": 0.1,
+    "rise_time_s": 1,
+    "gust_amplitude_fraction": 0.25,
+    "gust_period_s": 8,
+    "random_seed": 42,
+    "random_update_period_s": 0.5,
+    "random_speed_std_mps": 0.5,
+    "random_direction_std_deg": 15,
+    "schedule": [
+      {
+        "time_s": 8,
+        "velocity_enu_mps": [
+          0,
+          3,
+          0
+        ]
+      },
+      {
+        "time_s": 18,
+        "velocity_enu_mps": [
+          -2,
+          -2,
+          0
+        ]
+      }
+    ]
+  }
+}

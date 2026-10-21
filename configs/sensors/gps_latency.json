@@ -1,0 +1,6 @@
+{
+  "sensor_timing": {
+    "seed": 9,
+    "gps": {"latency_s": 0.15, "jitter_s": 0.01}
+  }
+}

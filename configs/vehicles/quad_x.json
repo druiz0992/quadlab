@@ -1,0 +1,956 @@
+{
+  "schema_version": 1,
+  "vehicle": {
+    "body_mass_kg": 1.5,
+    "rotor_mass_kg": 0.01,
+    "body_inertia_kg_m2": [
+      0.03,
+      0.03,
+      0.05
+    ],
+    "rotor_inertia_kg_m2": 1e-05,
+    "body_size_m": [
+      0.48,
+      0.48,
+      0.12
+    ],
+    "arm_offset_m": 0.2,
+    "rotor_height_m": 0.08,
+    "propeller_diameter_m": 0.25,
+    "rotors": [],
+    "center_of_mass_offset_m": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "motors": {
+    "thrust_coefficient_n_s2": 8.55e-06,
+    "reaction_moment_ratio_m": 0.016,
+    "max_speed_rad_s": 1000.0,
+    "max_thrust_n": null,
+    "time_constant_up_s": 0.02,
+    "time_constant_down_s": 0.03,
+    "rotor_drag_coefficient": 8e-05,
+    "rolling_moment_coefficient": 1e-06,
+    "rotor_thrust_scale": [],
+    "rotor_moment_scale": [],
+    "esc": {
+      "update_rate_hz": null,
+      "resolution_steps": 0,
+      "telemetry": {
+        "enabled": false,
+        "rate_hz": 100.0,
+        "noise_std_rad_s": 0.0,
+        "seed": 0
+      }
+    },
+    "faults": {
+      "events": []
+    }
+  },
+  "sensors": {
+    "imu": {
+      "mount": {
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "enabled": true,
+      "rate_hz": 200.0,
+      "acceleration_mps2": {
+        "bias": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "noise_stddev": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "angular_rate_rad_s": {
+        "bias": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "noise_stddev": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "vibration": {
+        "enabled": false,
+        "frequency_hz": 60.0,
+        "accel_amplitude_mps2": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "phase_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "random_std_mps2": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "random_correlation_s": 0.01,
+        "clip_limit_mps2": null,
+        "seed": 0
+      },
+      "error_model": {
+        "enabled": false,
+        "seed": 0,
+        "accel_noise_density_mps2_per_sqrt_hz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "accel_bias_random_walk_mps2_per_sqrt_s": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "accel_turn_on_bias_std_mps2": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gyro_noise_density_rad_s_per_sqrt_hz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gyro_bias_random_walk_rad_s_per_sqrt_s": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gyro_turn_on_bias_std_rad_s": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "temperature": {
+        "enabled": false,
+        "warmup_rise_c": 10.0,
+        "warmup_time_constant_s": 120.0,
+        "calibration_c": 25.0,
+        "accel_bias_per_c": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gyro_bias_per_c": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "imperfections": {
+        "enabled": false,
+        "seed": 0,
+        "accel_scale_factor": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gyro_scale_factor": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "accel_cross_coupling": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "gyro_cross_coupling": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "gyro_g_sensitivity_rad_s_per_mps2": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "accel_bias_instability_mps2": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gyro_bias_instability_rad_s": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bias_instability_correlation_s": 100.0,
+        "accel_range_mps2": null,
+        "gyro_range_rad_s": null,
+        "sample_drop_probability": 0.0,
+        "outages_s": [],
+        "timestamp_jitter_s": 0.0
+      },
+      "faults": {
+        "seed": 0,
+        "events": []
+      }
+    },
+    "gps": {
+      "mount": {
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "enabled": true,
+      "rate_hz": 10.0,
+      "dropout": {
+        "probability": 0.0,
+        "seed": 0,
+        "outages_s": [],
+        "zones": []
+      },
+      "multipath": {
+        "enabled": false,
+        "seed": 0,
+        "zones": [],
+        "onset_rate_hz": 0.0,
+        "duration_s": 3.0,
+        "horizontal_std_m": 0.0,
+        "vertical_std_m": 0.0
+      },
+      "error_model": {
+        "enabled": false,
+        "seed": 0,
+        "horizontal_std_m": 0.0,
+        "vertical_std_m": 0.0,
+        "correlation_time_s": 60.0,
+        "white_horizontal_std_m": 0.0,
+        "white_vertical_std_m": 0.0
+      },
+      "horizontal_position_m": {
+        "bias": 0.0,
+        "noise_stddev": 0.0
+      },
+      "vertical_position_m": {
+        "bias": 0.0,
+        "noise_stddev": 0.0
+      },
+      "horizontal_velocity_mps": {
+        "bias": 0.0,
+        "noise_stddev": 0.0
+      },
+      "vertical_velocity_mps": {
+        "bias": 0.0,
+        "noise_stddev": 0.0
+      },
+      "velocity_error": {
+        "enabled": false,
+        "seed": 0,
+        "white_horizontal_std_mps": 0.0,
+        "white_vertical_std_mps": 0.0,
+        "correlated_std_mps": 0.0,
+        "correlation_time_s": 10.0
+      },
+      "receiver": {
+        "seed": 0,
+        "satellites": 14,
+        "satellite_variation": 2,
+        "multipath_satellite_loss": 5,
+        "hdop": 0.9,
+        "uere_m": 1.5,
+        "speed_accuracy_mps": 0.1
+      },
+      "rtk": {
+        "enabled": false,
+        "seed": 0,
+        "convergence_s": 30.0,
+        "float_std_m": 0.3,
+        "fixed_std_m": 0.015,
+        "fixed_vertical_std_m": 0.03
+      },
+      "heading": {
+        "enabled": false,
+        "seed": 0,
+        "noise_std_deg": 0.3,
+        "mount_yaw_deg": 0.0
+      }
+    },
+    "contacts": {
+      "enabled": true,
+      "rate_hz": 100.0
+    },
+    "baro": {
+      "mount": {
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "enabled": false,
+      "rate_hz": 50.0,
+      "pressure_pa": {
+        "bias": 0.0,
+        "noise_stddev": 0.0
+      },
+      "error_model": {
+        "enabled": false,
+        "seed": 0,
+        "offset_m": 0.0,
+        "drift_std_m": 0.0,
+        "drift_correlation_time_s": 300.0,
+        "white_std_m": 0.0,
+        "prop_wash_coefficient": 0.0,
+        "airspeed_coefficient": 0.0
+      }
+    },
+    "camera": {
+      "mount": {
+        "position_m": [
+          0.3,
+          0.0,
+          0.1
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "enabled": false,
+      "rate_hz": 10.0,
+      "width": 320,
+      "height": 240,
+      "horizontal_fov_rad": 1.047,
+      "near_m": 0.1,
+      "far_m": 100.0,
+      "intensity": {
+        "bias": 0.0,
+        "noise_stddev": 0.0
+      },
+      "lens": {
+        "type": "pinhole",
+        "k1": 0.0,
+        "k2": 0.0,
+        "k3": 0.0,
+        "p1": 0.0,
+        "p2": 0.0
+      },
+      "exposure_time_s": 0.0,
+      "rolling_shutter_readout_s": 0.0,
+      "latency_s": 0.0
+    },
+    "lidar": {
+      "mount": {
+        "position_m": [
+          0.0,
+          0.0,
+          0.2
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "enabled": false,
+      "rate_hz": 10.0,
+      "samples": 360,
+      "vertical_samples": 1,
+      "vertical_min_angle_deg": 0.0,
+      "vertical_max_angle_deg": 0.0,
+      "min_range_m": 0.15,
+      "max_range_m": 50.0,
+      "range_m": {
+        "bias": 0.0,
+        "noise_stddev": 0.0
+      },
+      "effects": {
+        "seed": 0,
+        "noise_std_m": 0.0,
+        "noise_per_m": 0.0,
+        "dropout_probability": 0.0,
+        "far_dropout_exponent": 0.0,
+        "scan_time_s": 0.0,
+        "beam_divergence_rad": 0.0,
+        "range_resolution_m": null,
+        "return_mode": "first",
+        "edge_min_jump_m": 0.3,
+        "detection": {
+          "enabled": false,
+          "reference_range_m": 40.0,
+          "reference_reflectivity": 0.1,
+          "default_reflectivity": 0.5
+        }
+      }
+    },
+    "magnetometer": {
+      "mount": {
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "enabled": false,
+      "rate_hz": 50.0,
+      "field_ut": {
+        "bias": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "noise_stddev": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "error_model": {
+        "enabled": false,
+        "seed": 0,
+        "hard_iron_ut": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "soft_iron": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "motor_interference_ut_per_n": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "current_interference_ut_per_a": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "drift_std_ut": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "drift_correlation_s": 300.0,
+        "white_std_ut": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "dipoles": []
+    },
+    "rangefinder": {
+      "mount": {
+        "position_m": [
+          0.0,
+          0.0,
+          -0.07
+        ],
+        "rotation_deg": [
+          0.0,
+          90.0,
+          0.0
+        ]
+      },
+      "enabled": false,
+      "rate_hz": 20.0,
+      "min_range_m": 0.1,
+      "max_range_m": 12.0,
+      "range_m": {
+        "bias": 0.0,
+        "noise_stddev": 0.0
+      }
+    },
+    "battery_monitor": {
+      "enabled": false,
+      "rate_hz": 10.0,
+      "seed": 0,
+      "voltage_noise_std_v": 0.0,
+      "current_noise_std_a": 0.0,
+      "current_offset_a": 0.0
+    },
+    "optical_flow": {
+      "mount": {
+        "position_m": [
+          0.0,
+          0.0,
+          -0.07
+        ],
+        "rotation_deg": [
+          0.0,
+          90.0,
+          0.0
+        ]
+      },
+      "enabled": false,
+      "rate_hz": 50.0,
+      "seed": 0,
+      "min_distance_m": 0.08,
+      "max_distance_m": 8.0,
+      "max_rate_rad_s": 7.0,
+      "noise_std_rad_s": 0.0
+    }
+  },
+  "wind": {
+    "enabled": false,
+    "velocity_enu_mps": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "force_scale_per_s": 0.1,
+    "rise_time_s": 1.0,
+    "gust_amplitude_fraction": 0.0,
+    "gust_period_s": 10.0,
+    "random_seed": 0,
+    "random_update_period_s": 0.5,
+    "random_speed_std_mps": 0.0,
+    "random_direction_std_deg": 0.0,
+    "schedule": [],
+    "still_air_drag": false,
+    "turbulence": {
+      "enabled": false,
+      "seed": 0,
+      "intensity_mps": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "length_scale_m": [
+        20.0,
+        20.0,
+        5.0
+      ],
+      "update_period_s": 0.05,
+      "min_advection_speed_mps": 1.0
+    }
+  },
+  "payload": {
+    "enabled": false,
+    "mass_kg": 0.3,
+    "size_m": [
+      0.12,
+      0.12,
+      0.08
+    ],
+    "offset_m": [
+      0.0,
+      0.0,
+      -0.12
+    ],
+    "drop_s": null,
+    "pickup_radius_m": 0.3,
+    "tether": {
+      "enabled": false,
+      "anchor_m": [
+        0.0,
+        0.0,
+        -0.07
+      ],
+      "initial_length_m": 1.0,
+      "max_length_m": 3.0,
+      "winch_speed_mps": 0.5,
+      "swing_damping": 0.0005,
+      "length_schedule": []
+    }
+  },
+  "failsafe": {
+    "low_battery": {
+      "enabled": false,
+      "action": "land",
+      "warn_remaining_pct": 30.0,
+      "land_remaining_pct": 15.0,
+      "critical_cell_voltage_v": 3.3,
+      "descent_mps": 0.5,
+      "return_speed_mps": 3.0,
+      "home_radius_m": 1.0,
+      "touchdown_height_m": 0.05,
+      "touchdown_speed_mps": 0.1,
+      "touchdown_hold_s": 0.5
+    }
+  },
+  "environment": {
+    "ambient_temperature_c": 25.0,
+    "weather": {
+      "visibility_m": null,
+      "lidar_clutter_per_m": 0.0,
+      "lidar_clutter_max_range_m": 10.0,
+      "lidar_clutter_reflectivity": 0.05
+    }
+  },
+  "battery": {
+    "enabled": false,
+    "cells": 4,
+    "capacity_mah": 5000.0,
+    "internal_resistance_ohm": 0.02,
+    "initial_soc": 1.0,
+    "infinite": false,
+    "thermal": {
+      "enabled": false,
+      "heat_capacity_j_per_k": 300.0,
+      "cooling_w_per_k": 1.5,
+      "resistance_coefficient_per_c": 0.028,
+      "capacity_coefficient_per_c": 0.006
+    },
+    "powertrain_efficiency": 0.7,
+    "avionics_power_w": 5.0
+  },
+  "aerodynamics": {
+    "air_density_kg_m3": 1.225,
+    "ground_effect": {
+      "enabled": false
+    },
+    "body_drag": {
+      "enabled": false,
+      "drag_area_m2": [
+        0.012,
+        0.012,
+        0.03
+      ]
+    },
+    "translational_lift": {
+      "enabled": false,
+      "max_gain": 0.15
+    },
+    "vortex_ring": {
+      "enabled": false,
+      "thrust_loss": 0.3,
+      "fluctuation_std": 0.1,
+      "seed": 0
+    }
+  },
+  "ekf": {
+    "initial_position_m": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "initial_velocity_mps": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "initial_rotation_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "initial_accel_bias_mps2": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "initial_gyro_bias_rad_s": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "initial_position_std_m": 5.0,
+    "initial_velocity_std_mps": 1.0,
+    "initial_attitude_std_deg": 10.0,
+    "initial_accel_bias_std_mps2": 0.2,
+    "initial_gyro_bias_std_rad_s": 0.02,
+    "accel_std_mps2": 0.08,
+    "gyro_std_rad_s": 0.003,
+    "accel_bias_walk": 0.001,
+    "gyro_bias_walk": 0.0001,
+    "gps_std_m": [
+      0.5,
+      0.5,
+      0.8
+    ],
+    "gps_gate_squared": 25.0,
+    "reorder_capacity": 4096,
+    "max_sensor_lag_sim_s": 1.0,
+    "sensor_watchdog_wall_s": 5.0
+  },
+  "control": {
+    "publish_rate_hz": 50.0,
+    "command_lifetime_sim_s": 0.1,
+    "watchdog_wall_s": 1.0,
+    "odometry_rate_hz": 50.0,
+    "control_rate_hz": 50.0,
+    "position_rate_hz": null,
+    "state_latency_s": 0.0,
+    "command_latency_s": 0.0,
+    "publish_on_send": false
+  },
+  "controller": {
+    "position_gain": 1.2,
+    "velocity_gain": 2.2,
+    "attitude_gain": [
+      1.8,
+      1.8,
+      0.8
+    ],
+    "angular_rate_gain": [
+      0.35,
+      0.35,
+      0.25
+    ],
+    "max_acceleration_mps2": 2.0,
+    "max_position_error_m": 1.5,
+    "min_altitude_m": 0.4
+  },
+  "velocity_controller": {
+    "velocity_gain": [
+      3.0,
+      3.0,
+      4.0
+    ],
+    "attitude_gain": [
+      2.0,
+      2.0,
+      0.15
+    ],
+    "angular_rate_gain": [
+      0.4,
+      0.4,
+      0.18
+    ],
+    "max_acceleration_mps2": [
+      2.0,
+      2.0,
+      2.0
+    ]
+  },
+  "keyboard_effects": {
+    "motor_stop_rotor": 0,
+    "damaged_rotor": 1,
+    "damaged_thrust_fraction": 0.7,
+    "gps_multipath_offset_enu_m": [
+      4.0,
+      -3.0,
+      2.0
+    ],
+    "gyro_bias_step_rad_s": [
+      0.0,
+      0.0,
+      0.02
+    ],
+    "flying_object_size_m": [
+      0.5,
+      0.5,
+      0.3
+    ],
+    "flying_object_radius_m": 3.0,
+    "flying_object_speed_mps": 2.0,
+    "battery_drain_fraction": 0.1,
+    "ambient_step_c": 10.0
+  },
+  "randomization": {
+    "enabled": false,
+    "seed": 0,
+    "mass_fraction_std": 0.0,
+    "inertia_fraction_std": 0.0,
+    "center_of_mass_std_m": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotor_thrust_fraction_std": 0.0,
+    "rotor_moment_fraction_std": 0.0,
+    "motor_time_constant_fraction_std": 0.0,
+    "imu_mount_rotation_std_deg": 0.0
+  },
+  "algorithms": {
+    "estimator": "",
+    "estimator_options": {},
+    "controller": "",
+    "controller_options": {},
+    "control_state_source": "truth",
+    "max_estimate_age_s": 0.1,
+    "evaluation_rate_hz": 50.0,
+    "evaluation_start_s": 2.0
+  },
+  "sensor_timing": {
+    "seed": 0,
+    "reorder_window_s": 0.004,
+    "imu": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "gps": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "gps_heading": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "baro": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "magnetometer": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "rangefinder": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "optical_flow": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "battery_monitor": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "esc": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "lidar": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    },
+    "camera": {
+      "latency_s": 0.0,
+      "jitter_s": 0.0,
+      "timestamp_offset_s": 0.0
+    }
+  },
+  "mission": {
+    "type": "none",
+    "center_m": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "yaw_deg": 0.0,
+    "yaw_mode": "fixed",
+    "step_m": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "step_time_s": 2.0,
+    "waypoints_m": [],
+    "speed_mps": 1.0,
+    "dwell_s": 1.0,
+    "laps": 1,
+    "yaw_rate_dps": 45.0,
+    "radius_m": 2.0,
+    "axis": "x",
+    "amplitude_m": 0.5,
+    "frequency_start_hz": 0.1,
+    "frequency_end_hz": 1.0,
+    "duration_s": 30.0,
+    "pulse_s": 2.0
+  },
+  "pilot": {
+    "forward_mps": 1.0,
+    "yaw_rate_rad_s": 0.7,
+    "climb_mps": 0.6,
+    "takeoff_altitude_m": 1.0,
+    "takeoff_climb_mps": 0.5
+  },
+  "simulation": {
+    "step_s": 0.002,
+    "real_time_factor": 1.0,
+    "lockstep": false,
+    "spawn_position_m": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "start_on_ground": false
+  }
+}

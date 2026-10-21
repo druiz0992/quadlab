@@ -1,0 +1,12 @@
+{
+  "mission": {
+    "type": "figure_eight",
+    "center_m": [
+      0,
+      -4,
+      1.5
+    ],
+    "radius_m": 3.0,
+    "speed_mps": 2.0
+  }
+}

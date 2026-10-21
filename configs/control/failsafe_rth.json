@@ -1,0 +1,8 @@
+{
+  "failsafe": {
+    "low_battery": {
+      "enabled": true,
+      "action": "return_and_land"
+    }
+  }
+}

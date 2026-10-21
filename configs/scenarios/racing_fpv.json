@@ -1,0 +1,11 @@
+{
+  "extends": [
+    "../vehicles/racing_5in.json",
+    "../sensors/fpv_camera.json"
+  ],
+  "sensors": {
+    "gps": {
+      "enabled": false
+    }
+  }
+}

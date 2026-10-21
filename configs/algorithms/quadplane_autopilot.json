@@ -1,0 +1,53 @@
+{
+  "algorithms": {
+    "controller": "dronelab.control.quadplane:QuadplaneController",
+    "controller_options": {
+      "cruise_altitude_m": 40.0,
+      "cruise_airspeed_mps": 22.0,
+      "laps": 1,
+      "route_m": [
+        [
+          300,
+          0
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          0,
+          300
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "hover": {
+        "position_gain": 1.0,
+        "velocity_gain": 1.8,
+        "attitude_gain": [
+          64.8,
+          86.4,
+          35.0
+        ],
+        "angular_rate_gain": [
+          17.3,
+          23.0,
+          18.7
+        ],
+        "max_acceleration_mps2": 5.0,
+        "max_position_error_m": 2.0,
+        "min_altitude_m": 0.8
+      }
+    }
+  },
+  "mission": {
+    "type": "hold",
+    "center_m": [
+      0,
+      0,
+      0
+    ]
+  }
+}

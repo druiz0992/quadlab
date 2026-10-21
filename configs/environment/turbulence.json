@@ -1,0 +1,26 @@
+{
+  "wind": {
+    "enabled": true,
+    "velocity_enu_mps": [
+      3,
+      0,
+      0
+    ],
+    "rise_time_s": 0.1,
+    "turbulence": {
+      "enabled": true,
+      "seed": 41,
+      "intensity_mps": [
+        1.0,
+        0.8,
+        0.5
+      ],
+      "length_scale_m": [
+        20,
+        20,
+        5
+      ],
+      "update_period_s": 0.05
+    }
+  }
+}

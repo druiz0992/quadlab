@@ -1,0 +1,143 @@
+{
+  "vehicle": {
+    "body_mass_kg": 21.25,
+    "rotor_mass_kg": 0.15,
+    "body_inertia_kg_m2": [
+      1.8,
+      2.4,
+      3.9
+    ],
+    "rotor_inertia_kg_m2": 0.0005,
+    "body_size_m": [
+      1.6,
+      0.25,
+      0.25
+    ],
+    "propeller_diameter_m": 0.56,
+    "rotor_height_m": 0.15,
+    "rotors": [
+      {
+        "position_m": [
+          0.65,
+          0.75,
+          0.15
+        ],
+        "direction": "ccw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          -0.65,
+          -0.75,
+          0.15
+        ],
+        "direction": "ccw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          0.65,
+          -0.75,
+          0.15
+        ],
+        "direction": "cw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          -0.65,
+          0.75,
+          0.15
+        ],
+        "direction": "cw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          -0.85,
+          0.0,
+          0.0
+        ],
+        "direction": "ccw",
+        "axis": [
+          1,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "motors": {
+    "thrust_coefficient_n_s2": 0.0002245,
+    "reaction_moment_ratio_m": 0.03,
+    "max_speed_rad_s": 700.0,
+    "time_constant_up_s": 0.06,
+    "time_constant_down_s": 0.09
+  },
+  "fixed_wing": {
+    "enabled": true,
+    "wing_area_m2": 0.932,
+    "wingspan_m": 2.99,
+    "chord_m": 0.312,
+    "oswald_efficiency": 0.9,
+    "stall_alpha_rad": 0.27,
+    "coefficients": {
+      "Cm0": 0.25
+    }
+  },
+  "battery": {
+    "enabled": true,
+    "cells": 12,
+    "capacity_mah": 45000,
+    "internal_resistance_ohm": 0.02,
+    "powertrain_efficiency": 0.85,
+    "avionics_power_w": 40.0
+  },
+  "controller": {
+    "position_gain": 1.0,
+    "velocity_gain": 1.8,
+    "attitude_gain": [
+      64.8,
+      86.4,
+      35.0
+    ],
+    "angular_rate_gain": [
+      17.3,
+      23.0,
+      18.7
+    ],
+    "max_acceleration_mps2": 5.0,
+    "max_position_error_m": 2.0,
+    "min_altitude_m": 0.8
+  },
+  "sensors": {
+    "airspeed": {
+      "enabled": true,
+      "noise_std_pa": 1.0,
+      "seed": 31
+    }
+  },
+  "simulation": {
+    "spawn_position_m": [
+      0.0,
+      0.0,
+      2.0
+    ]
+  }
+}

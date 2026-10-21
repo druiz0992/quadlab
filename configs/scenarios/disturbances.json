@@ -1,0 +1,6 @@
+{
+  "extends": [
+    "../environment/gusty_wind.json",
+    "../faults/gps_dropout.json"
+  ]
+}

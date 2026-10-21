@@ -1,0 +1,13 @@
+{
+  "mission": {
+    "type": "circle",
+    "center_m": [
+      0,
+      -4,
+      1.5
+    ],
+    "radius_m": 2.5,
+    "speed_mps": 1.5,
+    "yaw_mode": "path"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "terrain": {
+    "seed": 7,
+    "size_m": [60.0, 60.0],
+    "resolution_m": 0.5,
+    "hills": 14,
+    "max_height_m": 3.0,
+    "hill_radius_m": [3.0, 9.0],
+    "flat_radius_m": 4.0
+  },
+  "obstacles": [
+    {"name": "mast", "position": [12.0, 6.0, 4.0], "size": [0.4, 0.4, 8.0]}
+  ]
+}

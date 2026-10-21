@@ -1,0 +1,22 @@
+{
+  "sensors": {
+    "imu": {
+      "imperfections": {
+        "enabled": true,
+        "seed": 21,
+        "accel_scale_factor": [0.005, -0.004, 0.006],
+        "gyro_scale_factor": [0.003, 0.004, -0.003],
+        "accel_cross_coupling": [[0, 0.0035, -0.002], [-0.003, 0, 0.0025], [0.002, -0.003, 0]],
+        "gyro_cross_coupling": [[0, 0.003, 0.002], [-0.0025, 0, -0.003], [0.003, 0.002, 0]],
+        "gyro_g_sensitivity_rad_s_per_mps2": [[5e-5, 0, 0], [0, 5e-5, 0], [0, 0, 5e-5]],
+        "accel_bias_instability_mps2": [0.0005, 0.0005, 0.0005],
+        "gyro_bias_instability_rad_s": [5e-05, 5e-05, 5e-05],
+        "bias_instability_correlation_s": 100.0,
+        "accel_range_mps2": 156.9,
+        "gyro_range_rad_s": 34.9,
+        "sample_drop_probability": 0.001,
+        "timestamp_jitter_s": 0.0005
+      }
+    }
+  }
+}

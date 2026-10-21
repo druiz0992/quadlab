@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "sensors": {
+    "imu": {
+      "acceleration_mps2": {
+        "bias": [
+          0.02,
+          -0.01,
+          0.03
+        ],
+        "noise_stddev": [
+          0.08,
+          0.08,
+          0.08
+        ]
+      },
+      "angular_rate_rad_s": {
+        "bias": [
+          0.001,
+          -0.002,
+          0.001
+        ],
+        "noise_stddev": [
+          0.003,
+          0.003,
+          0.003
+        ]
+      }
+    },
+    "gps": {
+      "horizontal_position_m": {
+        "noise_stddev": 0.5
+      },
+      "vertical_position_m": {
+        "bias": 0.2,
+        "noise_stddev": 0.8
+      }
+    },
+    "lidar": {
+      "range_m": {
+        "bias": 0.01,
+        "noise_stddev": 0.02
+      }
+    },
+    "camera": {
+      "intensity": {
+        "noise_stddev": 0.01
+      }
+    }
+  }
+}

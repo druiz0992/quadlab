@@ -1,0 +1,16 @@
+{
+  "sensors": {
+    "imu": {
+      "vibration": {
+        "enabled": true,
+        "frequency_hz": 60,
+        "accel_amplitude_mps2": [2, 2, 15],
+        "phase_deg": [0, 90, 0],
+        "random_std_mps2": [0.3, 0.3, 1],
+        "random_correlation_s": 0.01,
+        "clip_limit_mps2": 19.62,
+        "seed": 42
+      }
+    }
+  }
+}

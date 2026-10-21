@@ -1,0 +1,13 @@
+{
+  "algorithms": {
+    "estimator": "gps_imu_ekf"
+  },
+  "ekf": {
+    "initial_position_m": [
+      0,
+      0,
+      1
+    ],
+    "initial_position_std_m": 1.0
+  }
+}

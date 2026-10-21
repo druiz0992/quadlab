@@ -1,0 +1,14 @@
+{
+  "motors": {
+    "esc": {
+      "update_rate_hz": 100.0,
+      "resolution_steps": 2000,
+      "telemetry": {
+        "enabled": true,
+        "rate_hz": 100.0,
+        "noise_std_rad_s": 3.0,
+        "seed": 7
+      }
+    }
+  }
+}

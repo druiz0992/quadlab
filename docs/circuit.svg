@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 530" role="img" aria-label="DroneLab circuit top view, 60 by 40 metres">
+<rect width="720" height="530" fill="#f6f8fa"/>
+<text x="50" y="28" font-family="sans-serif" font-size="18">DroneLab circuit · top view · metres · north is +y</text>
+<rect x="45.0" y="448.0" width="610" height="4.0" fill="#596776"><title>boundary_south</title></rect>
+<rect x="45.0" y="48.00000000000001" width="610" height="4.0" fill="#596776"><title>boundary_north</title></rect>
+<rect x="48.00000000000001" y="50.0" width="4.0" height="400" fill="#596776"><title>boundary_west</title></rect>
+<rect x="648.0" y="50.0" width="4.0" height="400" fill="#596776"><title>boundary_east</title></rect>
+<rect x="228.0" y="370.0" width="4.0" height="4.0" fill="#596776"><title>gate_01_left</title></rect>
+<rect x="228.0" y="326.0" width="4.0" height="4.0" fill="#596776"><title>gate_01_right</title></rect>
+<rect x="228.0" y="326.0" width="4.0" height="48.0" fill="#596776"><title>gate_01_top</title></rect>
+<rect x="348.0" y="370.0" width="4.0" height="4.0" fill="#596776"><title>gate_02_left</title></rect>
+<rect x="348.0" y="326.0" width="4.0" height="4.0" fill="#596776"><title>gate_02_right</title></rect>
+<rect x="348.0" y="326.0" width="4.0" height="48.0" fill="#596776"><title>gate_02_top</title></rect>
+<rect x="348.0" y="326.0" width="4.0" height="48.0" fill="#596776"><title>gate_02_sill</title></rect>
+<rect x="466.0" y="268.0" width="4.0" height="4.0" fill="#596776"><title>gate_03_left</title></rect>
+<rect x="510.0" y="268.0" width="4.0" height="4.0" fill="#596776"><title>gate_03_right</title></rect>
+<rect x="466.0" y="268.0" width="48.0" height="4.0" fill="#596776"><title>gate_03_top</title></rect>
+<rect x="466.0" y="148.0" width="4.0" height="4.0" fill="#596776"><title>gate_04_left</title></rect>
+<rect x="510.0" y="148.0" width="4.0" height="4.0" fill="#596776"><title>gate_04_right</title></rect>
+<rect x="466.0" y="148.0" width="48.0" height="4.0" fill="#596776"><title>gate_04_top</title></rect>
+<rect x="348.0" y="130.0" width="4.0" height="4.0" fill="#596776"><title>gate_05_left</title></rect>
+<rect x="348.0" y="86.00000000000001" width="4.0" height="4.0" fill="#596776"><title>gate_05_right</title></rect>
+<rect x="348.0" y="86.00000000000001" width="4.0" height="48.0" fill="#596776"><title>gate_05_top</title></rect>
+<rect x="188.0" y="130.0" width="4.0" height="4.0" fill="#596776"><title>gate_06_left</title></rect>
+<rect x="188.0" y="86.00000000000001" width="4.0" height="4.0" fill="#596776"><title>gate_06_right</title></rect>
+<rect x="188.0" y="86.00000000000001" width="4.0" height="48.0" fill="#596776"><title>gate_06_top</title></rect>
+<rect x="86.0" y="228.0" width="4.0" height="4.0" fill="#596776"><title>gate_07_left</title></rect>
+<rect x="130.0" y="228.0" width="4.0" height="4.0" fill="#596776"><title>gate_07_right</title></rect>
+<rect x="86.0" y="228.0" width="48.0" height="4.0" fill="#596776"><title>gate_07_top</title></rect>
+<rect x="406.0" y="361.0" width="8.0" height="8.0" fill="#596776"><title>slalom_1</title></rect>
+<rect x="436.0" y="331.0" width="8.0" height="8.0" fill="#596776"><title>slalom_2</title></rect>
+<rect x="466.0" y="361.0" width="8.0" height="8.0" fill="#596776"><title>slalom_3</title></rect>
+<rect x="465.0" y="207.5" width="50" height="5.0" fill="#596776"><title>low_hurdle</title></rect>
+<rect x="220.0" y="267.5" width="180" height="5.0" fill="#596776"><title>island_south</title></rect>
+<rect x="220.0" y="187.5" width="180" height="5.0" fill="#596776"><title>island_north</title></rect>
+<rect x="217.5" y="190.0" width="5.0" height="80" fill="#596776"><title>island_west</title></rect>
+<rect x="397.5" y="190.0" width="5.0" height="80" fill="#596776"><title>island_east</title></rect>
+<rect x="250.0" y="230.0" width="20" height="20" fill="#596776"><title>island_tower_1</title></rect>
+<rect x="310.0" y="210.0" width="20" height="20" fill="#596776"><title>island_tower_2</title></rect>
+<rect x="360.0" y="230.0" width="20" height="20" fill="#596776"><title>island_tower_3</title></rect>
+<rect x="277.5" y="120.0" width="5.0" height="30" fill="#596776"><title>return_chicane_south</title></rect>
+<rect x="247.5" y="70.0" width="5.0" height="30" fill="#596776"><title>return_chicane_north</title></rect>
+<polyline points="150,350 230,350 350,350 400,340 430,360 460,340 490,320 490,270 490,210 490,150 490,110 350,110 290,100 270,110 250,120 190,110 110,110 110,230 110,350 150,350" fill="none" stroke="#008c95" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="237" y="342" font-family="sans-serif" font-size="13" fill="#a33b00">G1</text>
+<text x="357" y="342" font-family="sans-serif" font-size="13" fill="#a33b00">G2</text>
+<text x="497" y="262" font-family="sans-serif" font-size="13" fill="#a33b00">G3</text>
+<text x="497" y="142" font-family="sans-serif" font-size="13" fill="#a33b00">G4</text>
+<text x="357" y="102" font-family="sans-serif" font-size="13" fill="#a33b00">G5</text>
+<text x="197" y="102" font-family="sans-serif" font-size="13" fill="#a33b00">G6</text>
+<text x="117" y="222" font-family="sans-serif" font-size="13" fill="#a33b00">G7</text>
+<circle cx="150" cy="350" r="5" fill="#008c95"/>
+<text x="126" y="372" font-family="sans-serif" font-size="13">Start (0,0)</text>
+<text x="50" y="488" font-family="sans-serif" font-size="14">Dashed line: suggested direction from start through G1–G7, then home.</text>
+<text x="50" y="510" font-family="sans-serif" font-size="13">Route is illustrative; altitude and collision clearance require flight validation.</text>
+</svg>

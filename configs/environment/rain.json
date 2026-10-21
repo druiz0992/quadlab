@@ -1,0 +1,18 @@
+{
+  "environment": {
+    "weather": {
+      "visibility_m": 1500,
+      "lidar_clutter_per_m": 0.01,
+      "lidar_clutter_max_range_m": 15
+    }
+  },
+  "sensors": {
+    "lidar": {
+      "effects": {
+        "detection": {
+          "enabled": true
+        }
+      }
+    }
+  }
+}

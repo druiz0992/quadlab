@@ -1,0 +1,96 @@
+{
+  "vehicle": {
+    "body_mass_kg": 2.4,
+    "body_inertia_kg_m2": [
+      0.06,
+      0.06,
+      0.1
+    ],
+    "body_size_m": [
+      0.6,
+      0.6,
+      0.14
+    ],
+    "propeller_diameter_m": 0.28,
+    "rotors": [
+      {
+        "position_m": [
+          0.3031,
+          0.175,
+          0.08
+        ],
+        "direction": "ccw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          0.0,
+          0.35,
+          0.08
+        ],
+        "direction": "cw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          -0.3031,
+          0.175,
+          0.08
+        ],
+        "direction": "ccw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          -0.3031,
+          -0.175,
+          0.08
+        ],
+        "direction": "cw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          -0.0,
+          -0.35,
+          0.08
+        ],
+        "direction": "ccw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "position_m": [
+          0.3031,
+          -0.175,
+          0.08
+        ],
+        "direction": "cw",
+        "axis": [
+          0,
+          0,
+          1
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "motors": {
+    "faults": {
+      "events": [
+        {
+          "type": "partial_thrust",
+          "rotor": 1,
+          "start_s": 5.0,
+          "end_s": null,
+          "value": 0.7
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "motors": {
+    "faults": {
+      "events": [
+        {
+          "type": "stop",
+          "rotor": 0,
+          "start_s": 5.0,
+          "end_s": null
+        }
+      ]
+    }
+  }
+}
