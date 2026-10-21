@@ -27,7 +27,12 @@ from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
 from ..control.interface import ControlState, RotorController
-from ..core.algorithms import AlgorithmContext, SensorDescription
+from ..core.algorithms import (
+    AlgorithmContext,
+    DebugLog,
+    SensorDescription,
+    ignore_debug,
+)
 from ..core.measurements import EstimatedState, GpsReading, Sample
 from ..core.vehicle import DroneProperties
 from ..estimation.interface import Innovation, StateEstimator
@@ -68,8 +73,12 @@ def build_context(
     vehicle: DroneProperties,
     gps_reference: GpsReading,
     kinds: tuple[str, ...],
+    log: DebugLog = ignore_debug,
 ) -> AlgorithmContext:
-    """Context from configuration only: sensor frames, rates, and mounts."""
+    """Context from configuration only: sensor frames, rates, and mounts.
+
+    ``log`` backs ``context.log`` (the plug-ins' debug channel).
+    """
     sensors = settings["sensors"]
     descriptions = {}
     for kind in kinds:
@@ -92,7 +101,7 @@ def build_context(
             quaternion,
             calibration if calibration and calibration.get("enabled") else None,
         )
-    return AlgorithmContext(gps_reference, vehicle, descriptions)
+    return AlgorithmContext(gps_reference, vehicle, descriptions, log=log)
 
 
 def build_estimator(
@@ -230,15 +239,22 @@ def build_algorithm_stack(
     bus_kinds: tuple[str, ...],
     *,
     rotor_mode: bool,
+    log: DebugLog = ignore_debug,
+    need_bus: bool = False,
 ) -> AlgorithmStack:
     """Context, estimator, sensor bus, runner, state source, and controller.
 
-    Algorithms see configuration-derived context only, never truth.
+    Algorithms see configuration-derived context only, never truth. The bus
+    exists with an estimator, or when ``need_bus`` (recording for replay).
     """
     algorithms = settings["algorithms"]
-    context = build_context(settings, vehicle, reference, bus_kinds)
+    context = build_context(settings, vehicle, reference, bus_kinds, log)
     estimator = build_estimator(settings, context)
-    bus = SensorBus(settings["sensor_timing"], bus_kinds) if estimator else None
+    bus = (
+        SensorBus(settings["sensor_timing"], bus_kinds)
+        if estimator or need_bus
+        else None
+    )
     runner = AlgorithmRunner(bus, estimator) if bus is not None else None
     estimate_source = (
         EstimateStateSource(

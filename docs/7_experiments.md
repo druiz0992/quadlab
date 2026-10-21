@@ -32,6 +32,7 @@ controller only receives it when `control_state_source` is `truth`.
 | `max_estimate_age_s` | 0.1 | Older estimate at a control tick stops the mission (`StaleEstimate`) |
 | `evaluation_rate_hz` | 50 | Rate at which estimates are scored |
 | `evaluation_start_s` | 2 | Estimates in the first seconds are not scored (convergence) |
+| `record_bus` | off | Record bus deliveries and truth for offline replay: `off`, `light` (all streams but camera and lidar), `all` ([Offline replay](#offline-replay)) |
 
 Plug-ins are constructed as `cls(context, options)`.
 `context` is an `AlgorithmContext` (`core/algorithms.py`):
@@ -42,6 +43,17 @@ Plug-ins are constructed as `cls(context, options)`.
   mount position and quaternion, as from a calibration file.
 
 It deliberately excludes simulator truth and the configured error models.
+
+`context.log(name, sim_time_ns, values, labels=None)` is the plug-ins'
+**debug channel** for their own time series (innovations, internal states,
+gains). Entries go to `algorithm-debug.jsonl` (`name`, `sim_time_ns`,
+`values`, `labels`) and to Rerun under `algorithms/<name>` in Gazebo runs,
+and to the replay output offline. Stamp each entry with the sample time it
+describes. Names use letters, digits, `_ . / -`; values must be finite;
+invalid entries raise `ValueError` at the call. The file is only created
+when something is logged; `summary.json.algorithm_debug_entries` counts
+entries. The built-in EKF logs `ekf/gps` (NIS, accepted) and `ekf/bias`
+(accelerometer and gyro bias estimates) at each GPS update.
 Option objects are passed through without validation, so plug-ins must
 check them.
 
@@ -258,12 +270,15 @@ value seen), `subject` (e.g. the obstacle's model), and a `message`.
 | `hard_impact` | failed | a contact while the true speed in the preceding `impact_window_s` exceeded `hard_impact_speed_mps` |
 | `obstacle_contact` | failed | contact with any model other than `ground` or `terrain` (the attached payload is ignored) |
 | `below_ground` | failed | body centre more than `below_ground_margin_m` below the ground or terrain surface |
+| `no_liftoff` | failed | commanded thrust ≥ `no_liftoff_thrust_ratio` × weight for `no_liftoff_s` while the vehicle neither rose 5 cm nor moved faster than 0.2 m/s (commands not reaching the motors, a pinned vehicle) |
 | `incomplete` | failed | the run ended on an error before its duration (e.g. a stale estimate) |
 | `interrupted` | warning | Ctrl-C (closing the keyboard window is a normal end) |
 | `ground_contact` | warning | a touchdown after at least `touchdown_gap_s` without contact; resting on the ground from the start is not one |
+| `tracking_lost` | warning | mission position error above `tracking_lost_m` for `tracking_lost_s`; a warning on purpose, so poor tracking stays in batch aggregates as a result |
 | `left_ground_area` | warning | flew past the ground plane's edge (also `left_ground_area_s`) |
 | `saturated` | warning | more than `saturated_fraction` of non-warm-up commands saturated |
 | `dropped_messages` | warning | more than `max_dropped_messages` messages dropped (ingress queues plus command events) |
+| `ordering_timeouts` | warning | lockstep periods processed before every scheduled sample arrived (not deterministic; [2 Simulation](2_simulation.md#lockstep-simulation)) |
 
 The thresholds are the drone config's `health` section, recorded in the
 verdict:
@@ -278,6 +293,10 @@ verdict:
 | `touchdown_gap_s` | 0.5 | s |
 | `saturated_fraction` | 0.5 | fraction, in (0, 1] |
 | `max_dropped_messages` | 0 | count |
+| `no_liftoff_s` | 1.0 | s |
+| `no_liftoff_thrust_ratio` | 1.2 | × true weight, > 1 |
+| `tracking_lost_m` | 2.0 | m |
+| `tracking_lost_s` | 3.0 | s |
 
 Contacts come from the drone body's contact sensor, so they cover the
 body box only. The impact speed looks back over a window because Gazebo can
@@ -288,6 +307,48 @@ gives a `ground_contact` warning; aerobatic experiments should raise
 Verified in lockstep: a hover was `ok`; with the battery started at 1 %
 charge from 2 m, the vehicle fell and the run `failed` with a 6.0 m/s
 ground impact at 3.5 s.
+
+## Offline replay
+
+Estimators can be developed and compared without Gazebo. A run with
+`algorithms.record_bus` set to `light` (`configs/algorithms/record_replay.json`)
+or `all` writes `replay.jsonl` (`experiments/replay_log.py`):
+
+- a header with the resolved settings, the true weight, and the
+  `AlgorithmContext` the plug-ins were given;
+- every sample the sensor bus delivered, in delivery order, interleaved
+  with the truth samples (and the effective IMU bias the metrics score
+  against) exactly as the live run processed them.
+
+Recording creates the sensor bus even without an estimator, so a flight
+can be recorded once and used for any number of estimators. `light` keeps
+logs small (about 190 kB per simulated second with IMU at 200 Hz and GPS at
+10 Hz); `all` adds camera frames and lidar points.
+
+```bash
+dronelab ... --drone configs/algorithms/record_replay.json --output outputs/rec
+dronelab-replay outputs/rec --output outputs/rec-ekf                      # estimator as flown
+dronelab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:MyFilter \
+  --set 'algorithms.estimator_options={"gain": 2}'
+dronelab-replay outputs/rec --output outputs/rec-tuned --set 'ekf.gps_std_m=[1,1,2]'
+```
+
+`dronelab-replay` (`experiments/replay.py`) builds the estimator from the
+recorded settings plus `--set` overrides (dotted keys, JSON values,
+validated like any config layer) and the recorded context, feeds it the
+samples in order, and scores it against the recorded truth with the same
+metrics as a live run. It writes `estimates.jsonl`, `metrics.json`
+(`estimation` section), `algorithm-debug.jsonl`, `replay-settings.json`,
+and `replay-summary.json` into a fresh directory. The estimator never sees
+truth.
+
+Replay is **open loop**: the recorded flight does not change, so it suits
+estimators, not controllers, and flying on a different estimate still
+needs the simulator. The context is as recorded (sensor overrides do not
+change it). The `--ekf` live observer does not use the bus and is not
+recorded. Verified in lockstep: replaying the built-in EKF on a 20 s
+square with sensor errors reproduced the live `estimates.jsonl`,
+`algorithm-debug.jsonl`, and estimation metrics exactly, in 3.4 s.
 
 ## Batch experiments and baselines
 

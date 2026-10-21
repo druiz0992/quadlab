@@ -9,7 +9,7 @@ models: configured noise describes the simulator, never knowledge an
 algorithm should have.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 from types import MappingProxyType
@@ -35,14 +35,37 @@ class SensorDescription:
     calibration: Mapping[str, Any] | None = None
 
 
+DebugLog = Callable[[str, int, Sequence[float], Sequence[str] | None], None]
+
+
+def ignore_debug(
+    name: str,
+    sim_time_ns: int,
+    values: Sequence[float],
+    labels: Sequence[str] | None = None,
+) -> None:
+    """Default debug channel: discard (algorithms may always call ``log``)."""
+
+
 @dataclass(frozen=True)
 class AlgorithmContext:
-    """Static information for algorithm construction (see module docs)."""
+    """Static information for algorithm construction (see module docs).
+
+    ``log(name, sim_time_ns, values, labels=None)`` records a plug-in's own
+    time series (innovations, internal states, gains) for inspection: to
+    ``algorithm-debug.jsonl`` and Rerun (``algorithms/<name>``) in Gazebo
+    runs, and to the replay output offline. Stamp entries with the sample
+    time they describe. ``values`` must be finite numbers; ``labels``
+    (default ``0, 1, ...``) must match them in length.
+    """
 
     gps_reference: GpsReading
     vehicle: DroneProperties
     sensors: Mapping[str, SensorDescription] = field(default_factory=dict)
     gravity_mps2: float = 9.81
+    log: DebugLog = field(
+        default=ignore_debug, compare=False, repr=False, metadata={"serialize": False}
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "sensors", MappingProxyType(dict(self.sensors)))

@@ -38,13 +38,17 @@ from ..control.manual import FlightCommand
 from ..control.waypoint import waypoint_velocity
 from ..simulation.gazebo.environment import gazebo_environment
 from ..simulation.gazebo.messages import timestamp, timestamp_ns, vector
+from ..simulation.gazebo.stepping import wait_for_subscribers
 from .keyboard_flight import apply_keyboard_effects
 from .rotor_loop import RotorControlLoop
 from .rotor_mission import RotorMission, RotorMissionParts
+from .replay_log import estimate_record
 from .run_summary import build_summary, final_exit_reason
 
 # Real-time limits (wall seconds) for a silent simulator.
 NO_TELEMETRY_TIMEOUT_WALL_S = 30.0
+# Gazebo start-up allowance for command-topic subscriptions (wall s).
+STARTUP_TIMEOUT_WALL_S = 60.0
 # Native velocity-mode command period (s, simulation time).
 VELOCITY_COMMAND_PERIOD_S = 0.04
 
@@ -54,7 +58,8 @@ class MissionParts:
     """Everything the running mission uses, built before Gazebo starts.
 
     Optional parts are None when not configured. ``command`` is the
-    ``gz sim`` command line; ``current_wind()`` the wind the vehicle sees.
+    ``gz sim`` command line; ``current_wind()`` the wind the vehicle sees;
+    ``orderer`` (lockstep only) fixes the processing order of messages.
     """
 
     args: Any
@@ -69,6 +74,9 @@ class MissionParts:
     recorder: Any
     node: Any
     ingress: Any
+    orderer: Any | None
+    replay: Any | None
+    debug: Any
     command: list[str]
     wind_control: Any | None
     current_wind: Any
@@ -212,6 +220,9 @@ class MissionLoop:
                 # Gazebo cannot advance while Python stalls in lockstep.
                 watchdog_wall_s=None if parts.lockstep else timing["watchdog_wall_s"],
                 publish_on_send=timing["publish_on_send"],
+                # Lockstep: no wall-clock republishing; the loop calls tick()
+                # once per odometry period instead (see _heartbeat).
+                start_worker=not parts.lockstep,
             )
             handle = self.thrust_control.acquire()
             self.control_loop = RotorControlLoop(
@@ -224,6 +235,11 @@ class MissionLoop:
             )
             self.rotor = RotorMission(self._rotor_parts())
         if parts.lockstep:
+            # Commands published before Gazebo subscribes are lost: connect
+            # every command topic before the first step.
+            wait_for_subscribers(
+                parts.node.publishers, timeout_s=STARTUP_TIMEOUT_WALL_S
+            )
             self.stepper = lockstep_stepper(parts.node, settings)
             self.stepper.start()
 
@@ -286,6 +302,9 @@ class MissionLoop:
 
     def _write_results(self) -> None:
         output = self.parts.output
+        if self.parts.replay is not None:
+            self.parts.replay.close()
+        self.parts.debug.close()
         metrics = self.parts.evaluation.summary()
         (output / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
         self.summary = build_summary(self, metrics)
@@ -303,7 +322,8 @@ class MissionLoop:
         if not self._housekeeping():
             return False
         try:
-            kind, message, received_at = self.parts.ingress.get(
+            source = self.parts.orderer or self.parts.ingress
+            kind, message, received_at = source.get(
                 timeout_s=0.01 if self.parts.keyboard is not None else 0.2
             )
         except Empty:
@@ -412,6 +432,9 @@ class MissionLoop:
             if kind not in ("poses", "contacts"):
                 self._bus_now_ns = max(self._bus_now_ns, timestamp_ns(message))
             delivered, estimates, innovations = stack.runner.advance(self._bus_now_ns)
+            if parts.replay is not None:
+                for delivered_kind, sample in delivered:
+                    parts.replay.on_sample(self._bus_now_ns, delivered_kind, sample)
             for delivered_kind, sample in delivered:
                 if stack.estimate_source is not None:
                     stack.estimate_source.on_delivered(delivered_kind, sample)
@@ -434,25 +457,7 @@ class MissionLoop:
     def _write_estimate(self, sample: Any) -> None:
         """Record one estimate (estimates.jsonl, Rerun, metrics, health)."""
         parts, state = self.parts, sample.payload
-        self.files.estimates.write(
-            json.dumps(
-                dict(
-                    sim_time_ns=sample.sim_time_ns,
-                    sequence=sample.sequence,
-                    stream_id=sample.stream_id,
-                    epoch=sample.epoch,
-                    frame_id=sample.frame_id,
-                    position_m=state.position_m.tolist(),
-                    velocity_mps=state.velocity_mps.tolist(),
-                    quaternion_xyzw=state.quaternion_xyzw.tolist(),
-                    accel_bias_mps2=state.accel_bias_mps2.tolist(),
-                    gyro_bias_rad_s=state.gyro_bias_rad_s.tolist(),
-                    covariance=state.covariance.tolist(),
-                    parents=sample.parents,
-                )
-            )
-            + "\n"
-        )
+        self.files.estimates.write(json.dumps(estimate_record(sample)) + "\n")
         parts.recorder.log_estimate(sample)
         parts.evaluation.on_estimate(sample)
         parts.health.on_estimate(
@@ -517,8 +522,10 @@ class MissionLoop:
                 self._pilot_command,
             ):
                 # No command yet: still advance the lockstep world.
+                self._heartbeat()
                 self._advance_world(stamp)
                 return True
+            self._heartbeat()
         elif t - self._last_command_time >= VELOCITY_COMMAND_PERIOD_S:
             self._velocity_command(p, quaternion)
             self._last_command_time = t
@@ -588,10 +595,16 @@ class MissionLoop:
     ) -> None:
         """Metrics, health, ground-area warning, and telemetry.jsonl."""
         parts = self.parts
-        parts.evaluation.on_truth(
+        if parts.replay is not None:
+            parts.replay.on_truth(
+                stamp, p, velocity_world, quaternion, parts.pipeline.imu_bias.current()
+            )
+        errors = parts.evaluation.on_truth(
             stamp, p, velocity_world, quaternion, controlled=parts.rotor_mode
         )
         parts.health.on_truth(stamp, p, velocity_world, quaternion)
+        if errors is not None:
+            parts.health.on_tracking_error(stamp, errors["position_m"])
         self.positions.append(p)
         left = parts.health.left_ground_area_s
         if self.left_ground_s is None and left is not None:
@@ -615,6 +628,13 @@ class MissionLoop:
         velocity = waypoint_velocity(p, quaternion, self.parts.args.target)
         twist.linear.x, twist.linear.y, twist.linear.z = map(float, velocity)
         self.parts.publisher.publish(twist)
+
+    def _heartbeat(self) -> None:
+        """Lockstep stand-in for the thrust worker: republish the current
+        command (battery and ESC models see it) and expire stale ones, once
+        per odometry period in simulation time instead of wall time."""
+        if self.parts.lockstep and self.thrust_control is not None:
+            self.thrust_control.tick()
 
     def _advance_world(self, stamp: int) -> None:
         if self.stepper is not None:

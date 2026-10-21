@@ -60,11 +60,16 @@ class RunEvaluation:
         quaternion_xyzw: NDArray[np.float64],
         *,
         controlled: bool,
-    ) -> None:
-        """One odometry sample; ``controlled`` when a rotor controller flies."""
+    ) -> dict[str, float] | None:
+        """One odometry sample; ``controlled`` when a rotor controller flies.
+
+        Returns the tracking errors at this sample, or None without a
+        reference.
+        """
         if self._first_ns is None:
             self._first_ns = sim_time_ns
         self.truth.add(sim_time_ns, position_m, velocity_mps, quaternion_xyzw)
+        errors = None
         if controlled:
             elapsed = (sim_time_ns - self._first_ns) * 1e-9
             errors = self.control.add_state(
@@ -79,6 +84,7 @@ class RunEvaluation:
         for scored in self.estimation.process():
             values = {k: v for k, v in scored.items() if k != "sim_time_s"}
             self._log("evaluation/estimation", list(values.values()), list(values))
+        return errors
 
     def on_estimate(self, sample: Sample[EstimatedState]) -> None:
         self.estimates += 1

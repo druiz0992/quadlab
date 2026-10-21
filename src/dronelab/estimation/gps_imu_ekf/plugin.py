@@ -5,6 +5,10 @@ noise assumptions, GPS gate). Sensor mounts come from the context: the IMU
 mount rotation and the GPS antenna lever arm. Samples are handled exactly as
 delivered; a GPS fix older than the filter time (e.g. after GPS latency) is
 counted in ``rejected_gps_timing``, since the filter does not re-propagate.
+
+Debug channel (``context.log``, the reference example for plug-ins): at
+each GPS update, ``ekf/gps`` = NIS and accepted (1/0), and ``ekf/bias`` =
+the estimated accelerometer (m/s²) and gyro (rad/s) biases.
 """
 
 from collections.abc import Mapping
@@ -101,6 +105,7 @@ class GpsImuEkfEstimator:
         self._latest: Sample[EstimatedState] | None = None
         self._innovations: list[Innovation] = []
         self._errors = 0
+        self._log = context.log
 
     def on_sample(self, kind: str, sample: Sample[Any]) -> None:
         if kind == "imu":
@@ -114,8 +119,21 @@ class GpsImuEkfEstimator:
             and ekf.last_gps_nis is not None
         ):
             self._innovations.append(Innovation("gps", ekf.last_gps_nis, 3, accepted))
+            self._log(
+                "ekf/gps",
+                sample.sim_time_ns,
+                [ekf.last_gps_nis, float(accepted)],
+                ["nis", "accepted"],
+            )
         if accepted:
             self._latest = self._estimates.next(timeout_wall_s=0)
+            state = self._latest.payload
+            self._log(
+                "ekf/bias",
+                sample.sim_time_ns,
+                [*state.accel_bias_mps2, *state.gyro_bias_rad_s],
+                ["accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z"],
+            )
 
     def latest(self) -> Sample[EstimatedState] | None:
         return self._latest

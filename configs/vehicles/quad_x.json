@@ -846,7 +846,8 @@
     "control_state_source": "truth",
     "max_estimate_age_s": 0.1,
     "evaluation_rate_hz": 50.0,
-    "evaluation_start_s": 2.0
+    "evaluation_start_s": 2.0,
+    "record_bus": "off"
   },
   "health": {
     "flip_tilt_deg": 90.0,
@@ -856,7 +857,11 @@
     "below_ground_margin_m": 0.1,
     "touchdown_gap_s": 0.5,
     "saturated_fraction": 0.5,
-    "max_dropped_messages": 0
+    "max_dropped_messages": 0,
+    "no_liftoff_s": 1.0,
+    "no_liftoff_thrust_ratio": 1.2,
+    "tracking_lost_m": 2.0,
+    "tracking_lost_s": 3.0
   },
   "sensor_timing": {
     "seed": 0,

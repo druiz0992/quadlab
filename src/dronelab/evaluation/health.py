@@ -14,12 +14,15 @@ worst value seen:
 | ``hard_impact`` | failed | contact while speed exceeded ``hard_impact_speed_mps`` |
 | ``obstacle_contact`` | failed | contact with anything but the ground or terrain |
 | ``below_ground`` | failed | body centre more than ``below_ground_margin_m`` below the ground |
+| ``no_liftoff`` | failed | commanded thrust ≥ ``no_liftoff_thrust_ratio`` × weight for ``no_liftoff_s`` while the vehicle neither rose nor moved |
 | ``incomplete`` | failed | the run ended on an error before its duration |
 | ``interrupted`` | warning | the user interrupted the run |
 | ``ground_contact`` | warning | touchdown after ``touchdown_gap_s`` without contact |
+| ``tracking_lost`` | warning | position error above ``tracking_lost_m`` for ``tracking_lost_s`` (kept in batch aggregates: it is a result, not a broken run) |
 | ``left_ground_area`` | warning | flew past the ground plane's edge (nothing below collides) |
 | ``saturated`` | warning | more than ``saturated_fraction`` of commands saturated |
 | ``dropped_messages`` | warning | more than ``max_dropped_messages`` messages dropped |
+| ``ordering_timeouts`` | warning | lockstep periods processed before all scheduled samples arrived |
 
 The verdict is ``failed`` if any finding failed, else ``warning`` if any
 finding warned, else ``ok``.
@@ -45,6 +48,9 @@ GROUND_MODELS = frozenset({"ground", "terrain"})
 # The drone's own collisions and the attached payload are not obstacles.
 IGNORED_MODELS = frozenset({"drone", "payload"})
 WORLD_SCOPE = "dronelab"
+# A vehicle "lifted off" once it rose this far or moved this fast.
+LIFTOFF_RISE_M = 0.05
+LIFTOFF_SPEED_MPS = 0.2
 # Normal ends of a run that stop before the configured duration.
 USER_EXITS = frozenset({"keyboard_closed"})
 
@@ -66,10 +72,16 @@ class HealthThresholds:
     touchdown_gap_s: float = 0.5
     saturated_fraction: float = 0.5
     max_dropped_messages: int = 0
+    no_liftoff_s: float = 1.0
+    no_liftoff_thrust_ratio: float = 1.2
+    tracking_lost_m: float = 2.0
+    tracking_lost_s: float = 3.0
 
     def __post_init__(self) -> None:
         if not 0 < self.flip_tilt_deg <= 180:
             raise ValueError("health.flip_tilt_deg must be in (0, 180]")
+        if self.no_liftoff_thrust_ratio <= 1:
+            raise ValueError("health.no_liftoff_thrust_ratio must exceed 1")
         if not 0 < self.saturated_fraction <= 1:
             raise ValueError("health.saturated_fraction must be in (0, 1]")
         if self.max_dropped_messages != int(self.max_dropped_messages):
@@ -124,7 +136,8 @@ class RunHealth:
 
     ``ground_height_m(x, y)`` is the ground surface height in metres (flat
     ground: 0); ``ground_half_m`` is half the ground plane's side, or None to
-    skip the ground-area check. All ``sim_time_ns`` are simulation
+    skip the ground-area check; ``weight_n`` is the true vehicle weight, or
+    None to skip the lift-off check. All ``sim_time_ns`` are simulation
     nanoseconds from the source messages.
     """
 
@@ -133,6 +146,7 @@ class RunHealth:
         thresholds: HealthThresholds,
         ground_height_m: Callable[[float, float], float] = lambda x, y: 0.0,
         ground_half_m: float | None = None,
+        weight_n: float | None = None,
     ) -> None:
         self.thresholds = thresholds
         self._ground_height_m = ground_height_m
@@ -146,6 +160,12 @@ class RunHealth:
         self._commands = 0
         self._saturated = 0
         self.left_ground_area_s: float | None = None
+        self._weight_n = weight_n
+        self._position: np.ndarray | None = None
+        self._speed = 0.0
+        # Open episodes: (start ns, start height, reported) / (start ns, reported).
+        self._lift: tuple[int, float, bool] | None = None
+        self._lost: tuple[int, bool] | None = None
 
     def _time_s(self, sim_time_ns: int) -> float:
         if self._origin_ns is None:
@@ -186,7 +206,9 @@ class RunHealth:
         if not _finite(position_m, velocity_mps, quaternion_xyzw):
             self._report("non_finite", FAILED, t, "non-finite truth", subject="truth")
             return
-        self._speeds.append((sim_time_ns, float(np.linalg.norm(velocity_mps))))
+        self._position = np.asarray(position_m, float)
+        self._speed = float(np.linalg.norm(velocity_mps))
+        self._speeds.append((sim_time_ns, self._speed))
         # One second of speeds is plenty for any sensible impact window.
         while sim_time_ns - self._speeds[0][0] > 1e9:
             self._speeds.popleft()
@@ -292,6 +314,68 @@ class RunHealth:
             )
         self._commands += 1
         self._saturated += bool(record["saturated"])
+        self._check_liftoff(
+            record["release_sim_time_ns"], float(np.sum(record["accepted_thrust_n"]))
+        )
+
+    def _check_liftoff(self, sim_time_ns: int, total_thrust_n: float) -> None:
+        """Fail when thrust well above weight moves the vehicle nowhere.
+
+        Catches commands that never reach the motors and vehicles pinned
+        down; a falling vehicle at full thrust is moving, so it is not one.
+        """
+        limits = self.thresholds
+        if (
+            self._weight_n is None
+            or self._position is None
+            or total_thrust_n < limits.no_liftoff_thrust_ratio * self._weight_n
+        ):
+            self._lift = None
+            return
+        z = float(self._position[2])
+        if self._lift is None:
+            self._lift = (sim_time_ns, z, False)
+            return
+        start_ns, start_z, reported = self._lift
+        if z - start_z > LIFTOFF_RISE_M or self._speed > LIFTOFF_SPEED_MPS:
+            self._lift = None  # it moves: a new episode starts at the next command
+            return
+        if not reported and (sim_time_ns - start_ns) * 1e-9 >= limits.no_liftoff_s:
+            self._lift = (start_ns, start_z, True)
+            self._report(
+                "no_liftoff",
+                FAILED,
+                self._time_s(start_ns),
+                f"thrust ≥ {limits.no_liftoff_thrust_ratio:g}× weight for "
+                f"{limits.no_liftoff_s:g} s without lift-off",
+                total_thrust_n / self._weight_n,
+            )
+
+    def on_tracking_error(self, sim_time_ns: int, position_error_m: float) -> None:
+        """Mission position error (m) at one truth sample."""
+        limits = self.thresholds
+        if position_error_m <= limits.tracking_lost_m:
+            self._lost = None
+            return
+        if self._lost is None:
+            self._lost = (sim_time_ns, False)
+            return
+        start_ns, reported = self._lost
+        if (sim_time_ns - start_ns) * 1e-9 < limits.tracking_lost_s:
+            return
+        if not reported:
+            self._lost = (start_ns, True)
+            self._report(
+                "tracking_lost",
+                WARNING,
+                self._time_s(start_ns),
+                f"position error above {limits.tracking_lost_m:g} m for "
+                f"{limits.tracking_lost_s:g} s",
+                position_error_m,
+            )
+        else:
+            finding = self._findings[("tracking_lost", None)]
+            finding.value = max(finding.value or 0.0, position_error_m)
 
     def on_estimate(
         self,
@@ -308,7 +392,12 @@ class RunHealth:
             )
 
     def summary(
-        self, *, completed: bool, exit_reason: str, dropped: Mapping[str, int]
+        self,
+        *,
+        completed: bool,
+        exit_reason: str,
+        dropped: Mapping[str, int],
+        ordering_timeouts: int = 0,
     ) -> dict[str, Any]:
         """Add run-level findings and return ``summary.json.health``.
 
@@ -316,6 +405,15 @@ class RunHealth:
         events). Call once, at the end of the run.
         """
         self._run_level_findings(completed, exit_reason, dropped)
+        if ordering_timeouts:
+            self._report(
+                "ordering_timeouts",
+                WARNING,
+                None,
+                f"{ordering_timeouts} lockstep periods released before all "
+                "scheduled samples arrived (not deterministic)",
+                ordering_timeouts,
+            )
         findings = sorted(
             self._findings.values(),
             key=lambda f: (math.inf if f.time_s is None else f.time_s, f.kind),

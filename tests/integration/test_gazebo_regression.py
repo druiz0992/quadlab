@@ -214,8 +214,26 @@ def test_esc_telemetry_matches_commanded_speeds(tmp_path, monkeypatch):
     assert np.all(measured.std(axis=0) > 2.0)
 
 
-def test_lockstep_runs_are_deterministic(tmp_path):
-    layers = ["configs/missions/step_x.json", "configs/algorithms/ekf_in_the_loop.json"]
+@pytest.mark.parametrize(
+    "layers",
+    [
+        ["configs/missions/step_x.json", "configs/algorithms/ekf_in_the_loop.json"],
+        # Each varied between identical runs before deterministic ordering,
+        # the start-up subscriber barrier, and simulation-time republishing.
+        [
+            "configs/vehicles/battery_low.json",
+            "configs/control/esc_dshot.json",
+            "configs/scenarios/ground_start.json",
+            "configs/sensors/imu_vibration.json",
+            "configs/sensors/sensor_errors.json",
+            "configs/sensors/magnetometer.json",
+            "configs/missions/square.json",
+            "configs/algorithms/ekf_observer.json",
+        ],
+    ],
+    ids=["ekf-step", "ground-battery-esc-errors"],
+)
+def test_lockstep_runs_are_deterministic(tmp_path, layers):
     first = fly(tmp_path / "a", layers, 8)
     second = fly(tmp_path / "b", layers, 8)
     for name in ("telemetry.jsonl", "commands.jsonl", "estimates.jsonl"):
@@ -262,3 +280,27 @@ def test_quadplane_full_mission(tmp_path):
     assert {f["kind"] for f in summary["health"]["findings"]} == {"ground_contact"}
     x, y, z = summary["final_position"]
     assert np.hypot(x, y) < 1.0 and z < 0.5
+
+
+def test_replay_reproduces_live_estimates(tmp_path):
+    """Recorded bus deliveries replayed offline give the live EKF output."""
+    from dronelab.experiments.replay import replay
+
+    live = fly(
+        tmp_path,
+        [
+            "configs/sensors/sensor_errors.json",
+            "configs/missions/square.json",
+            "configs/algorithms/ekf_observer.json",
+            "configs/algorithms/record_replay.json",
+        ],
+        12,
+    )
+    run_dir = tmp_path / "run"
+    summary = replay(run_dir / "replay.jsonl", tmp_path / "replay")
+    assert summary["estimates"] > 1000
+    assert (tmp_path / "replay" / "estimates.jsonl").read_bytes() == (
+        run_dir / "estimates.jsonl"
+    ).read_bytes()
+    replayed = json.loads((tmp_path / "replay" / "metrics.json").read_text())
+    assert replayed["estimation"] == live["metrics"]["estimation"]

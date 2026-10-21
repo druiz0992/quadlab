@@ -99,14 +99,41 @@ repeatable. With `simulation.lockstep: true`
 (`configs/control/lockstep.json`) Gazebo starts paused and Python advances it
 one odometry period at a time (`simulation/gazebo/stepping.py`):
 
-1. Python requests a burst of physics steps through `/world/dronelab/control`.
-2. The odometry message at the end of the burst is the barrier.
-3. Python processes everything (controller tick, motor commands, wind), then
-   requests the next burst.
+1. Before the first burst, Python waits until Gazebo has subscribed to
+   every command topic it publishes (motors, wind, wrench, payload, ...):
+   messages published before transport discovery connects are lost
+   silently, and once left a ground-start run with motors that never spun.
+2. Python requests a burst of physics steps through `/world/dronelab/control`.
+3. The odometry message at the end of the burst (time T) is the barrier.
+4. Python processes the period in a fixed order
+   (`simulation/gazebo/ingress.py`, `LockstepOrderer`): it waits until every
+   scheduled sensor has delivered its last sample stamped ≤ T (Gazebo
+   samples a sensor of period P at the first step at or after k·P), then
+   handles all messages stamped ≤ T by timestamp, measurements before the
+   odometry at equal stamps. Messages Gazebo repeats while paused (joint
+   states, poses, contacts) are dropped as duplicates.
+5. Python processes everything (controller tick, motor commands, wind),
+   republishes the current command once (in place of the wall-clock thrust
+   worker, which lockstep does not start), then requests the next burst.
 
-Python's processing time therefore costs no simulation time, and runs are
-**bit-for-bit repeatable**: two runs of a 19 s scripted manoeuvre produced
-identical telemetry and command logs. `simulation.real_time_factor` caps the
+Python's processing time therefore costs no simulation time. Gazebo
+delivers topics on separate threads, so arrival order varies between
+otherwise identical runs; step 4 makes processing independent of it.
+Verified under full CPU load (16 busy processes, 5 identical runs each,
+byte-identical telemetry, commands, estimates, and metrics): ground start
+with IMU vibration; battery, ESC, ground start and rotor aerodynamics on
+the square; sensor errors with magnetometer interference and the EKF on the
+circle; static wind; Python body drag.
+
+**Known limitation.** Commands reach Gazebo as topic messages and the step
+request as a service call on a separate connection, so under heavy load
+Gazebo can run a step before it has read that period's commands, which
+then take effect one period late. Seen with dynamically published wind
+(turbulence, gusts, schedules: 1 of 6 runs under full load) and with
+rendered sensors (camera, lidar), where every run diverged at a different
+time. Python cannot verify receipt; a Gazebo-side barrier (a small system
+plugin) would close this. Until then, keep regression comparisons of those
+configurations to unloaded machines and expect occasional divergence. `simulation.real_time_factor` caps the
 speed: 1 is no faster than real time (for watching live), 0 is as fast as
 possible (allowed only in lockstep). Measured speeds with 0: 3.5× real time
 for a 50 Hz hover mission; 0.83× for the racing preset at 250 Hz with a
@@ -115,7 +142,8 @@ for a 50 Hz hover mission; 0.83× for the racing preset at 250 Hz with a
 Implementation notes, measured on gz-sim 8:
 
 - Motor commands published just before a step request are applied in that
-  step (identical trajectories with and without an added 5 ms delay).
+  step on an unloaded machine (identical trajectories with and without an
+  added 5 ms delay); under load see the limitation above.
 - The control service's reply is unreliable from Python (5–43 % of replies
   lost depending on the timeout) although every burst runs. Replies are
   therefore ignored (counted as `lost_replies`); a burst is re-sent only if
@@ -127,7 +155,9 @@ rotor-thrust mode needs `control.publish_on_send`. Not available with
 Wall-clock watchdogs that guard against a stalled Python while Gazebo keeps
 flying are disabled, because Gazebo cannot advance while Python stalls.
 `summary.json` field `lockstep` reports bursts, steps per burst, lost
-replies, and resends. Rendered sensors keep their full frame count.
+replies, and resends; `message_ordering` reports dropped duplicates and
+`barrier_timeouts` (periods released after 5 s without a scheduled sample;
+determinism is then not guaranteed, and the health verdict warns). Rendered sensors keep their full frame count.
 
 ## Sensors
 
@@ -324,8 +354,10 @@ dronelab --headless --target 8 0 1 --duration 10 --output outputs/collision   # 
 | `command-events.jsonl` | Command publication, supersession, expiry, stop, and failure events |
 | `estimates.jsonl` | EKF state, covariance, and provenance (`--ekf`) |
 | `wind-commands.jsonl` | Published dynamic wind targets (random/scheduled wind) |
+| `replay.jsonl` | Bus deliveries and truth for `dronelab-replay` (`algorithms.record_bus`) |
+| `algorithm-debug.jsonl` | Plug-in debug series (`context.log`), only when a plug-in logs |
 | `camera-first.png` | First camera frame (rendered runs) |
-| `summary.json` | Health verdict and findings ([7 Experiments](7_experiments.md#run-health-verdict-health)), completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing and `control_timing`, EKF/dropout/vibration/sensor-error/fault diagnostics |
+| `summary.json` | Lockstep `message_ordering`, health verdict and findings ([7 Experiments](7_experiments.md#run-health-verdict-health)), completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing and `control_timing`, EKF/dropout/vibration/sensor-error/fault diagnostics |
 | `gazebo.log` | Gazebo process output |
 
 Reusing an output directory overwrites these files and can leave stale

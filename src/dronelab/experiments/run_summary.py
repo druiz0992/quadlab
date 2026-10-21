@@ -32,6 +32,9 @@ def build_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
                 parts.ingress.dropped,
                 command_events=thrust.dropped_events if thrust else 0,
             ),
+            ordering_timeouts=(
+                parts.orderer.barrier_timeouts if parts.orderer is not None else 0
+            ),
         ),
         ekf=parts.live_ekf.summary() if parts.live_ekf is not None else None,
         exit_reason=exit_reason,
@@ -39,6 +42,8 @@ def build_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
         state_source=_state_source(settings, parts.stack),
         algorithms=_algorithms(settings, parts.stack),
         sensor_bus=parts.stack.bus.summary() if parts.stack.bus is not None else None,
+        replay=parts.replay.summary() if parts.replay is not None else None,
+        algorithm_debug_entries=parts.debug.entries,
         randomization=parts.randomization_draws or None,
         esc=_esc(parts),
         metrics=metrics,
@@ -55,6 +60,9 @@ def build_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
         command_watchdog_wall_s=timing["watchdog_wall_s"] if rotor_mode else None,
         messages=dict(loop.counts),
         dropped=dict(parts.ingress.dropped),
+        message_ordering=(
+            parts.orderer.summary() if parts.orderer is not None else None
+        ),
         gps_dropout=sensors["gps_dropout"],
         accelerometer_vibration=sensors["accelerometer_vibration"],
         imu_errors=sensors["imu_errors"],

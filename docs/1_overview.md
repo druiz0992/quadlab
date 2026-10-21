@@ -18,7 +18,7 @@ organization, and shared conventions. Following documents:
 | Vehicle physics | Gazebo motor lag/limits; ESC update rate and resolution; Python battery voltage sag and depletion, rotor ground effect; still-air body drag; centre-of-mass offset, per-rotor spread, per-run randomization of the true vehicle |
 | Disturbances and faults | GPS dropouts/outages/blockout zones, GPS multipath jumps, scheduled IMU faults (bias step, stuck, spikes, scale, noise), native wind with Dryden-style turbulence, accelerometer vibration/clipping |
 | Estimation | GPS/IMU error-state EKF, as a live observer (`--ekf`) or an estimator plug-in |
-| Algorithm harness | Estimator/controller plug-ins on a typed sensor bus with modelled delivery delay and clock offsets; control on truth or on the estimate; reference missions (step, waypoints/laps, circle, figure-eight, chirp, doublet); estimation and control metrics; truth-based run health verdict (crash, flip, impact, contact); batch sweeps with regression baselines ([7 Experiments](7_experiments.md)) |
+| Algorithm harness | Estimator/controller plug-ins on a typed sensor bus with modelled delivery delay and clock offsets; control on truth or on the estimate; reference missions (step, waypoints/laps, circle, figure-eight, chirp, doublet); estimation and control metrics; truth-based run health verdict (crash, flip, impact, contact, no lift-off); offline estimator replay of recorded runs; plug-in debug channel; batch sweeps with regression baselines ([7 Experiments](7_experiments.md)) |
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
 | Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse |
 
@@ -36,9 +36,11 @@ truth; it is used only to synthesize measurements and to score runs.
 ```text
 src/dronelab/
 ├── cli/                    # Argument parsing: `dronelab` (gazebo.py), `dronelab-batch`
-│                           #   (batch.py), `dronelab-magcal` (magcal.py), `dronelab-imucal`
+│                           #   (batch.py), `dronelab-replay` (replay.py), `dronelab-magcal`
+│                           #   (magcal.py), `dronelab-imucal`
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
-│                           #   measurement samples, rotor commands
+│                           #   measurement samples, rotor commands, JSON codec
+│                           #   (serialization.py)
 ├── sensors/                # Synthetic models, Gazebo decoding, geodesy, in-process
 │                           #   streams, GPS dropout, accelerometer vibration,
 │                           #   IMU/GPS error models (imu_errors.py, gps_errors.py),
@@ -98,6 +100,9 @@ src/dronelab/
 │   ├── vehicle_forces.py   # Python body drag and fixed-wing wrench
 │   ├── keyboard_flight.py  # Keyboard effect toggles wiring and log
 │   ├── run_summary.py      # summary.json assembly
+│   ├── replay_log.py       # Record bus deliveries and truth (replay.jsonl)
+│   ├── replay.py           # Offline estimator replay and scoring (dronelab-replay)
+│   ├── algorithm_debug.py  # Plug-in debug channel (algorithm-debug.jsonl, Rerun)
 │   ├── rotor_loop.py       # Fixed-rate rotor-thrust control loop with latency
 │   ├── algorithms.py       # Plug-in loading, context, runner, estimate-driven state
 │   ├── mission.py          # Mission clock and reference sampling

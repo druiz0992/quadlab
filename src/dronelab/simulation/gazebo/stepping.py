@@ -8,9 +8,12 @@ are repeatable.
 
 Measured with gz-sim 8 on this project: the control service returns
 immediately and the steps run afterwards, so the odometry message at the end
-of each burst is the barrier. A motor command published just before a step
-request is applied in that step (identical trajectories with and without an
-added 5 ms delivery delay). Gazebo still paces bursts by the world's
+of each burst is the barrier. On an unloaded machine a motor command
+published just before a step request is applied in that step (identical
+trajectories with and without an added 5 ms delivery delay). Under heavy
+load it can arrive after the steps started: topics and the service use
+separate connections, so their order is not guaranteed (see
+docs/2_simulation.md, lockstep limitation). Gazebo still paces bursts by the world's
 real_time_factor; 0 runs them as fast as possible.
 
 The service reply is unreliable from Python: in a probe of 300 bursts, 22 %
@@ -142,3 +145,53 @@ class LockstepStepper:
             lost_replies=self.lost_replies,
             resends=self.resends,
         )
+
+
+class TrackedNode:
+    """A transport node that remembers the topics it advertises.
+
+    Gazebo silently drops messages published before its subscriber has
+    connected (transport discovery). In lockstep the first steps can run
+    within milliseconds of start-up, so commands could be lost; the stepper
+    therefore waits until every tracked publisher is connected. All other
+    attributes are delegated to the wrapped node.
+    """
+
+    def __init__(self, node: Any) -> None:
+        self._node = node
+        self.publishers: list[tuple[str, Any]] = []
+
+    def advertise(self, topic: str, message_type: Any) -> Any:
+        publisher = self._node.advertise(topic, message_type)
+        self.publishers.append((topic, publisher))
+        return publisher
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._node, name)
+
+
+def wait_for_subscribers(
+    publishers: list[tuple[str, Any]],
+    *,
+    timeout_s: float = 30.0,
+    poll_s: float = 0.05,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> None:
+    """Block until every publisher has a connected subscriber.
+
+    Raises RuntimeError naming the unconnected topics after ``timeout_s``
+    (wall seconds): a command topic nobody subscribes to is a configuration
+    or SDF error, never something to ignore.
+    """
+    deadline = monotonic() + timeout_s
+    while True:
+        missing = sorted(t for t, p in publishers if not p.has_connections())
+        if not missing:
+            return
+        if monotonic() > deadline:
+            raise RuntimeError(
+                f"Gazebo did not subscribe to command topics within {timeout_s:g} s: "
+                f"{missing}"
+            )
+        sleep(poll_s)

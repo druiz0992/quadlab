@@ -221,7 +221,10 @@ events, and terminate its simulator on faults.
   accepted vector immediately and records a `published` event, so actuation
   follows the caller's simulation-time schedule; the worker still
   republishes and enforces expiry. Without it, each command waits a random
-  0 to 1/publish-rate seconds before reaching Gazebo.
+  0 to 1/publish-rate seconds before reaching Gazebo. In lockstep the worker
+  is not started: the mission loop calls the same `tick()` (republish and
+  expiry check) once per odometry period, in simulation time, so wall time
+  never reaches the battery and ESC models through republishing.
 - **Expiry and watchdog.** Expiry uses the session clock at submission. Expiry
   or the 1 s wall-clock submission watchdog requests zero motor speeds, which
   removes lift; it does not hover or land.

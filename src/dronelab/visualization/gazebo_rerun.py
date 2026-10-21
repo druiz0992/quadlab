@@ -507,6 +507,11 @@ class GazeboRerunRecorder:
             )
             rr.log("world/drone/lidar", rr.Points3D(points, radii=0.025))
 
+    def log_algorithm_debug(self, name, sim_time_ns, values, labels):
+        """A plug-in's debug series under ``algorithms/<name>`` at its own time."""
+        self.rr.set_time("sim_time", duration=sim_time_ns * 1e-9)
+        self.log_vector(f"algorithms/{name}", values, labels)
+
     def log_estimate(self, sample):
         """Observer only: truth is used for matched-time error plots, never filtering."""
         rr = self.rr

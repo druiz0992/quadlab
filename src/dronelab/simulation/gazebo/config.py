@@ -674,6 +674,9 @@ DEFAULTS = {
         # Scoring against truth (evaluation/), after initial convergence.
         "evaluation_rate_hz": 50.0,
         "evaluation_start_s": 2.0,
+        # Record bus deliveries and truth for dronelab-replay:
+        # off | light (all but camera/lidar) | all; see experiments/replay_log.py.
+        "record_bus": "off",
     },
     # Run health verdict thresholds (summary.json.health); see
     # evaluation/health.py. Evaluation only: never affects the flight.
@@ -686,6 +689,10 @@ DEFAULTS = {
         "touchdown_gap_s": 0.5,
         "saturated_fraction": 0.5,
         "max_dropped_messages": 0,
+        "no_liftoff_s": 1.0,
+        "no_liftoff_thrust_ratio": 1.2,
+        "tracking_lost_m": 2.0,
+        "tracking_lost_s": 3.0,
     },
     # Delivery of processed measurements to algorithms; see sensors/bus.py.
     "sensor_timing": {
@@ -1524,6 +1531,10 @@ def load_drone_config(paths: ConfigPaths = None, *, render_sensors: bool = False
 
     HealthThresholds.from_settings(data["health"])
     algorithms = data["algorithms"]
+    from ...experiments.replay_log import RECORD_MODES
+
+    if algorithms["record_bus"] not in RECORD_MODES:
+        raise ValueError(f"algorithms.record_bus must be one of {RECORD_MODES}")
     if algorithms["control_state_source"] not in ("truth", "estimate"):
         raise ValueError("algorithms.control_state_source must be truth or estimate")
     if algorithms["control_state_source"] == "estimate" and not algorithms["estimator"]:

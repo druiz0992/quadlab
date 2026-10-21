@@ -19,9 +19,17 @@ from .sensor_pipeline import SensorPipeline, TruthSnapshot
 from .vehicle_forces import ExternalForces
 from .keyboard_flight import keyboard_effects
 from .mission_loop import MissionLoop, MissionParts
-from ..simulation.gazebo.ingress import MessageIngress, gz_sim_command, subscriptions
+from ..simulation.gazebo.stepping import TrackedNode
+from ..simulation.gazebo.ingress import (
+    LockstepOrderer,
+    MessageIngress,
+    gz_sim_command,
+    subscriptions,
+)
 from ..evaluation.health import HealthThresholds, RunHealth
 from .algorithms import build_algorithm_stack
+from .algorithm_debug import AlgorithmDebugLog
+from .replay_log import ReplayRecorder
 from ..core.measurements import GpsReading
 from ..simulation.gazebo.odometry import OdometryVelocityFix
 from ..simulation.moving_obstacles import MovingObstacleCommands
@@ -70,6 +78,35 @@ def run(args: GazeboConfig, command_source=None):
     finally:
         if keyboard is not None:
             keyboard.close()
+
+
+def _step_ns(settings: dict) -> int:
+    return round(settings["simulation"]["step_s"] * 1e9)
+
+
+def _scheduled_periods_ns(settings: dict, pipeline: SensorPipeline) -> dict[str, float]:
+    """Sample period (ns) of every transported stream with a fixed schedule.
+
+    Poses (throttled by wall time) and contacts (only while touching) have
+    none. Gazebo publishes rotor joint states every physics step.
+    """
+    sensors = settings["sensors"]
+    periods = {
+        kind: 1e9 / sensors[kind]["rate_hz"]
+        for kind in (
+            "imu",
+            "gps",
+            "baro",
+            "magnetometer",
+            "rangefinder",
+            "camera",
+            "lidar",
+        )
+        if sensors[kind]["enabled"]
+    }
+    if pipeline.esc_telemetry.enabled:
+        periods["esc"] = float(_step_ns(settings))
+    return periods
 
 
 def _print_health(health: dict) -> None:
@@ -174,7 +211,8 @@ def _run(args, keyboard, command_source):
     # Latest truth for measurement synthesis and fault models, never EKF input.
     truth = TruthSnapshot()
 
-    node = Node()
+    # Tracks advertised command topics for the lockstep start-up barrier.
+    node = TrackedNode(Node())
     from ..simulation.gazebo.wind import WindCommands, dynamic_wind
 
     # Keyboard flight can switch configured wind on and off, which needs the
@@ -302,12 +340,29 @@ def _run(args, keyboard, command_source):
         if keyboard is not None
         else None
     )
+    debug = AlgorithmDebugLog(
+        output / "algorithm-debug.jsonl", rerun=recorder.log_algorithm_debug
+    )
+    record_mode = settings["algorithms"]["record_bus"]
     stack = build_algorithm_stack(
         settings,
         config.properties,
         reference_from_world(world) if not args.world else GpsReading(0, 0, 0),
         pipeline.bus_kinds(),
         rotor_mode=rotor_mode,
+        log=debug,
+        need_bus=record_mode != "off",
+    )
+    replay = (
+        ReplayRecorder(
+            output / "replay.jsonl",
+            record_mode,
+            settings,
+            stack.context,
+            true_config.properties.mass * 9.81,
+        )
+        if record_mode != "off"
+        else None
     )
 
     true_biases = pipeline.imu_bias.current
@@ -328,6 +383,7 @@ def _run(args, keyboard, command_source):
             0.0 if terrain is None else float(terrain.height(x, y))
         ),
         ground_half_m=ground_half_m,
+        weight_n=true_config.properties.mass * 9.81,
     )
     publisher = None if rotor_mode else node.advertise("/drone/cmd_vel", Twist)
     ingress.subscribe(node, subscriptions(sensors, pipeline.esc_telemetry.enabled))
@@ -336,6 +392,13 @@ def _run(args, keyboard, command_source):
         lockstep=lockstep,
         headless=args.headless,
         render_sensors=config.render_sensors,
+    )
+    orderer = (
+        LockstepOrderer(
+            ingress, _scheduled_periods_ns(settings, pipeline), _step_ns(settings)
+        )
+        if lockstep
+        else None
     )
     loop = MissionLoop(
         MissionParts(
@@ -351,6 +414,9 @@ def _run(args, keyboard, command_source):
             recorder=recorder,
             node=node,
             ingress=ingress,
+            orderer=orderer,
+            replay=replay,
+            debug=debug,
             command=command,
             wind_control=wind_control,
             current_wind=current_wind,

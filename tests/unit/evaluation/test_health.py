@@ -32,6 +32,14 @@ def kinds(result):
     return [f["kind"] for f in result["findings"]]
 
 
+def command(thrust_n, saturated=False, t_s=0.0):
+    return dict(
+        accepted_thrust_n=thrust_n,
+        saturated=saturated,
+        release_sim_time_ns=round(t_s * S),
+    )
+
+
 def hover(health, start_s=0.0, end_s=1.0, z=1.0, rate_hz=100):
     for t in np.arange(start_s, end_s, 1 / rate_hz):
         health.on_truth(round(t * S), [0, 0, z], STILL, LEVEL)
@@ -40,7 +48,7 @@ def hover(health, start_s=0.0, end_s=1.0, z=1.0, rate_hz=100):
 def test_quiet_flight_is_ok():
     health = RunHealth(HealthThresholds(), ground_half_m=50)
     hover(health)
-    health.on_command(dict(accepted_thrust_n=[4.0] * 4, saturated=False))
+    health.on_command(command([4.0] * 4))
     result = summary(health, dropped={"imu": 0})
     assert result["verdict"] == "ok" and result["findings"] == []
     assert result["thresholds"]["flip_tilt_deg"] == 90
@@ -160,9 +168,9 @@ def test_non_finite_truth_commands_and_estimates():
 def test_run_level_saturation_drops_and_exit_reasons():
     health = RunHealth(HealthThresholds(saturated_fraction=0.5, max_dropped_messages=2))
     hover(health)
-    health.on_command(dict(accepted_thrust_n=[0] * 4, saturated=True, warmup=True))
+    health.on_command(dict(command([0] * 4, saturated=True), warmup=True))
     for saturated in (True, True, False):
-        health.on_command(dict(accepted_thrust_n=[9.0] * 4, saturated=saturated))
+        health.on_command(command([9.0] * 4, saturated=saturated))
     result = summary(health, dropped={"imu": 2, "gps": 1, "baro": 0})
     by_kind = {f["kind"]: f for f in result["findings"]}
     assert by_kind["saturated"]["value"] == pytest.approx(2 / 3)
@@ -188,8 +196,54 @@ def test_run_level_saturation_drops_and_exit_reasons():
         ({"max_dropped_messages": 1.5}, "integer"),
         ({"touchdown_gap_s": -1}, "touchdown_gap_s"),
         ({"bogus": 1}, "Unknown health keys"),
+        ({"no_liftoff_thrust_ratio": 1.0}, "exceed 1"),
     ],
 )
 def test_threshold_validation(settings, message):
     with pytest.raises(ValueError, match=message):
         HealthThresholds.from_settings(settings)
+
+
+def test_no_liftoff_when_thrust_moves_nothing():
+    weight = 14.7
+    health = RunHealth(HealthThresholds(), weight_n=weight)
+    for t in np.arange(0.0, 2.0, 0.02):  # resting on the ground, motors ignored
+        health.on_truth(round(t * S), [0, 0, 0.06], STILL, LEVEL)
+        health.on_command(command([1.3 * weight / 4] * 4, t_s=t))
+    result = summary(health)
+    (finding,) = result["findings"]
+    assert finding["kind"] == "no_liftoff" and result["verdict"] == "failed"
+    assert finding["time_s"] == pytest.approx(0.0)
+    assert finding["value"] == pytest.approx(1.3)
+    assert finding["count"] == 1
+
+
+def test_climbing_falling_or_hovering_is_not_no_liftoff():
+    weight = 14.7
+    climb = RunHealth(HealthThresholds(), weight_n=weight)
+    for t in np.arange(0.0, 2.0, 0.02):
+        climb.on_truth(round(t * S), [0, 0, 0.06 + 0.5 * t * t], [0, 0, t], LEVEL)
+        climb.on_command(command([1.3 * weight / 4] * 4, t_s=t))
+    fall = RunHealth(HealthThresholds(), weight_n=weight)
+    for t in np.arange(0.0, 2.0, 0.02):  # full thrust while falling
+        fall.on_truth(round(t * S), [0, 0, 5 - t], [0, 0, -1.0], LEVEL)
+        fall.on_command(command([2 * weight / 4] * 4, t_s=t))
+    hover_ = RunHealth(HealthThresholds(), weight_n=weight)
+    for t in np.arange(0.0, 2.0, 0.02):
+        hover_.on_truth(round(t * S), [0, 0, 1], STILL, LEVEL)
+        hover_.on_command(command([weight / 4] * 4, t_s=t))
+    assert all(summary(h)["verdict"] == "ok" for h in (climb, fall, hover_))
+
+
+def test_tracking_lost_is_a_sustained_large_error_warning():
+    health = RunHealth(HealthThresholds(tracking_lost_m=2.0, tracking_lost_s=3.0))
+    for t in np.arange(0.0, 10.0, 0.1):
+        health.on_truth(round(t * S), [0, 0, 1], STILL, LEVEL)
+        error = 2.5 if 1.0 <= t < 3.0 or t >= 5.0 else 0.5  # first spell too short
+        error += 0.1 if t > 9 else 0.0
+        health.on_tracking_error(round(t * S), error)
+    result = summary(health)
+    (finding,) = result["findings"]
+    assert finding["kind"] == "tracking_lost" and result["verdict"] == "warning"
+    assert finding["time_s"] == pytest.approx(5.0)
+    assert finding["value"] == pytest.approx(2.6)

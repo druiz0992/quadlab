@@ -184,6 +184,13 @@ dronelab --headless --rerun --control-mode rotor-thrust --scene worlds/airfield.
   --drone configs/vehicles/kite_quadplane.json --drone configs/algorithms/quadplane_autopilot.json \
   --drone configs/control/lockstep.json --duration 160 --output outputs/quadplane
 
+# Record a flight once, then run estimators on it offline (no Gazebo; deterministic)
+dronelab --headless --control-mode rotor-thrust --drone configs/control/lockstep.json \
+  --drone configs/missions/square.json --drone configs/algorithms/ekf_observer.json \
+  --drone configs/algorithms/record_replay.json --duration 30 --output outputs/rec
+dronelab-replay outputs/rec --output outputs/rec-ekf
+dronelab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:MyFilter
+
 # Magnetometer calibration (compass dance + throttle sweep in Gazebo), then fly with it
 dronelab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal
 dronelab --headless --control-mode rotor-thrust --drone configs/sensors/magnetometer.json \
@@ -254,7 +261,9 @@ Each mission writes `flight.rrd`, `telemetry.jsonl`, `commands.jsonl`,
 `world.sdf` and `drone-resolved.json`; every run writes `metrics.json`
 (estimation and control scores, [7 Experiments](docs/7_experiments.md#metrics-metricsjson));
 `--ekf` or an estimator plug-in adds `estimates.jsonl`; dynamic
-wind adds `wind-commands.jsonl`; camera runs save `camera-first.png`. Check
+wind adds `wind-commands.jsonl`; camera runs save `camera-first.png`;
+`algorithms.record_bus` adds `replay.jsonl` for `dronelab-replay`; plug-ins
+that log debug series add `algorithm-debug.jsonl`. Check
 the health verdict (`ok`/`warning`/`failed`, printed after the run),
 completion, message counts, and dropped counters in `summary.json` before
 trusting a dataset. Details: [2 Simulation](docs/2_simulation.md#run-artifacts).
