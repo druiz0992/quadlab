@@ -1,9 +1,10 @@
 """Opt-in Gazebo regression suite: short lockstep runs pinning verified numbers.
 
-Run with ``DRONELAB_TEST_GAZEBO=1`` (about 5 minutes wall time); the
+Run with ``DRONELAB_TEST_GAZEBO=1`` (about 2 minutes wall time); the
 quadplane mission (about 17 minutes) also needs ``DRONELAB_TEST_GAZEBO_SLOW=1``.
 Each run uses lockstep (``configs/control/lockstep.json``) so results are
-repeatable, and a fresh pytest temporary directory. The expected values are
+repeatable, and a fresh pytest temporary directory. Tests that compare two
+flights run them at once in separate processes (``fly_concurrently``). The expected values are
 the ones verified by hand and recorded in the numbered docs; tolerances
 leave room for floating-point differences across machines, not for
 behaviour changes.
@@ -12,6 +13,8 @@ behaviour changes.
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -31,6 +34,20 @@ LOCKSTEP = "configs/control/lockstep.json"
 HOLD_1M = {"mission": {"type": "hold", "center_m": [0, 0, 1]}}
 
 
+def layer_paths(directory: Path, layers: list[str | dict]) -> list[str]:
+    """Lockstep first, then ``layers``; dict layers become JSON files in
+    ``directory``."""
+    directory.mkdir(parents=True, exist_ok=True)
+    paths = [LOCKSTEP]
+    for index, layer in enumerate(layers):
+        if isinstance(layer, dict):
+            path = directory / f"layer{index}.json"
+            path.write_text(json.dumps(layer))
+            layer = str(path)
+        paths.append(layer)
+    return paths
+
+
 def fly(
     directory: Path,
     layers: list[str | dict],
@@ -42,19 +59,11 @@ def fly(
     Dict layers are written as JSON files in ``directory``; the run's
     outputs go to ``directory / "run"``.
     """
-    directory.mkdir(parents=True, exist_ok=True)
-    paths = [LOCKSTEP]
-    for index, layer in enumerate(layers):
-        if isinstance(layer, dict):
-            path = directory / f"layer{index}.json"
-            path.write_text(json.dumps(layer))
-            layer = str(path)
-        paths.append(layer)
     output = directory / "run"
     run(
         GazeboConfig(
             scene=scene,
-            drone=tuple(paths),
+            drone=tuple(layer_paths(directory, layers)),
             output=str(output),
             headless=True,
             control_mode="rotor-thrust",
@@ -62,6 +71,46 @@ def fly(
         )
     )
     return json.loads((output / "summary.json").read_text())
+
+
+def fly_concurrently(
+    flights: list[tuple[Path, list[str | dict], float]],
+) -> list[dict]:
+    """Run several ``fly`` missions at once, each a separate ``dronelab``
+    process with its own transport partition, like ``dronelab-batch``.
+
+    Lockstep results do not depend on machine load, so this only saves
+    wall time. Returns the summaries in order; fails with the run's output
+    if any process exits non-zero. (In-process spies such as ``capture``
+    do not see these runs.)
+    """
+    processes = []
+    for directory, layers, duration_s in flights:
+        command = [sys.executable, "-m", "dronelab", "--headless"]
+        command += ["--control-mode", "rotor-thrust", "--duration", str(duration_s)]
+        for path in layer_paths(directory, layers):
+            command += ["--drone", path]
+        command += ["--output", str(directory / "run")]
+        log = (directory / "dronelab.log").open("w")
+        processes.append(
+            (
+                directory,
+                log,
+                subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT),
+            )
+        )
+    failures = []
+    for directory, log, process in processes:
+        if process.wait() != 0:
+            failures.append(directory)
+        log.close()
+    assert not failures, "\n".join(
+        (directory / "dronelab.log").read_text() for directory in failures
+    )
+    return [
+        json.loads((directory / "run" / "summary.json").read_text())
+        for directory, _, _ in flights
+    ]
 
 
 def jsonl(path: Path) -> list[dict]:
@@ -182,11 +231,15 @@ def test_imu_calibration_recovers_scale_and_writes_priors(tmp_path):
 def test_ekf_in_the_loop_tracks_like_truth_control(tmp_path):
     # Verified: 0.102 m on truth, 0.103 m on the estimate, 4 mm estimation RMSE.
     layers = ["configs/missions/square.json"]
-    truth = fly(
-        tmp_path / "truth", layers + ["configs/algorithms/ekf_observer.json"], 45
-    )
-    estimate = fly(
-        tmp_path / "estimate", layers + ["configs/algorithms/ekf_in_the_loop.json"], 45
+    truth, estimate = fly_concurrently(
+        [
+            (tmp_path / "truth", layers + ["configs/algorithms/ekf_observer.json"], 45),
+            (
+                tmp_path / "estimate",
+                layers + ["configs/algorithms/ekf_in_the_loop.json"],
+                45,
+            ),
+        ]
     )
     on_truth = truth["metrics"]["control"]["tracking"]["position_m"]["rmse"]
     on_estimate = estimate["metrics"]["control"]["tracking"]["position_m"]["rmse"]
@@ -240,8 +293,9 @@ def test_lockstep_runs_are_deterministic(tmp_path, layers):
 
     if "turbulence" in layers[0] and not lockstep_plugin_available():
         pytest.skip("needs the lockstep plugin (dronelab-build-plugins)")
-    first = fly(tmp_path / "a", layers, 8)
-    second = fly(tmp_path / "b", layers, 8)
+    first, second = fly_concurrently(
+        [(tmp_path / "a", layers, 8), (tmp_path / "b", layers, 8)]
+    )
     compared = 0
     for name in ("telemetry.jsonl", "commands.jsonl", "estimates.jsonl"):
         a, b = (tmp_path / side / "run" / name for side in ("a", "b"))
