@@ -30,8 +30,24 @@ or uses the saved world.
   concurrent local runs cannot exchange messages.
 
 Transport callbacks only enqueue messages into a bounded queue (4,000
-entries; overflows are counted). The mission loop drains it into Rerun and
-the controllers. Mission duration is measured from the first odometry
+entries; overflows are counted, `simulation/gazebo/ingress.py`). The mission
+loop (`experiments/mission_loop.py`) drains it serially, one message at a
+time, through these stages:
+
+1. **Housekeeping:** live-EKF and thrust-worker health, keyboard input and
+   effects, watchdogs, Gazebo process liveness.
+2. **Measurement pipeline** (`sensor_pipeline.py`): error and fault
+   models, then recording, sensor status, and the sensor bus; then the
+   estimator runner and the live EKF.
+3. **Truth step**, per odometry sample: payload and moving obstacles,
+   Python external forces (`vehicle_forces.py`), synthetic sensors,
+   evaluation and health, `telemetry.jsonl`, then the rotor-thrust tick
+   (`rotor_mission.py`) or a velocity command, then the lockstep advance.
+4. Poses feed payload and moving obstacles; contacts feed the health
+   verdict.
+
+The stage order is part of the behaviour (seeded models draw per call), so
+lockstep runs stay byte-identical across refactors. Mission duration is measured from the first odometry
 timestamp. Loss of odometry for 30 wall-clock seconds raises an error
 (rotor-thrust modes use a stricter 1 s watchdog, see [4 Control](4_control.md)).
 Cleanup sends a zero command, terminates the child, and writes summary and

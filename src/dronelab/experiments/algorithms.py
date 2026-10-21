@@ -18,6 +18,7 @@ a control tick, ``StaleEstimate`` is raised and the mission stops thrust.
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 import importlib
 from typing import Any
 
@@ -203,3 +204,49 @@ class EstimateStateSource:
             source="estimate",
             airspeed_mps=self._airspeed,
         )
+
+
+@dataclass(frozen=True)
+class AlgorithmStack:
+    """The plug-ins of one run and how they are wired.
+
+    ``bus`` and ``runner`` exist only with an estimator; ``estimate_source``
+    only when the controller flies on the estimate; ``controller`` only in
+    rotor-thrust mode.
+    """
+
+    context: AlgorithmContext
+    estimator: StateEstimator | None
+    bus: SensorBus | None
+    runner: AlgorithmRunner | None
+    estimate_source: EstimateStateSource | None
+    controller: RotorController | None
+
+
+def build_algorithm_stack(
+    settings: Mapping[str, Any],
+    vehicle: DroneProperties,
+    reference: GpsReading,
+    bus_kinds: tuple[str, ...],
+    *,
+    rotor_mode: bool,
+) -> AlgorithmStack:
+    """Context, estimator, sensor bus, runner, state source, and controller.
+
+    Algorithms see configuration-derived context only, never truth.
+    """
+    algorithms = settings["algorithms"]
+    context = build_context(settings, vehicle, reference, bus_kinds)
+    estimator = build_estimator(settings, context)
+    bus = SensorBus(settings["sensor_timing"], bus_kinds) if estimator else None
+    runner = AlgorithmRunner(bus, estimator) if bus is not None else None
+    estimate_source = (
+        EstimateStateSource(
+            context.sensors["imu"].mount_quaternion_xyzw,
+            algorithms["max_estimate_age_s"],
+        )
+        if algorithms["control_state_source"] == "estimate"
+        else None
+    )
+    controller = build_controller(settings, context) if rotor_mode else None
+    return AlgorithmStack(context, estimator, bus, runner, estimate_source, controller)

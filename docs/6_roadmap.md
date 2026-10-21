@@ -88,7 +88,8 @@ document and update the status below.
 | Estimation (NEES/NIS) and control metrics against truth | Implemented ([7 Experiments](7_experiments.md#metrics-metricsjson)) |
 | Run health verdict (flip, hard impact, obstacle contact, below ground, left ground area, non-finite values, saturation, drops); batch runs exclude failed runs and `--check` fails on them | Implemented ([7 Experiments](7_experiments.md#run-health-verdict-health)) |
 | Opt-in Gazebo regression suite pinning verified numbers (lockstep) | Implemented (`tests/integration/test_gazebo_regression.py`, see the README) |
-| Split the Gazebo mission loop (`experiments/gazebo.py`) into pipeline stages under the regression suite | Future (simulation robustness) |
+| Split the Gazebo mission loop (`experiments/gazebo.py`) into pipeline stages under the regression suite | Implemented ([2 Simulation](2_simulation.md#mission-lifecycle)); verified byte-identical lockstep outputs |
+| Determinism gaps found while verifying the split: Python-published wind commands can land on either side of a lockstep step under CPU load; ground-start, ESC-telemetry, rendered-sensor, and magnetometer/sensor-error runs vary between identical runs; a ground-start run once never took off yet scored `ok` | Future (simulation robustness item 6) |
 | Audit remaining Gazebo defaults (atmosphere, magnetic table, solver and contact settings) | Future (simulation robustness) |
 | Lockstep performance on large worlds (pose-message volume) | Future (simulation robustness) |
 | Gazebo process cleanup and hang detection | Future (simulation robustness) |

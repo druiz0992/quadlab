@@ -87,9 +87,17 @@ src/dronelab/
 │       ├── wind.py         # Seeded wind targets and native wind commands
 │       ├── sdf.py          # XML-building helpers
 │       ├── environment.py  # Child-process library environment (Snap fix)
+│       ├── ingress.py      # Topic subscriptions into one bounded, counted queue; gz command
 │       └── messages.py     # Gazebo timestamp/vector adapters
 ├── experiments/
-│   ├── gazebo.py           # Compose and run a Gazebo mission
+│   ├── gazebo.py           # Compose a Gazebo mission (run entry point, wiring)
+│   ├── run_setup.py        # Option checks, true vehicle draw, world and resolved config
+│   ├── mission_loop.py     # The running mission: message loop, truth step, shutdown
+│   ├── sensor_pipeline.py  # Error/fault models → recording → sensor bus; synthetic sensors
+│   ├── rotor_mission.py    # Rotor-thrust tick: powertrain, state source, failsafe, pilot
+│   ├── vehicle_forces.py   # Python body drag and fixed-wing wrench
+│   ├── keyboard_flight.py  # Keyboard effect toggles wiring and log
+│   ├── run_summary.py      # summary.json assembly
 │   ├── rotor_loop.py       # Fixed-rate rotor-thrust control loop with latency
 │   ├── algorithms.py       # Plug-in loading, context, runner, estimate-driven state
 │   ├── mission.py          # Mission clock and reference sampling

@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation
 
 from dronelab.estimation.imu_calibration import ImuCalibration, ImuCalibrationDriver
 from dronelab.evaluation.imu_bias import EffectiveImuBias
-from dronelab.experiments.gazebo import _calibration_warnings
+from dronelab.experiments.sensor_pipeline import calibration_warnings
 from dronelab.experiments.imu_calibration import (
     AXIS_POSES,
     imu_calibration_config,
@@ -90,13 +90,13 @@ def test_config_round_trip_and_staleness_fingerprints(tmp_path):
     path = tmp_path / "imu-calibration.json"
     path.write_text(json.dumps({"sensors": {"imu": {"calibration": section}}}))
     config = load_drone_config(path)
-    assert _calibration_warnings(config.data["sensors"]) == []
+    assert calibration_warnings(config.data["sensors"]) == []
     # Seeds change at every run; they must not make a calibration stale.
     reseeded = load_drone_config(path)
     reseeded.data["sensors"]["imu"]["error_model"]["seed"] = 99
-    assert _calibration_warnings(reseeded.data["sensors"]) == []
+    assert calibration_warnings(reseeded.data["sensors"]) == []
     changed = load_drone_config([path, "configs/sensors/imu_consumer_mems.json"])
-    assert "imu calibration" in _calibration_warnings(changed.data["sensors"])[0]
+    assert "imu calibration" in calibration_warnings(changed.data["sensors"])[0]
     bypassed = load_drone_config(
         [
             path,
@@ -104,7 +104,7 @@ def test_config_round_trip_and_staleness_fingerprints(tmp_path):
             "configs/sensors/no_calibration.json",
         ]
     )
-    assert _calibration_warnings(bypassed.data["sensors"]) == []
+    assert calibration_warnings(bypassed.data["sensors"]) == []
 
 
 def test_startup_calibration_needs_ground_start(tmp_path):
