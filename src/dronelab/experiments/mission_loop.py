@@ -40,6 +40,7 @@ from ..simulation.gazebo.environment import gazebo_environment
 from ..simulation.gazebo.messages import timestamp, timestamp_ns, vector
 from ..simulation.gazebo.stepping import wait_for_subscribers
 from .keyboard_flight import apply_keyboard_effects
+from .loop_timing import LoopTiming
 from .rotor_loop import RotorControlLoop
 from .rotor_mission import RotorMission, RotorMissionParts
 from .replay_log import estimate_record
@@ -51,6 +52,11 @@ NO_TELEMETRY_TIMEOUT_WALL_S = 30.0
 STARTUP_TIMEOUT_WALL_S = 60.0
 # Native velocity-mode command period (s, simulation time).
 VELOCITY_COMMAND_PERIOD_S = 0.04
+# Keyboard window service period (wall s). A Tk update with redraw costs
+# ~0.5 ms (spikes to ~20 ms); doing it per message (~500/s at 250 Hz
+# odometry) kept a 250 Hz real-time loop near full load. 50 Hz is still
+# far below human reaction time.
+KEYBOARD_POLL_PERIOD_WALL_S = 0.02
 
 
 @dataclass(frozen=True)
@@ -166,6 +172,7 @@ class MissionLoop:
         self.parts = parts
         self.settings = parts.config.data
         self.counts: Counter = Counter()
+        self.timing = LoopTiming()
         self.positions: list[NDArray[np.float64]] = []
         self.collisions: list[dict[str, Any]] = []
         self.first_time: float | None = None
@@ -178,6 +185,7 @@ class MissionLoop:
         self._last_command_time = -float("inf")
         self._bus_now_ns = 0
         self._pilot_command = FlightCommand()
+        self._next_keyboard_poll_wall_s = 0.0
         self.thrust_control: Any | None = None
         self.control_loop: RotorControlLoop | None = None
         self.stepper: Any | None = None
@@ -348,7 +356,12 @@ class MissionLoop:
 
     def _step(self) -> bool:
         """Process at most one message; False when the mission is over."""
-        if not self._housekeeping():
+        self.timing.begin("housekeeping")
+        try:
+            running = self._housekeeping()
+        finally:
+            self.timing.end()
+        if not running:
             return False
         try:
             source = self.parts.orderer or self.parts.ingress
@@ -358,7 +371,12 @@ class MissionLoop:
         except Empty:
             self._idle()
             return True
-        return self._handle(kind, message, received_at)
+        self.timing.begin(kind, received_at)
+        try:
+            return self._handle(kind, message, received_at)
+        finally:
+            # last_time is the newest odometry stamp: the simulated span.
+            self.timing.end(self.last_time)
 
     def _housekeeping(self) -> bool:
         """Health checks and keyboard input; False when the keyboard closed."""
@@ -371,10 +389,25 @@ class MissionLoop:
         if self.thrust_control is not None:
             self.thrust_control.check_health()
             self._drain_command_events()
-        keyboard = parts.keyboard
-        self._pilot_command = (
-            keyboard.poll() if keyboard is not None else FlightCommand()
-        )
+        if not self._poll_keyboard():
+            self.exit_reason = "keyboard_closed"
+            return False
+        self._check_watchdogs()
+        return True
+
+    def _poll_keyboard(self) -> bool:
+        """Service the keyboard window at most every
+        ``KEYBOARD_POLL_PERIOD_WALL_S``: pilot command, then effect keys
+        (stamped with the latest odometry time). Between polls the last
+        command holds. False once the window has closed."""
+        parts, keyboard = self.parts, self.parts.keyboard
+        if keyboard is None:
+            return True
+        now = time.monotonic()
+        if now < self._next_keyboard_poll_wall_s:
+            return True
+        self._next_keyboard_poll_wall_s = now + KEYBOARD_POLL_PERIOD_WALL_S
+        self._pilot_command = keyboard.poll()
         if parts.effects is not None:
             apply_keyboard_effects(
                 keyboard,
@@ -383,11 +416,7 @@ class MissionLoop:
                 self.files.effects,
                 parts.recorder,
             )
-        if keyboard is not None and keyboard.closed:
-            self.exit_reason = "keyboard_closed"
-            return False
-        self._check_watchdogs()
-        return True
+        return not keyboard.closed
 
     def _check_watchdogs(self) -> None:
         parts = self.parts

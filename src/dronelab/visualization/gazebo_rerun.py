@@ -1,6 +1,7 @@
 """Rerun visualization adapter for Gazebo messages; no flight-control logic."""
 
 from collections import Counter
+from collections.abc import Callable
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -22,6 +23,54 @@ def _display_path(positions, max_vertices=2000):
     if positions and (len(positions) - 1) % stride:
         vertices.append(positions[-1])
     return vertices
+
+
+# Scalar series reach Rerun in batches spanning this much simulated time.
+SCALAR_BATCH_PERIOD_SIM_S = 0.1
+
+
+class ScalarBatch:
+    """Buffer scalar samples per entity path and send them in columns.
+
+    One ``rr.log`` per scalar cost ~30 µs (archetype construction); a
+    250 Hz flight logs ~30 scalars per odometry period, enough to push the
+    real-time mission loop behind Gazebo. Sending each path's buffered
+    samples as one column keeps every sample and timestamp at a fraction of
+    that cost; the viewer sees them up to ``period_sim_s`` later.
+
+    ``send(path, times_s, values)`` receives samples in arrival order.
+    A batch is flushed once a sample arrives ``period_sim_s`` or more after
+    the batch's first sample, and by ``flush()`` (the recorder's ``close``).
+    """
+
+    def __init__(
+        self,
+        send: Callable[[str, list[float], list[float]], None],
+        period_sim_s: float = SCALAR_BATCH_PERIOD_SIM_S,
+    ) -> None:
+        if not period_sim_s >= 0:
+            raise ValueError("period_sim_s must be non-negative")
+        self._send = send
+        self._period_sim_s = period_sim_s
+        self._series: dict[str, tuple[list[float], list[float]]] = {}
+        self._batch_start_s: float | None = None
+
+    def add(self, path: str, time_s: float, value: float) -> None:
+        """Buffer one sample of ``path`` at simulation time ``time_s``."""
+        times, values = self._series.setdefault(path, ([], []))
+        times.append(time_s)
+        values.append(float(value))
+        if self._batch_start_s is None:
+            self._batch_start_s = time_s
+        elif time_s - self._batch_start_s >= self._period_sim_s:
+            self.flush()
+
+    def flush(self) -> None:
+        """Send every buffered series and start a new batch."""
+        series, self._series = self._series, {}
+        self._batch_start_s = None
+        for path, (times, values) in series.items():
+            self._send(path, times, values)
 
 
 class GazeboRerunRecorder:
@@ -46,6 +95,8 @@ class GazeboRerunRecorder:
         self.estimate_positions = []
         self.truth_positions = {}
         self.counts = Counter()
+        self._time_s = 0.0
+        self._scalars = ScalarBatch(self._send_scalars)
         rr.init("dronelab_gazebo")
         sinks = [rr.FileSink(str(output / "flight.rrd"))]
         if not headless:
@@ -91,7 +142,7 @@ class GazeboRerunRecorder:
         rr.set_sinks(*sinks, default_blueprint=layout)
         # A default alone does not replace a layout cached by the viewer.
         rr.send_blueprint(layout, make_active=True, make_default=True)
-        rr.set_time("sim_time", duration=0.0)
+        self._set_time(0.0)
         rr.log("world", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
         if target is not None:
             rr.log(
@@ -198,6 +249,23 @@ class GazeboRerunRecorder:
                     )
         self.obstacle_names = obstacle_names
 
+    def _set_time(self, t: float) -> None:
+        """Set the ``sim_time`` (s) of following logs, scalars included."""
+        self._time_s = t
+        self.rr.set_time("sim_time", duration=t)
+
+    def _scalar(self, path: str, value: float) -> None:
+        """One scalar sample at the current ``sim_time`` (batched)."""
+        self._scalars.add(path, self._time_s, value)
+
+    def _send_scalars(self, path: str, times_s: list[float], values: list[float]):
+        rr = self.rr
+        rr.send_columns(
+            path,
+            indexes=[rr.TimeColumn("sim_time", duration=times_s)],
+            columns=rr.Scalars.columns(scalars=values),
+        )
+
     def _log_obj_mesh(self, path, uri):
         """Show a generated OBJ mesh (e.g. terrain) from its file:// URI."""
         from urllib.parse import unquote, urlparse
@@ -281,7 +349,7 @@ class GazeboRerunRecorder:
         """
         rr = self.rr
         self.counts["lidar"] += 1
-        rr.set_time("sim_time", duration=t)
+        self._set_time(t)
         colors = None
         if reflectivity is not None and len(reflectivity) == len(points_body):
             level = np.clip(np.asarray(reflectivity, float), 0.0, 1.0)[:, None]
@@ -294,7 +362,7 @@ class GazeboRerunRecorder:
         """Log a processed camera frame at its delivery time (see camera_effects)."""
         rr = self.rr
         self.counts["camera"] += 1
-        rr.set_time("sim_time", duration=t)
+        self._set_time(t)
         rr.log("camera/rgb", rr.Image(image))
         if self.counts["camera"] == 1:
             from PIL import Image as PillowImage
@@ -304,8 +372,8 @@ class GazeboRerunRecorder:
     def log_effect(self, event):
         """Effect switch from keyboard flight: status series plus an event line."""
         rr = self.rr
-        rr.set_time("sim_time", duration=event["sim_time_ns"] * 1e-9)
-        rr.log(f"status/effect_{event['effect']}", rr.Scalars(float(event["on"])))
+        self._set_time(event["sim_time_ns"] * 1e-9)
+        self._scalar(f"status/effect_{event['effect']}", float(event["on"]))
         if "soc" in event:  # one-shot battery action
             text = f"{event['effect']}: charge {event['soc']:.0%}"
         else:
@@ -314,9 +382,8 @@ class GazeboRerunRecorder:
 
     def log_vector(self, path, values, labels=("x", "y", "z")):
         """Log each component of a vector as its own time series."""
-        rr = self.rr
         for label, value in zip(labels, values):
-            rr.log(f"{path}/{label}", rr.Scalars(float(value)))
+            self._scalar(f"{path}/{label}", float(value))
 
     FAILSAFE_LEVELS = {
         "normal": 0,
@@ -329,9 +396,7 @@ class GazeboRerunRecorder:
     def log_failsafe(self, event):
         """Failsafe state change: status level plus an event line."""
         rr = self.rr
-        rr.log(
-            "status/failsafe_state", rr.Scalars(self.FAILSAFE_LEVELS[event["state"]])
-        )
+        self._scalar("status/failsafe_state", self.FAILSAFE_LEVELS[event["state"]])
         rr.log(
             "events/failsafe",
             rr.TextLog(
@@ -341,45 +406,41 @@ class GazeboRerunRecorder:
 
     def log_status(self, name, t, value):
         """Sensor health indicator time series (see experiments/gazebo.py)."""
-        rr = self.rr
-        rr.set_time("sim_time", duration=t)
-        rr.log(f"status/{name}", rr.Scalars(float(value)))
+        self._set_time(t)
+        self._scalar(f"status/{name}", float(value))
 
     def log_battery_monitor(self, reading):
         """Measured battery values from the power-module model."""
-        rr = self.rr
-        rr.set_time("sim_time", duration=reading.sim_time_ns * 1e-9)
-        rr.log("battery/measured/voltage_v", rr.Scalars(reading.voltage_v))
-        rr.log("battery/measured/current_a", rr.Scalars(reading.current_a))
-        rr.log("battery/measured/remaining_pct", rr.Scalars(reading.remaining_pct))
+        self._set_time(reading.sim_time_ns * 1e-9)
+        self._scalar("battery/measured/voltage_v", reading.voltage_v)
+        self._scalar("battery/measured/current_a", reading.current_a)
+        self._scalar("battery/measured/remaining_pct", reading.remaining_pct)
 
     def log_optical_flow(self, reading):
         """Optical-flow rates and distance; invalid samples log validity only."""
-        rr = self.rr
-        rr.set_time("sim_time", duration=reading.sim_time_ns * 1e-9)
-        rr.log("downward/flow_valid", rr.Scalars(float(reading.valid)))
-        rr.log("status/optical_flow_valid", rr.Scalars(float(reading.valid)))
+        self._set_time(reading.sim_time_ns * 1e-9)
+        self._scalar("downward/flow_valid", float(reading.valid))
+        self._scalar("status/optical_flow_valid", float(reading.valid))
         if reading.valid:
             for axis, value in zip(("y", "z"), reading.flow_rad_s):
-                rr.log(f"downward/flow_rad_s/{axis}", rr.Scalars(value))
-            rr.log("downward/flow_distance_m", rr.Scalars(reading.distance_m))
+                self._scalar(f"downward/flow_rad_s/{axis}", value)
+            self._scalar("downward/flow_distance_m", reading.distance_m)
 
     def log_powertrain(self, battery, ground_effect_factors, thrust_available=()):
         """Battery voltage/SoC/current and per-rotor ground-effect factors.
 
         Logged at the current simulation time (set by the latest odometry).
         """
-        rr = self.rr
         if battery is not None:
-            rr.log("battery/terminal_v", rr.Scalars(battery.terminal_v))
-            rr.log("battery/soc", rr.Scalars(battery.soc))
-            rr.log("battery/current_a", rr.Scalars(battery.current_a))
-            rr.log("battery/temperature_c", rr.Scalars(battery.temperature_c))
+            self._scalar("battery/terminal_v", battery.terminal_v)
+            self._scalar("battery/soc", battery.soc)
+            self._scalar("battery/current_a", battery.current_a)
+            self._scalar("battery/temperature_c", battery.temperature_c)
         for index, factor in enumerate(ground_effect_factors):
-            rr.log(f"battery/ground_effect/rotor_{index}", rr.Scalars(factor))
+            self._scalar(f"battery/ground_effect/rotor_{index}", factor)
         # Motor health: maximum thrust available vs healthy (1 = healthy).
         for index, fraction in enumerate(thrust_available):
-            rr.log(f"status/motor_{index}_thrust_available", rr.Scalars(fraction))
+            self._scalar(f"status/motor_{index}_thrust_available", fraction)
 
     def log_actuator_event(self, event):
         """Show published motor thrust targets, never inferred applied forces."""
@@ -390,15 +451,14 @@ class GazeboRerunRecorder:
         self.log_thrust_targets(event["thrust_n"], event["sim_time_ns"] * 1e-9)
 
     def log_thrust_targets(self, thrust_n, t):
-        rr = self.rr
-        rr.set_time("sim_time", duration=t)
+        self._set_time(t)
         for index, thrust in enumerate(thrust_n):
-            rr.log(f"actuators/thrust_target_n/rotor_{index}", rr.Scalars(thrust))
+            self._scalar(f"actuators/thrust_target_n/rotor_{index}", thrust)
 
     def log(self, kind, message, t):
         rr = self.rr
         self.counts[kind] += 1
-        rr.set_time("sim_time", duration=t)
+        self._set_time(t)
         if kind == "poses":
             for pose in message.pose:
                 if pose.name == "hook" and self.tether_anchor is not None:
@@ -445,30 +505,30 @@ class GazeboRerunRecorder:
                     ),
                 )
             if self.target is not None:
-                rr.log("tracking/error_m", rr.Scalars(np.linalg.norm(p - self.target)))
+                self._scalar("tracking/error_m", np.linalg.norm(p - self.target))
         elif kind == "imu":
             for label, values in [
                 ("accel", message.linear_acceleration),
                 ("gyro", message.angular_velocity),
             ]:
                 for axis, value in zip("xyz", vector(values)):
-                    rr.log(f"imu/{label}/{axis}", rr.Scalars(value))
+                    self._scalar(f"imu/{label}/{axis}", value)
         elif kind == "gps":
             for label in ["latitude_deg", "longitude_deg", "altitude"]:
-                rr.log(f"gps/{label}", rr.Scalars(getattr(message, label)))
+                self._scalar(f"gps/{label}", getattr(message, label))
         elif kind == "magnetometer":
             field_ut = vector(message.field_tesla) * 1e6
             for axis, value in zip("xyz", field_ut):
-                rr.log(f"magnetometer/field_ut/{axis}", rr.Scalars(value))
+                self._scalar(f"magnetometer/field_ut/{axis}", value)
             # Compass yaw (ENU, from east) assuming a level sensor and
             # ignoring declination: m_x = B_n sin(yaw), m_y = B_n cos(yaw).
             yaw = np.degrees(np.arctan2(field_ut[0], field_ut[1]))
-            rr.log("magnetometer/level_yaw_deg", rr.Scalars(yaw))
+            self._scalar("magnetometer/level_yaw_deg", yaw)
         elif kind == "rangefinder":
             distance = rangefinder_distance(message)
             ray = "world/drone/sensors/rangefinder/ray"
             if np.isfinite(distance):
-                rr.log("downward/range_m", rr.Scalars(distance))
+                self._scalar("downward/range_m", distance)
                 # Ray from the sensor along its +x axis to the measured hit.
                 rr.log(
                     ray,
@@ -479,11 +539,9 @@ class GazeboRerunRecorder:
             else:
                 rr.log(ray, rr.Clear(recursive=False))
         elif kind == "baro":
-            rr.log("baro/pressure_pa", rr.Scalars(message.pressure))
+            self._scalar("baro/pressure_pa", message.pressure)
             # Pressure altitude above sea level, comparable with GPS altitude.
-            rr.log(
-                "baro/altitude_m", rr.Scalars(pressure_to_altitude(message.pressure))
-            )
+            self._scalar("baro/altitude_m", pressure_to_altitude(message.pressure))
         elif kind == "contacts" and message.contact:
             for contact in message.contact:
                 event = dict(
@@ -509,14 +567,14 @@ class GazeboRerunRecorder:
 
     def log_algorithm_debug(self, name, sim_time_ns, values, labels):
         """A plug-in's debug series under ``algorithms/<name>`` at its own time."""
-        self.rr.set_time("sim_time", duration=sim_time_ns * 1e-9)
+        self._set_time(sim_time_ns * 1e-9)
         self.log_vector(f"algorithms/{name}", values, labels)
 
     def log_estimate(self, sample):
         """Observer only: truth is used for matched-time error plots, never filtering."""
         rr = self.rr
         state = sample.payload
-        rr.set_time("sim_time", duration=sample.sim_time_ns * 1e-9)
+        self._set_time(sample.sim_time_ns * 1e-9)
         rr.log(
             "world/ekf",
             rr.Transform3D(
@@ -537,15 +595,16 @@ class GazeboRerunRecorder:
             )
         truth = self.truth_positions.get(sample.sim_time_ns)
         for index, axis in enumerate("xyz"):
-            rr.log(f"estimation/position/{axis}", rr.Scalars(state.position_m[index]))
+            self._scalar(f"estimation/position/{axis}", state.position_m[index])
             if truth is not None:
-                rr.log(f"estimation/truth_position/{axis}", rr.Scalars(truth[index]))
+                self._scalar(f"estimation/truth_position/{axis}", truth[index])
         if truth is not None:
-            rr.log(
+            self._scalar(
                 "estimation/position_error_m",
-                rr.Scalars(np.linalg.norm(state.position_m - truth)),
+                np.linalg.norm(state.position_m - truth),
             )
-        rr.log("estimation/speed_mps", rr.Scalars(np.linalg.norm(state.velocity_mps)))
+        self._scalar("estimation/speed_mps", np.linalg.norm(state.velocity_mps))
 
     def close(self):
+        self._scalars.flush()
         self.rr.disconnect()

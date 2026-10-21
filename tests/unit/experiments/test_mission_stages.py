@@ -240,3 +240,36 @@ def test_final_exit_reason():
     assert final_exit_reason(False, "duration") == "error"
     assert final_exit_reason(False, "interrupted") == "interrupted"
     assert final_exit_reason(False, "keyboard_closed") == "keyboard_closed"
+
+
+# mission_loop -----------------------------------------------------------------
+
+
+def test_keyboard_polled_at_most_every_period(monkeypatch):
+    from dronelab.experiments import mission_loop
+    from dronelab.experiments.mission_loop import (
+        KEYBOARD_POLL_PERIOD_WALL_S,
+        MissionLoop,
+    )
+
+    class Keyboard:
+        closed = False
+        polls = 0
+
+        def poll(self):
+            self.polls += 1
+            return FlightCommand(forward_mps=self.polls)
+
+    keyboard = Keyboard()
+    loop = MissionLoop.__new__(MissionLoop)
+    loop.parts = SimpleNamespace(keyboard=keyboard, effects=None)
+    loop._next_keyboard_poll_wall_s = 0.0
+    now = [10.0]
+    monkeypatch.setattr(mission_loop.time, "monotonic", lambda: now[0])
+    assert loop._poll_keyboard() and keyboard.polls == 1
+    now[0] += KEYBOARD_POLL_PERIOD_WALL_S / 2
+    assert loop._poll_keyboard() and keyboard.polls == 1  # command held
+    assert loop._pilot_command.forward_mps == 1
+    now[0] += KEYBOARD_POLL_PERIOD_WALL_S
+    keyboard.closed = True
+    assert not loop._poll_keyboard() and keyboard.polls == 2

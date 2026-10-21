@@ -2,6 +2,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -79,3 +81,32 @@ def test_repeated_drone_option_layers_files_and_records_sources(tmp_path):
     assert resolved["provenance"]["battery.enabled"] == "configs/vehicles/10in_4s.json"
     assert resolved["provenance"]["sensors.baro.enabled"] == "configs/sensors/baro.json"
     assert resolved["battery"]["enabled"] and resolved["sensors"]["baro"]["enabled"]
+
+
+def test_runtime_error_exits_without_usage(monkeypatch, capsys):
+    from dronelab.cli import gazebo
+
+    def fail(config):
+        raise RuntimeError("Stale odometry in rotor-control queue")
+
+    monkeypatch.setattr(sys, "argv", ["dronelab"])
+    monkeypatch.setattr(gazebo, "run", fail)
+    with pytest.raises(SystemExit) as exit_info:
+        gazebo.main()
+    assert exit_info.value.code == 1
+    err = capsys.readouterr().err
+    assert "Stale odometry" in err and "usage:" not in err
+
+
+def test_value_error_shows_usage(monkeypatch, capsys):
+    from dronelab.cli import gazebo
+
+    def invalid(config):
+        raise ValueError("bad option")
+
+    monkeypatch.setattr(sys, "argv", ["dronelab"])
+    monkeypatch.setattr(gazebo, "run", invalid)
+    with pytest.raises(SystemExit) as exit_info:
+        gazebo.main()
+    assert exit_info.value.code == 2
+    assert "usage:" in capsys.readouterr().err

@@ -299,6 +299,8 @@ source /opt/ros/jazzy/setup.bash
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_manual.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_live_gazebo_ekf.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GUI=1 python -m pytest -q tests/integration/test_keyboard_window.py
+# Real-time check: a 250 Hz flight keeps up with Gazebo on this machine
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_realtime.py
 # Gazebo regression suite (lockstep, about 2.5 min); add DRONELAB_TEST_GAZEBO_SLOW=1
 # for the full quadplane mission (about 17 min)
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_regression.py

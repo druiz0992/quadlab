@@ -49,7 +49,9 @@ KeyboardWindow ─→ FlightCommand ─↗    position loop ─→ attitude loop
 - `visualization/keyboard.py` owns only Tk key, focus, and window state.
   Keys can combine; opposite keys cancel; release or focus loss requests
   braking and hover. Descent setpoints stop 0.4 m above ground; this is not
-  a landing controller.
+  a landing controller. The mission loop services the window (keys and
+  effect toggles) at most every 20 ms of wall time and holds the last
+  pilot command in between ([2 Simulation](2_simulation.md#real-time-loop-timing)).
 - With `--control-mode rotor-thrust` and no keyboard, the controller holds
   the initial pose (zero pilot input).
 - `core/vehicle.py` holds shared built-in properties; SDF, allocation, and the

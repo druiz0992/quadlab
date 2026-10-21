@@ -90,6 +90,32 @@ sample); `summary.json` counts these as `odometry_startup_corrections`.
 Correcting it reduced the heavy-lift spawn sag only from 0.66 to 0.61 m;
 most of the sag is real motor spin-up.
 
+## Real-time loop timing
+
+In real time Gazebo does not wait for Python: the mission loop must handle
+each simulated second of messages in less than a wall second. When it
+cannot, messages queue up, control acts on older and older states, and
+rotor-thrust missions abort with "Stale odometry in rotor-control queue"
+once odometry is 0.25 s old when processed. `summary.json.loop_timing`
+measures this on every run (`experiments/loop_timing.py`):
+
+| Field | Meaning |
+| --- | --- |
+| `load` | Busy wall seconds of the loop per simulated second (keep well below 1 in real time; in lockstep it is the wall cost per simulated second) |
+| `odometry_queue_age_ms` | Mean and maximum wall time from odometry receipt to processing; `late` counts samples older than `late_threshold_ms` (50 ms) |
+| `per_kind` | Busy wall seconds, message count, and slowest single message (ms) per message kind, plus `housekeeping` (keyboard, watchdogs, health checks) |
+
+Slowest-message values include start-up (first window map, first control
+tick). Two costs dominated 250 Hz keyboard flight (`racing_5in`) and are
+now bounded: the keyboard window is serviced at most every 20 ms of wall
+time (it used to redraw for every message), and Rerun scalar series are
+sent in batches (see [Viewing](#viewing)). Measured on the reference
+desktop for a 15 s `racing_5in` keyboard hover: load 0.94 → 0.57 and
+mean odometry queue age 3.8 → 0.4 ms, with no late samples (also with the
+Gazebo GUI open). The opt-in `tests/integration/test_gazebo_realtime.py`
+checks a headless 250 Hz flight stays below load 0.85 with no late
+odometry; it measures the machine it runs on.
+
 ## Lockstep simulation
 
 By default Gazebo runs in real time on its own clock while all Python work
@@ -228,7 +254,9 @@ Select the `sim_time` timeline in Rerun. Rerun shows the blue truth vehicle
 and path, the magenta EKF vehicle and path with `--ekf`, forward arrows for
 body +X, an **EKF vs truth** tab, and a **Rotor thrust targets (N)** tab in
 thrust modes. Displayed paths keep at most 2,000 vertices; files keep every
-sample. Rerun loads box visuals from the world at startup and tracks model
+sample. Scalar time series are buffered and sent in batches covering 0.1 s
+of simulation time (every sample and timestamp is kept), so a live viewer
+shows them up to that much later than 3D poses. Rerun loads box visuals from the world at startup and tracks model
 poses; objects added or removed during flight, meshes, non-box shapes, and
 link-level rotations are not fully synchronized. Gazebo stays authoritative
 for geometry, rendering, and contacts. Close the Rerun viewer yourself.
@@ -381,7 +409,7 @@ dronelab --headless --target 8 0 1 --duration 10 --output outputs/collision   # 
 | `replay.jsonl` | Bus deliveries and truth for `dronelab-replay` (`algorithms.record_bus`) |
 | `algorithm-debug.jsonl` | Plug-in debug series (`context.log`), only when a plug-in logs |
 | `camera-first.png` | First camera frame (rendered runs) |
-| `summary.json` | Lockstep `message_ordering`, health verdict and findings ([7 Experiments](7_experiments.md#run-health-verdict-health)), completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing and `control_timing`, EKF/dropout/vibration/sensor-error/fault diagnostics |
+| `summary.json` | Lockstep `message_ordering`, health verdict and findings ([7 Experiments](7_experiments.md#run-health-verdict-health)), completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing, `control_timing` and `loop_timing` ([Real-time loop timing](#real-time-loop-timing)), EKF/dropout/vibration/sensor-error/fault diagnostics |
 | `gazebo.log` | Gazebo process output |
 
 Reusing an output directory overwrites these files and can leave stale

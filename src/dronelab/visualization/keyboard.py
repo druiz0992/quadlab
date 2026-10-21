@@ -130,18 +130,21 @@ class KeyboardWindow:
             self.root.update()
             if not self.closed:
                 focused = self.root.focus_displayof() is not None
-                self.input_status.set(
+                text = (
                     "Keys: " + (", ".join(sorted(self.keys)) or "none")
                     if focused
                     else "Click here to enable input"
                 )
+                # Setting a Tk variable schedules a redraw even when unchanged.
+                if text != self.input_status.get():
+                    self.input_status.set(text)
         return FlightCommand.from_keys(self.keys, self.pilot_rates)
 
     def show_position(self, position):
         if not self.closed:
-            self.status.set(
-                "Position: " + ", ".join(f"{v:.1f}" for v in position) + " m"
-            )
+            text = "Position: " + ", ".join(f"{v:.1f}" for v in position) + " m"
+            if text != self.status.get():
+                self.status.set(text)
 
     def close(self):
         if not self.closed:

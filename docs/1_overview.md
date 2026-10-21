@@ -104,6 +104,7 @@ src/dronelab/
 │   ├── vehicle_forces.py   # Python body drag and fixed-wing wrench
 │   ├── keyboard_flight.py  # Keyboard effect toggles wiring and log
 │   ├── run_summary.py      # summary.json assembly
+│   ├── loop_timing.py      # Mission-loop wall cost and queue age (loop_timing)
 │   ├── replay_log.py       # Record bus deliveries and truth (replay.jsonl)
 │   ├── replay.py           # Offline estimator replay and scoring (dronelab-replay)
 │   ├── algorithm_debug.py  # Plug-in debug channel (algorithm-debug.jsonl, Rerun)

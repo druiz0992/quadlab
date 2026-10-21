@@ -105,6 +105,7 @@ def build_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
         collisions=loop.collisions,
         target=None if rotor_mode else args.target,
         wall_seconds=time.monotonic() - loop.started,
+        loop_timing=loop.timing.summary(),
         lockstep=loop.stepper.summary() if loop.stepper is not None else None,
         final_position=loop.positions[-1].tolist() if loop.positions else None,
         left_ground_area_s=loop.left_ground_s,

@@ -444,7 +444,14 @@ def _run(args, keyboard, command_source):
             ground_half_m=ground_half_m,
         )
     )
-    summary = loop.run()
+    try:
+        summary = loop.run()
+    except BaseException:
+        # summary.json is written even when the run fails: point at it.
+        if loop.summary is not None:
+            print(f"Results: {output}")
+            _print_health(loop.summary["health"])
+        raise
     counts, completed = loop.counts, loop.completed
     expected = {"odometry"} | {
         name

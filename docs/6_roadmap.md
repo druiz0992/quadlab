@@ -68,7 +68,7 @@ document and update the status below.
 | Sensor delivery delay to the EKF | Implemented with the sensor bus; the built-in EKF rejects GPS older than its state (no re-propagation) |
 | Lockstep (deterministic) simulation stepping | Implemented ([2 Simulation](2_simulation.md#lockstep-simulation)); use it for timing-sensitive work (gain tuning, latency margins, estimator-driven control) |
 | Lockstep keyboard flight (real-time pacing cap with interactive input) | Future |
-| Measure Python pipeline delay in real-time mode (queue wait, processing time, publish lag behind Gazebo) | Future (lockstep removes the need for most experiments) |
+| Measure Python pipeline delay in real-time mode (queue wait, processing time, publish lag behind Gazebo) | Queue wait and processing time implemented (`summary.json.loop_timing`, [2 Simulation](2_simulation.md#real-time-loop-timing)); publish lag behind Gazebo future |
 | Battery voltage sag, body drag without wind, plausible motor/prop preset | Implemented ([3 Configuration](3_configuration.md#battery-and-powertrain-battery)) |
 | Dryden-style turbulence, ground effect | Implemented ([3 Configuration](3_configuration.md#turbulence-windturbulence)) |
 | Obstacle-aware ground effect | Future |
