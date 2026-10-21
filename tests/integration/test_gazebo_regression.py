@@ -3,8 +3,10 @@
 Run with ``DRONELAB_TEST_GAZEBO=1`` (about 2 minutes wall time); the
 quadplane mission (about 17 minutes) also needs ``DRONELAB_TEST_GAZEBO_SLOW=1``.
 Each run uses lockstep (``configs/control/lockstep.json``) so results are
-repeatable, and a fresh pytest temporary directory. Tests that compare two
-flights run them at once in separate processes (``fly_concurrently``). The expected values are
+repeatable, and a fresh pytest temporary directory. The EKF comparison
+flies its two missions at once in separate processes (``fly_concurrently``);
+the determinism test flies its pair one after the other, without the extra
+load. The expected values are
 the ones verified by hand and recorded in the numbered docs; tolerances
 leave room for floating-point differences across machines, not for
 behaviour changes.
@@ -293,19 +295,42 @@ def test_lockstep_runs_are_deterministic(tmp_path, layers):
 
     if "turbulence" in layers[0] and not lockstep_plugin_available():
         pytest.skip("needs the lockstep plugin (dronelab-build-plugins)")
-    first, second = fly_concurrently(
-        [(tmp_path / "a", layers, 8), (tmp_path / "b", layers, 8)]
-    )
+    # One after the other, not concurrently: the extra load of a second
+    # Gazebo once delayed a GPS sample past the orderer's 5 s wait, which
+    # releases periods non-deterministically (reported, but not this test).
+    first = fly(tmp_path / "a", layers, 8)
+    second = fly(tmp_path / "b", layers, 8)
+    for summary in (first, second):
+        ordering = summary["message_ordering"]
+        assert ordering["barrier_timeouts"] == 0, (
+            "machine too loaded for a determinism check: lockstep orderer "
+            f"timed out on {ordering['timeout_streams']}"
+        )
     compared = 0
     for name in ("telemetry.jsonl", "commands.jsonl", "estimates.jsonl"):
         a, b = (tmp_path / side / "run" / name for side in ("a", "b"))
         assert a.exists() == b.exists(), name
         if a.exists():
-            assert a.read_text() and a.read_text() == b.read_text(), name
+            assert a.stat().st_size > 0, name
+            # Compare cheaply: pytest's diff of multi-megabyte strings can
+            # take hours. Report the first differing line instead.
+            difference = first_difference(a, b)
+            assert difference is None, f"{name} differs: {difference}"
             compared += 1
     assert compared >= 2
     assert first["metrics"] == second["metrics"]
     assert first["health"] == second["health"]
+
+
+def first_difference(a: Path, b: Path) -> str | None:
+    """None when the files are identical, else the first differing line."""
+    if a.read_bytes() == b.read_bytes():
+        return None
+    lines_a, lines_b = a.read_text().splitlines(), b.read_text().splitlines()
+    for number, (line_a, line_b) in enumerate(zip(lines_a, lines_b), start=1):
+        if line_a != line_b:
+            return f"line {number}: {line_a[:200]!r} != {line_b[:200]!r}"
+    return f"lengths differ: {len(lines_a)} vs {len(lines_b)} lines"
 
 
 def test_battery_crash_is_reported_as_failed(tmp_path):
