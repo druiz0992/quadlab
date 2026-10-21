@@ -29,6 +29,12 @@ configuration never changes the values of existing ones. Each run is a separate 
 output directory, ``parallel`` at a time; each Gazebo uses its own private
 transport partition.
 
+Each run's health verdict (``summary.json.health``, see
+``evaluation/health.py``) is recorded. Runs whose verdict is ``failed`` are
+left out of the aggregates (their group reports how many were excluded):
+a crashed run's metrics describe the crash, not the algorithm. Runs from
+before the verdict existed have no verdict and are included.
+
 Aggregation groups runs by parameter values and reports count, mean,
 standard deviation, minimum, maximum, and the per-run values for each metric
 (dotted path into ``metrics.json``, or ``summary.<path>`` into
@@ -152,6 +158,22 @@ def run_metrics(run_dir: Path, metric_paths: Sequence[str]) -> dict[str, Any]:
     return values
 
 
+def run_health(run_dir: Path) -> dict[str, Any] | None:
+    """Verdict and findings from ``summary.json.health``, or None if absent."""
+    path = run_dir / "summary.json"
+    if not path.exists():
+        return None
+    health = json.loads(path.read_text()).get("health")
+    if not isinstance(health, Mapping):
+        return None
+    return dict(verdict=health.get("verdict"), findings=health.get("findings", []))
+
+
+def health_failed(result: Mapping[str, Any]) -> bool:
+    """Whether a run result's health verdict is ``failed``."""
+    return (result.get("health") or {}).get("verdict") == "failed"
+
+
 def _number(value: Any) -> float | None:
     if isinstance(value, bool):
         return float(value)
@@ -163,10 +185,19 @@ def _number(value: Any) -> float | None:
 def aggregate(
     results: Sequence[Mapping[str, Any]], metric_paths: Sequence[str]
 ) -> dict[str, dict[str, Any]]:
-    """Per group and metric: count, mean, std, min, max, values."""
+    """Per group and metric: count, mean, std, min, max, values.
+
+    Runs with a failed health verdict are excluded; each group's
+    ``excluded_runs`` entry lists them (it is not a metric).
+    """
     groups: dict[str, dict[str, list[float]]] = {}
+    excluded: dict[str, list[str]] = {}
     for result in results:
         group = groups.setdefault(result["group"], {m: [] for m in metric_paths})
+        excluded.setdefault(result["group"], [])
+        if health_failed(result):
+            excluded[result["group"]].append(result["name"])
+            continue
         for metric in metric_paths:
             value = _number(result["metrics"].get(metric))
             if value is not None:
@@ -187,6 +218,7 @@ def aggregate(
                 max=float(array.max()),
                 values=values,
             )
+        table[name]["excluded_runs"] = excluded[name]
     return table
 
 
@@ -195,7 +227,11 @@ def baseline_from(
 ) -> dict[str, dict[str, float]]:
     """Group means only (what a baseline stores)."""
     return {
-        group: {m: s["mean"] for m, s in metrics.items() if s.get("count")}
+        group: {
+            m: s["mean"]
+            for m, s in metrics.items()
+            if isinstance(s, Mapping) and s.get("count")
+        }
         for group, metrics in table.items()
     }
 
@@ -283,6 +319,7 @@ def execute(
             group=spec.group,
             seed=spec.seed,
             exit_code=code,
+            health=run_health(run_dir),
             metrics=run_metrics(run_dir, metrics),
         )
 

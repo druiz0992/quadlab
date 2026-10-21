@@ -237,12 +237,64 @@ the EKF assumes white GPS noise. Results:
 
 That is the estimator's limitation, which this harness is meant to expose.
 
+## Run health verdict (`health`)
+
+Every run also gets a truth-based health verdict in `summary.json.health`
+(`evaluation/health.py`), printed at the end of the run. It answers "did
+the simulated flight go physically wrong?", so that a crash is never read
+as a slightly worse metric. Like the metrics it is evaluation only and
+never affects the flight.
+
+`verdict` is `failed` if any finding failed, `warning` if any warned, else
+`ok`. Each entry in `findings` has `kind`, `severity`, `time_s` (first
+occurrence, seconds since the first odometry sample; null for run-level
+findings), `count` (occurrences, e.g. contact samples), `value` (the worst
+value seen), `subject` (e.g. the obstacle's model), and a `message`.
+
+| Kind | Severity | Condition |
+| --- | --- | --- |
+| `non_finite` | failed | NaN or infinity in truth, a thrust command, or an estimate |
+| `flipped` | failed | tilt above `flip_tilt_deg` for at least `flip_duration_s` |
+| `hard_impact` | failed | a contact while the true speed in the preceding `impact_window_s` exceeded `hard_impact_speed_mps` |
+| `obstacle_contact` | failed | contact with any model other than `ground` or `terrain` (the attached payload is ignored) |
+| `below_ground` | failed | body centre more than `below_ground_margin_m` below the ground or terrain surface |
+| `incomplete` | failed | the run ended on an error before its duration (e.g. a stale estimate) |
+| `interrupted` | warning | Ctrl-C (closing the keyboard window is a normal end) |
+| `ground_contact` | warning | a touchdown after at least `touchdown_gap_s` without contact; resting on the ground from the start is not one |
+| `left_ground_area` | warning | flew past the ground plane's edge (also `left_ground_area_s`) |
+| `saturated` | warning | more than `saturated_fraction` of non-warm-up commands saturated |
+| `dropped_messages` | warning | more than `max_dropped_messages` messages dropped (ingress queues plus command events) |
+
+The thresholds are the drone config's `health` section, recorded in the
+verdict:
+
+| Key | Default | Units |
+| --- | --- | --- |
+| `flip_tilt_deg` | 90 | deg, in (0, 180] |
+| `flip_duration_s` | 0.5 | s |
+| `hard_impact_speed_mps` | 2.0 | m/s |
+| `impact_window_s` | 0.1 | s |
+| `below_ground_margin_m` | 0.1 | m |
+| `touchdown_gap_s` | 0.5 | s |
+| `saturated_fraction` | 0.5 | fraction, in (0, 1] |
+| `max_dropped_messages` | 0 | count |
+
+Contacts come from the drone body's contact sensor, so they cover the
+body box only. The impact speed looks back over a window because Gazebo can
+deliver a contact after the post-impact odometry. A deliberate landing
+gives a `ground_contact` warning; aerobatic experiments should raise
+`flip_tilt_deg` or `flip_duration_s`.
+
+Verified in lockstep: a hover was `ok`; with the battery started at 1 %
+charge from 2 m, the vehicle fell and the run `failed` with a 6.0 m/s
+ground impact at 3.5 s.
+
 ## Batch experiments and baselines
 
 ```bash
 dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --dry-run
 dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --save-baseline
-dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check   # exit 1 on regression
+dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check   # exit 1 on regression or failed run
 ```
 
 An experiment file (`experiments/batch.py` documents every key) names:
@@ -264,14 +316,21 @@ How runs are built and executed:
   fresh output directory (non-empty ones are refused) and a private Gazebo
   transport partition.
 
-`batch-results.json` holds every run and, per parameter group, the count,
-mean, standard deviation, minimum, maximum, and values of each metric.
+`batch-results.json` holds every run, with its health verdict and
+findings, and, per parameter group, the count, mean, standard deviation,
+minimum, maximum, and values of each metric.
+
+Runs whose health verdict is `failed` are left out of the aggregates and
+listed in their group's `excluded_runs`: a crashed run's numbers describe
+the crash, not the algorithm. Warnings are kept. Runs from before the
+verdict existed have none and are included.
 
 A baseline stores the group means. `--check` flags any metric whose mean
 moved more than `absolute + relative·|baseline|`. The `direction` can be
 `both` (default; deliberate improvements then need a new baseline),
 `increase` (higher is worse), or `decrease`. Missing metrics count as
-regressions.
+regressions, and `--check` also fails when any run's health verdict is
+`failed` (listed as `health_failed_runs`).
 
 Verified with `step_wind_seeds` (2 wind conditions × 3 seeds, 3 in parallel,
 21 s wall time):

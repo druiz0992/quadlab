@@ -309,10 +309,11 @@ dronelab --headless --target 8 0 1 --duration 10 --output outputs/collision   # 
 | `estimates.jsonl` | EKF state, covariance, and provenance (`--ekf`) |
 | `wind-commands.jsonl` | Published dynamic wind targets (random/scheduled wind) |
 | `camera-first.png` | First camera frame (rendered runs) |
-| `summary.json` | Completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing and `control_timing`, EKF/dropout/vibration/sensor-error/fault diagnostics |
+| `summary.json` | Health verdict and findings ([7 Experiments](7_experiments.md#run-health-verdict-health)), completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing and `control_timing`, EKF/dropout/vibration/sensor-error/fault diagnostics |
 | `gazebo.log` | Gazebo process output |
 
 Reusing an output directory overwrites these files and can leave stale
 optional ones; use a new directory per dataset. Check `summary.json`
-completion, stream counts, and dropped counters before trusting a dataset.
+health verdict, completion, stream counts, and dropped counters before
+trusting a dataset.
 Long sessions grow recordings and in-memory path histories.

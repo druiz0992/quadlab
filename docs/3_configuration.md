@@ -130,6 +130,7 @@ also recorded in the summary. A configuration cannot be applied to a saved
 | `motors` | Thrust coefficient (N·s²); reaction moment ratio (m); max motor speed (rad/s); per-rotor max thrust (N); rise/fall time constants (s); rotor drag and rolling moment coefficients; per-rotor thrust and moment scale factors |
 | `randomization` | Per-run differences between the simulated and the nominal vehicle ([Model mismatch](#model-mismatch-and-randomization)) |
 | `algorithms`, `sensor_timing`, `mission` | Plug-ins, sensor delivery timing, reference missions ([7 Experiments](7_experiments.md)) |
+| `health` | Run health verdict thresholds: tilt, impact speed, ground margin, saturation, drops (evaluation only; [7 Experiments](7_experiments.md#run-health-verdict-health)) |
 | `sensors` | IMU, GPS, barometer, magnetometer, rangefinder, optical flow, battery monitor, contacts, camera, lidar (2D or 3D): enablement, rate (Hz), mount (except contacts), errors; camera resolution/FOV/clipping; lidar samples/ranges; GPS dropout and error model; IMU vibration and error model; barometer native noise and error model |
 | `controller` | Python thrust-mode position, velocity, attitude, angular-rate gains; acceleration limit; max position-setpoint error; min commanded altitude |
 | `velocity_controller` | Native Gazebo velocity-mode gains and acceleration limits |
@@ -1064,7 +1065,8 @@ plausible-model outputs, not measurements of the real aircraft.
 `worlds/airfield.json` is a 3 km × 3 km ground (scene key `ground_size_m`,
 10–20000 m) with a hangar, a tower, and a tree line. Beyond the ground's
 edge nothing collides, and a vehicle there falls forever. Runs print a
-warning and record `left_ground_area_s` in `summary.json`.
+warning and record `left_ground_area_s` in `summary.json`, and the health
+verdict reports a `left_ground_area` warning.
 
 ## Ground effect (`aerodynamics.ground_effect`)
 

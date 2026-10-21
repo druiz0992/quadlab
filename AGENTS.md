@@ -76,7 +76,8 @@ in [README.md](README.md); design, behavior, and reference material are in
 - When editing reusable worlds keep the world name `dronelab`, vehicle name
   `drone`, sensor topics, and plugins. Collision and visual sizes must match.
 - Gazebo is authoritative for collisions and rendered sensors; Rerun world
-  sync is partial. Check missing/dropped message counts in `summary.json`.
+  sync is partial. Check the health verdict and missing/dropped message
+  counts in `summary.json`.
 - Use a fresh output directory for every verification run.
 
 ## 6. Testing
@@ -86,7 +87,12 @@ in [README.md](README.md); design, behavior, and reference material are in
     validation, and edge cases, using fakes for transport, clocks, and RNGs.
   - **Integration tests** in `tests/integration/` for flows spanning
     components. Tests needing Gazebo or a display are opt-in through
-    `DRONELAB_TEST_GAZEBO=1` / `DRONELAB_TEST_GUI=1` and must skip otherwise.
+    `DRONELAB_TEST_GAZEBO=1` / `DRONELAB_TEST_GUI=1` and must skip otherwise;
+    missions of several minutes also need `DRONELAB_TEST_GAZEBO_SLOW=1`.
+  - **Gazebo regression tests** in `tests/integration/test_gazebo_regression.py`
+    pin verified simulator numbers in lockstep. Add one when you verify a new
+    Gazebo behavior, and run the suite after changing the mission loop,
+    physics, sensors, or Gazebo settings.
 - Before finishing, from the repository root:
 
   ```bash

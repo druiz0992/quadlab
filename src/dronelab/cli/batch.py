@@ -11,6 +11,7 @@ from ..experiments.batch import (
     check_baseline,
     execute,
     expand_runs,
+    health_failed,
     load_experiment,
     resolved_seed_paths,
     DEFAULT_METRICS,
@@ -35,7 +36,7 @@ def main() -> None:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Compare with the baseline; exit 1 on regression",
+        help="Compare with the baseline; exit 1 on regression or a failed run",
     )
     args = parser.parse_args()
     try:
@@ -62,6 +63,9 @@ def main() -> None:
     if failed_runs:
         print(f"Runs failed: {failed_runs} (see batch.log in each run directory)")
         status = 1
+    unhealthy = [r["name"] for r in results if health_failed(r)]
+    if unhealthy:
+        print(f"Health verdict failed (excluded from aggregates): {unhealthy}")
     baseline_path = experiment.get("baseline")
     if args.save_baseline:
         if not baseline_path:
@@ -79,13 +83,18 @@ def main() -> None:
         report["regressions"] = failures
         for failure in failures:
             print("REGRESSION", json.dumps(failure))
-        print("Baseline check:", "FAILED" if failures else "passed")
-        status = 1 if failures else status
+        report["health_failed_runs"] = unhealthy
+        failed_check = bool(failures or unhealthy)
+        print("Baseline check:", "FAILED" if failed_check else "passed")
+        status = 1 if failed_check else status
     (output / "batch-results.json").write_text(json.dumps(report, indent=2) + "\n")
     for group, metrics_table in table.items():
         print(f"[{group}]")
         for metric, stats in metrics_table.items():
-            if stats.get("count"):
+            if metric == "excluded_runs":
+                if stats:
+                    print(f"  excluded (health failed): {stats}")
+            elif stats.get("count"):
                 print(
                     f"  {metric}: mean {stats['mean']:.6g} ± {stats['std']:.3g} (n={stats['count']})"
                 )

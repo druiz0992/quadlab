@@ -86,6 +86,12 @@ document and update the status below.
 | Experiment configuration files (`configs/experiments/`): batch sweeps, aggregation, baselines | Implemented ([7 Experiments](7_experiments.md#batch-experiments-and-baselines)) |
 | Estimator-driven control | Implemented ([7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms)) |
 | Estimation (NEES/NIS) and control metrics against truth | Implemented ([7 Experiments](7_experiments.md#metrics-metricsjson)) |
+| Run health verdict (flip, hard impact, obstacle contact, below ground, left ground area, non-finite values, saturation, drops); batch runs exclude failed runs and `--check` fails on them | Implemented ([7 Experiments](7_experiments.md#run-health-verdict-health)) |
+| Opt-in Gazebo regression suite pinning verified numbers (lockstep) | Implemented (`tests/integration/test_gazebo_regression.py`, see the README) |
+| Split the Gazebo mission loop (`experiments/gazebo.py`) into pipeline stages under the regression suite | Future (simulation robustness) |
+| Audit remaining Gazebo defaults (atmosphere, magnetic table, solver and contact settings) | Future (simulation robustness) |
+| Lockstep performance on large worlds (pose-message volume) | Future (simulation robustness) |
+| Gazebo process cleanup and hang detection | Future (simulation robustness) |
 | Sensor delivery latency, jitter, clock offsets, cross-stream reordering | Implemented ([7 Experiments](7_experiments.md#sensor-bus-and-delivery-timing-sensor_timing)) |
 | Waypoint-sequence missions / circuit laps; step, circle, figure-eight, chirp, doublet references | Implemented ([7 Experiments](7_experiments.md#reference-missions-mission)) |
 | Allocation helpers exposing achieved wrench and residuals | Future |

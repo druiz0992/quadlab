@@ -22,6 +22,7 @@ from .failsafe import BatteryFailsafe
 from .live_ekf import reference_from_world
 from .mission import MissionRunner
 from .run_evaluation import RunEvaluation
+from ..evaluation.health import HealthThresholds, RunHealth
 from .algorithms import (
     AlgorithmRunner,
     EstimateStateSource,
@@ -309,6 +310,15 @@ def _rotor_velocities(message):
     """Rotor joint velocities (rad/s, joint frame) in rotor index order."""
     by_name = {joint.name: joint.axis1.velocity for joint in message.joint}
     return [by_name[f"rotor_{i}_joint"] for i in range(len(by_name))]
+
+
+def _print_health(health: dict) -> None:
+    """One line per health finding after the run (see evaluation/health.py)."""
+    print(f"Health: {health['verdict']}")
+    for finding in health["findings"]:
+        at = "" if finding["time_s"] is None else f" at {finding['time_s']:.2f} s"
+        count = f" (x{finding['count']})" if finding["count"] > 1 else ""
+        print(f"  {finding['severity']}: {finding['message']}{at}{count}")
 
 
 def _ground_height(settings, terrain):
@@ -832,6 +842,14 @@ def _run(args, keyboard, command_source):
     # Flying past the ground plane's edge means nothing collides below.
     ground_half_m = scene.get("ground_size_m", 100.0) / 2
     left_ground_s = None
+    # Truth-based verdict (summary.json.health); never feeds the flight.
+    health = RunHealth(
+        HealthThresholds.from_settings(settings["health"]),
+        ground_height_m=lambda x, y: (
+            0.0 if terrain is None else float(terrain.height(x, y))
+        ),
+        ground_half_m=ground_half_m,
+    )
     publisher = None if rotor_mode else node.advertise("/drone/cmd_vel", Twist)
     subscriptions = [
         (Odometry, "/dronelab/odometry", "odometry"),
@@ -943,6 +961,12 @@ def _run(args, keyboard, command_source):
                 )
                 recorder.log_estimate(sample)
                 evaluation.on_estimate(sample)
+                health.on_estimate(
+                    sample.sim_time_ns,
+                    state.position_m,
+                    state.velocity_mps,
+                    state.quaternion_xyzw,
+                )
 
             def drain_estimates():
                 if estimate_reader is None:
@@ -1306,9 +1330,12 @@ def _run(args, keyboard, command_source):
                         quaternion,
                         controlled=rotor_mode,
                     )
+                    health.on_truth(
+                        timestamp_ns(message), p, velocity_world, quaternion
+                    )
                     positions.append(p)
-                    if left_ground_s is None and np.max(np.abs(p[:2])) > ground_half_m:
-                        left_ground_s = t - first_time
+                    if left_ground_s is None and health.left_ground_area_s is not None:
+                        left_ground_s = health.left_ground_area_s
                         print(
                             f"Warning: vehicle left the {2 * ground_half_m:.0f} m ground "
                             f"area at {left_ground_s:.1f} s; nothing below it collides"
@@ -1432,6 +1459,7 @@ def _run(args, keyboard, command_source):
                             command_log.write(json.dumps(record) + "\n")
                             total_thrust_n = sum(record["accepted_thrust_n"])
                             evaluation.on_command(record)
+                            health.on_command(record)
                         surface_commands = getattr(controller, "surface_commands", None)
                         if surface_commands is not None and fixed_wing.enabled:
                             servos.set_command(surface_commands())
@@ -1469,6 +1497,11 @@ def _run(args, keyboard, command_source):
                         )
                 elif kind == "contacts":
                     for contact in message.contact:
+                        health.on_contact(
+                            timestamp_ns(message),
+                            contact.collision1.name,
+                            contact.collision2.name,
+                        )
                         collisions.append(
                             dict(
                                 time=t,
@@ -1507,12 +1540,23 @@ def _run(args, keyboard, command_source):
                 bus.close()
             metrics = evaluation.summary()
             (output / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+            final_exit_reason = (
+                exit_reason if completed or exit_reason != "duration" else "error"
+            )
             summary = dict(
                 completed=completed,
-                ekf=live_ekf.summary() if live_ekf is not None else None,
-                exit_reason=(
-                    exit_reason if completed or exit_reason != "duration" else "error"
+                health=health.summary(
+                    completed=completed,
+                    exit_reason=final_exit_reason,
+                    dropped=dict(
+                        dropped,
+                        command_events=(
+                            thrust_control.dropped_events if thrust_control else 0
+                        ),
+                    ),
                 ),
+                ekf=live_ekf.summary() if live_ekf is not None else None,
+                exit_reason=final_exit_reason,
                 control_mode="rotor-thrust" if rotor_mode else "velocity",
                 state_source=(
                     "simulator ground truth"
@@ -1662,3 +1706,4 @@ def _run(args, keyboard, command_source):
         )
     print(f"Results: {output}")
     print(f"Messages: {dict(counts)}; contact samples: {len(collisions)}")
+    _print_health(summary["health"])

@@ -675,6 +675,18 @@ DEFAULTS = {
         "evaluation_rate_hz": 50.0,
         "evaluation_start_s": 2.0,
     },
+    # Run health verdict thresholds (summary.json.health); see
+    # evaluation/health.py. Evaluation only: never affects the flight.
+    "health": {
+        "flip_tilt_deg": 90.0,
+        "flip_duration_s": 0.5,
+        "hard_impact_speed_mps": 2.0,
+        "impact_window_s": 0.1,
+        "below_ground_margin_m": 0.1,
+        "touchdown_gap_s": 0.5,
+        "saturated_fraction": 0.5,
+        "max_dropped_messages": 0,
+    },
     # Delivery of processed measurements to algorithms; see sensors/bus.py.
     "sensor_timing": {
         "seed": 0,
@@ -777,6 +789,11 @@ SIGNED_SCALAR_KEYS = {
     "vertical_max_angle_deg",
 }
 NONNEGATIVE_SCALAR_KEYS = {
+    "flip_duration_s",
+    "impact_window_s",
+    "below_ground_margin_m",
+    "touchdown_gap_s",
+    "max_dropped_messages",
     "startup_gyro_calibration_s",
     "noise_std_pa",
     "time_constant_s",
@@ -1503,6 +1520,9 @@ def load_drone_config(paths: ConfigPaths = None, *, render_sensors: bool = False
     from ...control.references import validate_mission
 
     validate_mission(data["mission"])
+    from ...evaluation.health import HealthThresholds
+
+    HealthThresholds.from_settings(data["health"])
     algorithms = data["algorithms"]
     if algorithms["control_state_source"] not in ("truth", "estimate"):
         raise ValueError("algorithms.control_state_source must be truth or estimate")

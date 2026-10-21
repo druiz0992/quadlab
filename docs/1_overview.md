@@ -18,7 +18,7 @@ organization, and shared conventions. Following documents:
 | Vehicle physics | Gazebo motor lag/limits; ESC update rate and resolution; Python battery voltage sag and depletion, rotor ground effect; still-air body drag; centre-of-mass offset, per-rotor spread, per-run randomization of the true vehicle |
 | Disturbances and faults | GPS dropouts/outages/blockout zones, GPS multipath jumps, scheduled IMU faults (bias step, stuck, spikes, scale, noise), native wind with Dryden-style turbulence, accelerometer vibration/clipping |
 | Estimation | GPS/IMU error-state EKF, as a live observer (`--ekf`) or an estimator plug-in |
-| Algorithm harness | Estimator/controller plug-ins on a typed sensor bus with modelled delivery delay and clock offsets; control on truth or on the estimate; reference missions (step, waypoints/laps, circle, figure-eight, chirp, doublet); estimation and control metrics; batch sweeps with regression baselines ([7 Experiments](7_experiments.md)) |
+| Algorithm harness | Estimator/controller plug-ins on a typed sensor bus with modelled delivery delay and clock offsets; control on truth or on the estimate; reference missions (step, waypoints/laps, circle, figure-eight, chirp, doublet); estimation and control metrics; truth-based run health verdict (crash, flip, impact, contact); batch sweeps with regression baselines ([7 Experiments](7_experiments.md)) |
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
 | Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse |
 
@@ -58,7 +58,8 @@ src/dronelab/
 │       ├── node.py         # Timestamp/frame adaptation and EKF state channel
 │       └── plugin.py       # The EKF as an estimator plug-in
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,
-│                           #   truth interpolation, effective IMU bias
+│                           #   truth interpolation, effective IMU bias, run health
+│                           #   verdict (health.py)
 ├── control/
 │   ├── interface.py        # RotorController plug-in contract, ControlState
 │   ├── references.py       # Mission reference trajectories (analytic derivatives)
@@ -119,7 +120,8 @@ baselines/                  # Stored batch metric baselines for regression check
 worlds/                     # Authored JSON scenes and saved SDF worlds
 docs/                       # These numbered documents
 tests/unit/<package>/       # Unit tests grouped by package
-tests/integration/          # Multi-component and opt-in Gazebo/GUI tests
+tests/integration/          # Multi-component and opt-in Gazebo/GUI tests, including
+                            #   the Gazebo regression suite (test_gazebo_regression.py)
 outputs/                    # Generated worlds, recordings, telemetry (not committed)
 ```
 

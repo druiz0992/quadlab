@@ -848,6 +848,16 @@
     "evaluation_rate_hz": 50.0,
     "evaluation_start_s": 2.0
   },
+  "health": {
+    "flip_tilt_deg": 90.0,
+    "flip_duration_s": 0.5,
+    "hard_impact_speed_mps": 2.0,
+    "impact_window_s": 0.1,
+    "below_ground_margin_m": 0.1,
+    "touchdown_gap_s": 0.5,
+    "saturated_fraction": 0.5,
+    "max_dropped_messages": 0
+  },
   "sensor_timing": {
     "seed": 0,
     "reorder_window_s": 0.004,

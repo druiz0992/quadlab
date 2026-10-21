@@ -10,6 +10,7 @@ from dronelab.experiments.batch import (
     check_baseline,
     execute,
     expand_runs,
+    health_failed,
     key_seed,
     nested,
     run_command,
@@ -109,3 +110,35 @@ def test_execute_refuses_non_empty_run_directories(tmp_path):
     (tmp_path / runs[0].name / "old.txt").write_text("x")
     with pytest.raises(ValueError, match="not empty"):
         execute({}, runs, tmp_path, runner=fake_runner)
+
+
+def test_failed_health_runs_are_excluded_from_aggregates(tmp_path):
+    def runner(command, run_dir):
+        fake_runner(command, run_dir)
+        verdict = "failed" if run_dir.name == "g00-s2" else "ok"
+        (run_dir / "summary.json").write_text(
+            json.dumps({"completed": True, "health": {"verdict": verdict}})
+        )
+        return 0
+
+    runs = expand_runs(EXPERIMENT, [])
+    results = execute(EXPERIMENT, runs, tmp_path, runner=runner)
+    assert [health_failed(r) for r in results] == [False, True, False, False]
+    assert results[1]["health"] == {"verdict": "failed", "findings": []}
+    table = aggregate(results, EXPERIMENT["metrics"])
+    calm = table[runs[0].group]
+    assert calm["excluded_runs"] == ["g00-s2"]
+    assert calm["control.tracking.position_m.rmse"]["count"] == 1
+    assert calm["control.tracking.position_m.rmse"]["mean"] == pytest.approx(0.1)
+    assert table[runs[2].group]["excluded_runs"] == []
+    baseline = baseline_from(table)
+    assert "excluded_runs" not in baseline[runs[0].group]
+    assert check_baseline(table, baseline, {}) == []
+    # Runs from before the verdict existed are included.
+    old = [dict(r, health=None) for r in results]
+    assert (
+        aggregate(old, EXPERIMENT["metrics"])[runs[0].group][
+            "control.tracking.position_m.rmse"
+        ]["count"]
+        == 2
+    )

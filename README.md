@@ -174,7 +174,8 @@ dronelab --headless --control-mode rotor-thrust --drone configs/missions/square.
   --drone configs/algorithms/ekf_in_the_loop.json --drone configs/control/lockstep.json \
   --duration 45 --output outputs/ekf-in-the-loop
 
-# Batch sweep (seeds × parameters, parallel) with a regression baseline
+# Batch sweep (seeds × parameters, parallel) with a regression baseline;
+# runs whose health verdict failed are excluded from aggregates and fail --check
 dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --save-baseline
 dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check
 
@@ -254,6 +255,7 @@ Each mission writes `flight.rrd`, `telemetry.jsonl`, `commands.jsonl`,
 (estimation and control scores, [7 Experiments](docs/7_experiments.md#metrics-metricsjson));
 `--ekf` or an estimator plug-in adds `estimates.jsonl`; dynamic
 wind adds `wind-commands.jsonl`; camera runs save `camera-first.png`. Check
+the health verdict (`ok`/`warning`/`failed`, printed after the run),
 completion, message counts, and dropped counters in `summary.json` before
 trusting a dataset. Details: [2 Simulation](docs/2_simulation.md#run-artifacts).
 
@@ -273,4 +275,16 @@ source /opt/ros/jazzy/setup.bash
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_manual.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_live_gazebo_ekf.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GUI=1 python -m pytest -q tests/integration/test_keyboard_window.py
+# Gazebo regression suite (lockstep, about 2.5 min); add DRONELAB_TEST_GAZEBO_SLOW=1
+# for the full quadplane mission (about 17 min)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_regression.py
 ```
+
+The regression suite flies short lockstep runs and asserts the numbers
+verified when each feature was built: the 1 cm centre-of-mass offset
+steady state, a magnetic dipole's −25 µT field change, `dronelab-magcal`
+and `dronelab-imucal` recovering injected errors, EKF-in-the-loop tracking
+matching truth-fed tracking on the square, ESC telemetry against commanded
+speeds, identical repeated lockstep runs, and a battery-depletion crash
+reported as `failed` by the health verdict. Run it after changing the
+mission loop, physics, sensors, or Gazebo settings.

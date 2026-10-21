@@ -835,3 +835,15 @@ def test_lockstep_runner_restrictions(tmp_path, kwargs, drone, message):
                 drone=str(path), output=str(tmp_path / "out"), duration=1, **kwargs
             )
         )
+
+
+def test_health_thresholds_validate_in_config(tmp_path):
+    layer = tmp_path / "health.json"
+    layer.write_text('{"health": {"saturated_fraction": 2.0}}')
+    with pytest.raises(ValueError, match="saturated_fraction"):
+        load_drone_config(layer)
+    layer.write_text('{"health": {"hard_impact_speed_mps": 0}}')
+    with pytest.raises(ValueError, match="positive"):
+        load_drone_config(layer)
+    layer.write_text('{"health": {"flip_tilt_deg": 120, "max_dropped_messages": 5}}')
+    assert load_drone_config(layer).data["health"]["flip_tilt_deg"] == 120
