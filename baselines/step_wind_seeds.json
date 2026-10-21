@@ -4,10 +4,10 @@
     "step_response.rise_time_s": 3.44,
     "step_response.overshoot_pct": 0.0,
     "step_response.steady_state_error_m": 0.007500856128138079,
-    "estimation.errors.position_m.rmse": 2.4451409437790805,
-    "estimation.errors.attitude_deg.rmse": 2.0464582302357552,
-    "estimation.nees.mean": 110.23585893859524,
-    "estimation.nis.gps.mean": 0.17880428940992668,
+    "estimation.errors.position_m.rmse": 2.4450272601799,
+    "estimation.errors.attitude_deg.rmse": 2.361479634918657,
+    "estimation.nees.mean": 151.56498076837545,
+    "estimation.nis.gps.mean": 0.2545666124575266,
     "summary.completed": 1.0
   },
   "wind.velocity_enu_mps=[3, 0, 0]": {
@@ -15,10 +15,10 @@
     "step_response.rise_time_s": 1.3200000000000003,
     "step_response.overshoot_pct": 58.851782390287646,
     "step_response.steady_state_error_m": -0.5840637392885232,
-    "estimation.errors.position_m.rmse": 2.4454360750486575,
-    "estimation.errors.attitude_deg.rmse": 2.00258003006487,
-    "estimation.nees.mean": 110.21953665769244,
-    "estimation.nis.gps.mean": 0.17880112479446053,
+    "estimation.errors.position_m.rmse": 2.4452505931113406,
+    "estimation.errors.attitude_deg.rmse": 2.3207760131814594,
+    "estimation.nees.mean": 151.53230930216054,
+    "estimation.nis.gps.mean": 0.25456137691481634,
     "summary.completed": 1.0
   }
 }

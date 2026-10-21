@@ -56,9 +56,12 @@ None of the numerical modules depend on Gazebo transport or Rerun.
 - **GPS covariance:** by default (`use_receiver_gps_accuracy`) each fix uses
   the receiver's own 1-σ estimates from its `GpsStatus` (horizontal for
   east/north, vertical for up, uncorrelated); fixes without valid ones fall
-  back to `gps_std_m`. The default receiver reports 1.35 m horizontal
-  (HDOP 0.9 × UERE 1.5 m) even though the default simulated GPS is
-  error-free, so the filter then weights GPS conservatively.
+  back to `gps_std_m`. The receiver's reports follow the configured GPS
+  error ([3 Configuration](3_configuration.md#gps-receiver-velocity-status-rtk-heading)),
+  e.g. 1.04 m horizontal and 2.06 m vertical for `sensor_errors.json`. Its
+  correlated part (60 s) still violates the filter's white-noise
+  assumption: on `step_wind_seeds` mean NEES is about 150 (consistent
+  ≈ 15), attitude RMSE 2.36°, GPS NIS 0.25.
 
 The right attitude error follows the error-state approach of
 [Solà, Quaternion kinematics for the error-state Kalman filter](https://arxiv.org/abs/1711.02508).

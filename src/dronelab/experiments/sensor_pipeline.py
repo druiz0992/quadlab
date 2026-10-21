@@ -58,6 +58,7 @@ from ..sensors.gps_errors import GpsErrorModel
 from ..sensors.gps_receiver import (
     GpsHeading,
     GpsStatusModel,
+    configured_position_sigma_m,
     GpsVelocityErrors,
     RtkErrorModel,
 )
@@ -208,7 +209,9 @@ class SensorPipeline:
         self.gps_multipath = GpsMultipath(gps["multipath"])
         self.gps_velocity = GpsVelocityErrors(gps["velocity_error"])
         self.gps_rtk = RtkErrorModel(gps["rtk"])
-        self.gps_status = GpsStatusModel(gps["receiver"])
+        self.gps_status = GpsStatusModel(
+            gps["receiver"], configured_position_sigma_m(gps)
+        )
         self.gps_heading = GpsHeading(gps["heading"])
 
     def _build_magnetometer(self, magnetometer: dict[str, Any], scene: dict) -> None:

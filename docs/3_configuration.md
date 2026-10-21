@@ -541,10 +541,16 @@ the sensor bus carries the ENU velocity and a `GpsStatus`.
     is active.
   - **HDOP:** `hdop`·√(sats₀/sats).
   - **Fix type:** `3d`, `rtk_float`, or `rtk_fixed`.
-  - **Reported accuracies:** horizontal is HDOP·`uere_m` (or the RTK σ),
-    vertical is 1.6× that, and speed is `speed_accuracy_mps`. These are the
-    receiver's own estimates, not the true error, so a filter that trusts
-    them can be tested for consistency.
+  - **Reported accuracies:** with `uere_m: "auto"` (default) horizontal and
+    vertical follow the configured position error: per-axis σ of native
+    noise and bias plus the enabled error model's correlated and white
+    parts (plus multipath σ while active), × HDOP/`hdop`, floored at
+    `min_accuracy_m` (0.05 m; the error-free default GPS reports this).
+    With a number, horizontal is HDOP·`uere_m` and vertical 1.6× that
+    (*migration:* `uere_m: 1.5` reproduces reports before 2026-10-22). RTK
+    reports its σ; speed is `speed_accuracy_mps`. These are the receiver's
+    estimates, not the actual error sequence (correlated errors stay
+    correlated), so a filter that trusts them can be tested for consistency.
   - **Logging:** Rerun logs `gps/status`.
 - **RTK** (`rtk`, exclusive with `error_model`): replaces the position
   error.

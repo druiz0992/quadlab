@@ -316,7 +316,8 @@
         "satellite_variation": 2,
         "multipath_satellite_loss": 5,
         "hdop": 0.9,
-        "uere_m": 1.5,
+        "uere_m": "auto",
+        "min_accuracy_m": 0.05,
         "speed_accuracy_mps": 0.1
       },
       "rtk": {

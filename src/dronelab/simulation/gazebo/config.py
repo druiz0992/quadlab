@@ -276,7 +276,9 @@ DEFAULTS: dict[str, Any] = {
                 "satellite_variation": 2,
                 "multipath_satellite_loss": 5,
                 "hdop": 0.9,
-                "uere_m": 1.5,
+                # "auto": reported accuracy follows the configured GPS error.
+                "uere_m": "auto",
+                "min_accuracy_m": 0.05,
                 "speed_accuracy_mps": 0.1,
             },
             "rtk": {
@@ -1244,6 +1246,10 @@ def validate_tree(value, template, path="config"):
             continue  # validated by the plug-in that receives it
         if key == "air_density_kg_m3":
             if item != "site":
+                number(item, name, positive=True)
+            continue
+        if key == "uere_m":
+            if item != "auto":
                 number(item, name, positive=True)
             continue
         if isinstance(default, dict):

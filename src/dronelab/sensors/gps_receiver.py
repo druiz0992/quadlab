@@ -14,9 +14,14 @@
   about itself. Satellites: ``satellites`` ± a bounded random walk of
   ``satellite_variation``, minus ``multipath_satellite_loss`` during
   multipath. HDOP = ``hdop`` · √(satellites₀ / satellites). Reported 1-σ
-  accuracies are the receiver's estimates, not the true error: horizontal =
-  HDOP · ``uere_m`` (RTK: the float/fixed σ), vertical = 1.6 × horizontal,
-  speed = ``speed_accuracy_mps``.
+  accuracies are the receiver's estimates, not the true error. With
+  ``uere_m: "auto"`` (default) they follow the configured position error:
+  per-axis σ of the native noise and bias plus the enabled error model's
+  correlated and white parts (plus multipath σ while multipath is active),
+  scaled by HDOP / ``hdop`` and floored at ``min_accuracy_m`` (a receiver
+  never reports zero). With a number, horizontal = HDOP · ``uere_m`` and
+  vertical = 1.6 × horizontal. RTK reports its float/fixed σ. Speed =
+  ``speed_accuracy_mps``.
 - ``GpsHeading`` (``sensors.gps.heading``): dual-antenna heading at each
   delivered fix: true yaw + ``mount_yaw_deg`` + N(0, ``noise_std_deg``²),
   wrapped to (−π, π]. Typical accuracy ≈ 0.2° per metre of baseline.
@@ -117,11 +122,47 @@ class RtkErrorModel:
         return float(self._fixed[0]) if self.state == "rtk_fixed" else self._float
 
 
-class GpsStatusModel:
-    """Receiver-reported fix quality (see module docs)."""
+def configured_position_sigma_m(
+    gps: Mapping[str, Any],
+) -> tuple[float, float, float, float]:
+    """Per-axis 1-σ position error the ``sensors.gps`` section configures.
 
-    def __init__(self, settings: Mapping[str, Any]) -> None:
+    Returns (horizontal, vertical) without multipath, then the multipath
+    (horizontal, vertical) σ added while multipath is active (0 when
+    multipath is disabled). Native noise contributes ``noise_stddev`` and
+    ``bias`` in quadrature; the error model, when enabled, its correlated
+    (``*_std_m``) and white (``white_*_std_m``) parts.
+    """
+    native_h, native_v = gps["horizontal_position_m"], gps["vertical_position_m"]
+    h2 = native_h["noise_stddev"] ** 2 + native_h["bias"] ** 2
+    v2 = native_v["noise_stddev"] ** 2 + native_v["bias"] ** 2
+    model = gps["error_model"]
+    if model["enabled"]:
+        h2 += model["horizontal_std_m"] ** 2 + model["white_horizontal_std_m"] ** 2
+        v2 += model["vertical_std_m"] ** 2 + model["white_vertical_std_m"] ** 2
+    multipath = gps["multipath"]
+    mh, mv = (
+        (multipath["horizontal_std_m"], multipath["vertical_std_m"])
+        if multipath["enabled"]
+        else (0.0, 0.0)
+    )
+    return math.sqrt(h2), math.sqrt(v2), float(mh), float(mv)
+
+
+class GpsStatusModel:
+    """Receiver-reported fix quality (see module docs).
+
+    ``position_sigma_m`` is ``configured_position_sigma_m`` of the GPS
+    section, used when ``uere_m`` is "auto".
+    """
+
+    def __init__(
+        self,
+        settings: Mapping[str, Any],
+        position_sigma_m: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
+    ) -> None:
         self._settings = settings
+        self._sigma = position_sigma_m
         self._rng = np.random.default_rng(settings["seed"])
         self._walk = 0
         self.status: GpsStatus | None = None
@@ -140,17 +181,33 @@ class GpsStatusModel:
         hdop = s["hdop"] * math.sqrt(s["satellites"] / satellites)
         if rtk is not None and rtk.enabled:
             fix_type, horizontal = rtk.state, rtk.accuracy_m
+            vertical = 1.6 * horizontal
+        elif s["uere_m"] == "auto":
+            fix_type = "3d"
+            horizontal, vertical = self._configured_accuracy(hdop, multipath_active)
         else:
             fix_type, horizontal = "3d", hdop * s["uere_m"]
+            vertical = 1.6 * horizontal
         self.status = GpsStatus(
             fix_type,
             satellites,
             hdop,
             horizontal,
-            1.6 * horizontal,
+            vertical,
             s["speed_accuracy_mps"],
         )
         return self.status
+
+    def _configured_accuracy(
+        self, hdop: float, multipath_active: bool
+    ) -> tuple[float, float]:
+        """(horizontal, vertical) 1-σ from the configured error (module docs)."""
+        h, v, mh, mv = self._sigma
+        if multipath_active:
+            h, v = math.hypot(h, mh), math.hypot(v, mv)
+        scale = hdop / self._settings["hdop"]
+        floor = self._settings["min_accuracy_m"]
+        return max(floor, h * scale), max(floor, v * scale)
 
 
 class GpsHeading:

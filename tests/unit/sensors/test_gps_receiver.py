@@ -70,7 +70,7 @@ def test_rtk_converges_from_float_to_fixed_and_falls_back_in_multipath():
 
 
 def test_status_reports_receiver_estimates():
-    model = GpsStatusModel(gps("receiver"))
+    model = GpsStatusModel(gps("receiver", uere_m=1.5))  # explicit UERE mode
     statuses = [model.update(False) for _ in range(500)]
     satellites = [s.satellites for s in statuses]
     assert min(satellites) >= 12 and max(satellites) <= 16
@@ -111,3 +111,35 @@ def test_rtk_and_standard_error_model_are_exclusive(tmp_path):
     )
     with pytest.raises(ValueError, match="not both"):
         load_drone_config(path)
+
+
+def test_auto_accuracy_follows_configured_error():
+    from dronelab.sensors.gps_receiver import configured_position_sigma_m
+
+    section = load_drone_config().data["sensors"]["gps"]
+    # Error-free default GPS: the receiver reports its floor, not 1.35 m.
+    assert configured_position_sigma_m(section) == (0.0, 0.0, 0.0, 0.0)
+    model = GpsStatusModel(gps("receiver"), configured_position_sigma_m(section))
+    status = model.update(False)
+    assert status.horizontal_accuracy_m == status.vertical_accuracy_m == 0.05
+    # Native noise and bias plus the error model add in quadrature.
+    section["horizontal_position_m"] = {"bias": 0.3, "noise_stddev": 0.4}
+    section["vertical_position_m"] = {"bias": 0.0, "noise_stddev": 0.6}
+    section["error_model"].update(
+        enabled=True,
+        horizontal_std_m=1.2,
+        white_horizontal_std_m=0.0,
+        vertical_std_m=0.8,
+        white_vertical_std_m=0.0,
+    )
+    section["multipath"].update(enabled=True, horizontal_std_m=2.0, vertical_std_m=3.0)
+    sigma = configured_position_sigma_m(section)
+    assert sigma == pytest.approx((1.3, 1.0, 2.0, 3.0))
+    model = GpsStatusModel(gps("receiver", satellite_variation=0), sigma)
+    nominal = model.update(False)  # 14 satellites: HDOP at its nominal 0.9
+    assert nominal.horizontal_accuracy_m == pytest.approx(1.3)
+    assert nominal.vertical_accuracy_m == pytest.approx(1.0)
+    degraded = model.update(True)  # multipath: extra σ and fewer satellites
+    scale = degraded.hdop / 0.9
+    assert degraded.horizontal_accuracy_m == pytest.approx(math.hypot(1.3, 2.0) * scale)
+    assert degraded.vertical_accuracy_m == pytest.approx(math.hypot(1.0, 3.0) * scale)

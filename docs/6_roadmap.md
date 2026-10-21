@@ -102,7 +102,8 @@ document and update the status below.
 | Allocation helpers exposing achieved wrench and residuals | Future |
 | Perception, planning (behavior → global → local), obstacle avoidance, RL | Future (placeholder packages) |
 | Spatial wind and calibrated aerodynamics | Future |
-| GPS receiver accuracy consistent with the configured GPS error model (default receiver reports 1.35 m while the default GPS is error-free, so the EKF under-weights GPS: NIS 0.18) | Proposed (review 2026-10-22; first priority) |
+| GPS receiver accuracy consistent with the configured GPS error model | Implemented (`receiver.uere_m: "auto"`, [3 Configuration](3_configuration.md#gps-receiver-velocity-status-rtk-heading)) |
+| EKF handling of time-correlated GPS error (e.g. Gauss–Markov GPS-bias states); with white-noise GPS the filter is overconfident (NEES ≈ 150 vs ≈ 15 on `step_wind_seeds`) | Proposed (found 2026-10-22) |
 | Lift-rotor thrust depending on axial inflow (climb, descent, forward flight), as pushers already do | Proposed (review 2026-10-22) |
 | Calibrated landing contacts (friction, restitution, contact softness) | Proposed (review 2026-10-22) |
 | Site-accurate magnetic declination and local gravity (Gazebo table gives 0° vs about +1°; project uses 9.81 vs about 9.80 m/s²) | Proposed (review 2026-10-22; gravity is a project convention) |
