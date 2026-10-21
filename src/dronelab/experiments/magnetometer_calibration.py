@@ -79,6 +79,8 @@ def write_world(config: DroneConfig, output: Path) -> Path:
     )
     tree = ET.parse(path)
     world = tree.getroot().find("world")
+    if world is None:
+        raise ValueError(f"{path} has no <world>")
     gravity = ET.Element("gravity")
     gravity.text = "0 0 0"
     world.insert(0, gravity)
@@ -189,14 +191,17 @@ def run_calibration(
     return report
 
 
-def _dance(session, instruments, rotations, samples) -> dict[str, list]:
+def _dance(session, instruments, rotations, samples) -> dict[str, np.ndarray]:
     """Readings at each orientation (motors off)."""
     raw, true, regressor, index = [], [], [], []
     for i, rotation in enumerate(rotations):
         session.set_attitude(rotation)
         for message in session.fresh(samples):
             r, t, u = instruments.read(message, 0.0)
-            raw.append(r), true.append(t), regressor.append(u), index.append(i)
+            raw.append(r)
+            true.append(t)
+            regressor.append(u)
+            index.append(i)
     return dict(
         raw=np.array(raw),
         true=np.array(true),
@@ -213,7 +218,8 @@ def _sweep(session, instruments, config, steps) -> dict[str, np.ndarray]:
     for thrust in np.linspace(0.0, lift * config.properties.max_rotor_thrust, steps):
         for message in session.fresh(10):
             r, _, u = instruments.read(message, float(thrust))
-            raw.append(r), regressor.append(u)
+            raw.append(r)
+            regressor.append(u)
     return dict(raw=np.array(raw), regressor=np.array(regressor))
 
 
@@ -248,7 +254,7 @@ def _fit(dance, sweep, settings, field_strength, uses_current):
 def _evaluate(dance, calibration, rotations, mount) -> dict[str, Any]:
     """Held-out heading and magnitude errors, raw versus calibrated."""
     held = dance["index"] % 5 == 0
-    result = {}
+    result: dict[str, Any] = {}
     for name, fields in (
         ("before", dance["raw"][held]),
         (

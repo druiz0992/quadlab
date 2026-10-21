@@ -101,7 +101,7 @@ class Powertrain:
             len(properties.rotors)
         )  # Physical speeds last commanded
         self._previous_time_ns: int | None = None
-        self._stats = dict(
+        self._stats: dict[str, Any] = dict(
             limited_commands=0, max_ground_effect_factor=1.0, depleted_sim_time_ns=None
         )
         self._min_voltage_v = math.inf

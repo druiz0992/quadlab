@@ -40,7 +40,9 @@ class ControlState:
 class RotorController(Protocol):
     """See module docs."""
 
-    saturated: bool  # last attitude update hit actuator limits
+    @property
+    def saturated(self) -> bool:
+        """Whether the last attitude update hit actuator limits."""
 
     @property
     def setpoint_m(self) -> NDArray[np.float64] | None:

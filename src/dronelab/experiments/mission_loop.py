@@ -21,13 +21,13 @@ deterministic lockstep outputs; change it only deliberately.
 """
 
 from collections import Counter
-from contextlib import ExitStack, nullcontext
+from contextlib import ExitStack
 from dataclasses import dataclass
 import json
 from pathlib import Path
 from queue import Empty
 import time
-from typing import Any, TextIO
+from typing import Any, TextIO, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -60,6 +60,17 @@ VELOCITY_COMMAND_PERIOD_S = 0.04
 # odometry) kept a 250 Hz real-time loop near full load. 50 Hz is still
 # far below human reaction time.
 KEYBOARD_POLL_PERIOD_WALL_S = 0.02
+
+
+T = TypeVar("T")
+
+
+def _started(value: T | None, name: str) -> T:
+    """``value``; RuntimeError if the loop uses it before creating it (a
+    programming error: these exist once ``run`` has started the mission)."""
+    if value is None:
+        raise RuntimeError(f"MissionLoop: {name} used before it was started")
+    return value
 
 
 @dataclass(frozen=True)
@@ -205,7 +216,7 @@ class MissionLoop:
             self.files = self._open_files(stack)
             try:
                 self.process = GazeboProcess(
-                    self.parts.command, self.files.gazebo_log, gazebo_environment()
+                    self.parts.command, self._files.gazebo_log, gazebo_environment()
                 )
                 self._start_control()
                 while self._step():
@@ -218,23 +229,25 @@ class MissionLoop:
                 with shielded():
                     self._shutdown()
                     self._write_results()
-        return self.summary
+        return _started(self.summary, "summary")
 
     def _open_files(self, stack: ExitStack) -> RunFiles:
         output, parts = self.parts.output, self.parts
 
+        def open_file(name: str) -> TextIO:
+            return stack.enter_context((output / name).open("w"))
+
         def open_if(condition: bool, name: str) -> TextIO | None:
-            context = (output / name).open("w") if condition else nullcontext(None)
-            return stack.enter_context(context)
+            return open_file(name) if condition else None
 
         return RunFiles(
             estimates=open_if(
                 parts.args.ekf or parts.stack.estimator is not None, "estimates.jsonl"
             ),
-            gazebo_log=open_if(True, "gazebo.log"),
-            telemetry=open_if(True, "telemetry.jsonl"),
-            commands=open_if(True, "commands.jsonl"),
-            command_events=open_if(True, "command-events.jsonl"),
+            gazebo_log=open_file("gazebo.log"),
+            telemetry=open_file("telemetry.jsonl"),
+            commands=open_file("commands.jsonl"),
+            command_events=open_file("command-events.jsonl"),
             effects=open_if(parts.keyboard is not None, "effect-toggles.jsonl"),
             wind=open_if(bool(parts.wind_control), "wind-commands.jsonl"),
         )
@@ -247,7 +260,7 @@ class MissionLoop:
             from ..control.drone import RotorThrustControl as ThrustCommands
 
             self.thrust_control = ThrustCommands(
-                parts.actuator.send,
+                _started(parts.actuator, "actuator").send,
                 properties=parts.config.properties,
                 publish_rate_hz=timing["publish_rate_hz"],
                 max_lifetime_sim_s=timing["command_lifetime_sim_s"],
@@ -269,7 +282,9 @@ class MissionLoop:
             )
             self.rotor = RotorMission(self._rotor_parts())
         if parts.lockstep:
-            self.stepper = lockstep_stepper(parts.node, settings, parts.barrier)
+            self.stepper = lockstep_stepper(
+                parts.node, settings, _started(parts.barrier, "lockstep barrier")
+            )
             # Commands published before Gazebo subscribes are lost: connect
             # every command topic (and the plugin's grant topic) first.
             wait_for_subscribers(
@@ -288,7 +303,7 @@ class MissionLoop:
             settings=self.settings,
             rotor_count=len(parts.config.properties.rotors),
             controller=parts.stack.controller,
-            control_loop=self.control_loop,
+            control_loop=_started(self.control_loop, "control loop"),
             powertrain=parts.powertrain,
             pipeline=parts.pipeline,
             forces=parts.forces,
@@ -306,7 +321,7 @@ class MissionLoop:
             terrain=parts.terrain,
             truth=parts.truth,
             counts=self.counts,
-            command_log=self.files.commands,
+            command_log=self._files.commands,
             lockstep=parts.lockstep,
         )
 
@@ -322,7 +337,7 @@ class MissionLoop:
             else:
                 from gz.msgs10.twist_pb2 import Twist
 
-                parts.publisher.publish(Twist())
+                _started(parts.publisher, "velocity publisher").publish(Twist())
         except Exception:
             pass
         if self.stepper is not None:
@@ -336,7 +351,7 @@ class MissionLoop:
             self._drain_command_events()
         if parts.live_ekf is not None:
             parts.live_ekf.close()
-            parts.estimate_reader.close()
+            _started(parts.estimate_reader, "estimate reader").close()
         if parts.stack.bus is not None:
             parts.stack.bus.close()
 
@@ -350,6 +365,10 @@ class MissionLoop:
         self.summary = build_summary(self, metrics)
         (output / "summary.json").write_text(json.dumps(self.summary, indent=2) + "\n")
         self.parts.recorder.close()
+
+    @property
+    def _files(self) -> RunFiles:
+        return _started(self.files, "run files")
 
     @property
     def final_exit_reason(self) -> str:
@@ -416,7 +435,7 @@ class MissionLoop:
                 keyboard,
                 parts.effects,
                 round((self.last_time or 0) * 1e9),
-                self.files.effects,
+                _started(self._files.effects, "effect log"),
                 parts.recorder,
             )
         return not keyboard.closed
@@ -434,9 +453,10 @@ class MissionLoop:
             raise RuntimeError(
                 "Odometry watchdog expired; ending rotor-control mission"
             )
-        if self.process.poll() is not None:
+        process = _started(self.process, "Gazebo process")
+        if process.poll() is not None:
             raise RuntimeError(
-                f"Gazebo exited ({self.process.returncode}); "
+                f"Gazebo exited ({process.returncode}); "
                 f'see {parts.output / "gazebo.log"}'
             )
 
@@ -451,8 +471,9 @@ class MissionLoop:
             )
 
     def _drain_command_events(self) -> None:
-        for event in self.thrust_control.drain_events():
-            self.files.command_events.write(json.dumps(event) + "\n")
+        thrust = _started(self.thrust_control, "thrust control")
+        for event in thrust.drain_events():
+            self._files.command_events.write(json.dumps(event) + "\n")
             self.parts.recorder.log_actuator_event(event)
 
     def _handle(self, kind: str, message: Any, received_at: float) -> bool:
@@ -468,7 +489,8 @@ class MissionLoop:
         if kind == "odometry" and parts.wind_control is not None:
             wind_event = parts.wind_control.update(timestamp_ns(message))
             if wind_event is not None:
-                self.files.wind.write(json.dumps(wind_event) + "\n")
+                wind_log = _started(self._files.wind, "wind log")
+                wind_log.write(json.dumps(wind_event) + "\n")
         gps_dropped = parts.pipeline.deliver(
             kind, message, t, self.last_time, parts.stack.bus
         )
@@ -518,7 +540,8 @@ class MissionLoop:
     def _write_estimate(self, sample: Any) -> None:
         """Record one estimate (estimates.jsonl, Rerun, metrics, health)."""
         parts, state = self.parts, sample.payload
-        self.files.estimates.write(json.dumps(estimate_record(sample)) + "\n")
+        estimates = _started(self._files.estimates, "estimates log")
+        estimates.write(json.dumps(estimate_record(sample)) + "\n")
         parts.recorder.log_estimate(sample)
         parts.evaluation.on_estimate(sample)
         parts.health.on_estimate(
@@ -569,7 +592,7 @@ class MissionLoop:
         )
         self._evaluate_truth(stamp, t, p, velocity_world, quaternion)
         if parts.rotor_mode:
-            if not self.rotor.tick(
+            if not _started(self.rotor, "rotor mission").tick(
                 stamp,
                 t,
                 self.first_time,
@@ -674,7 +697,7 @@ class MissionLoop:
                 f"Warning: vehicle left the {2 * parts.ground_half_m:.0f} m ground "
                 f"area at {left:.1f} s; nothing below it collides"
             )
-        self.files.telemetry.write(
+        self._files.telemetry.write(
             json.dumps(
                 dict(time=t, position=p.tolist(), quaternion=quaternion.tolist())
             )
@@ -688,7 +711,7 @@ class MissionLoop:
         twist = Twist()
         velocity = waypoint_velocity(p, quaternion, self.parts.args.target)
         twist.linear.x, twist.linear.y, twist.linear.z = map(float, velocity)
-        self.parts.publisher.publish(twist)
+        _started(self.parts.publisher, "velocity publisher").publish(twist)
 
     def _heartbeat(self) -> None:
         """Lockstep stand-in for the thrust worker: republish the current

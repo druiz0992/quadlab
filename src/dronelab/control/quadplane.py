@@ -43,7 +43,7 @@ rudder yaws nose left).
 
 from collections.abc import Mapping
 import math
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -53,7 +53,7 @@ from .interface import ControlState
 from .manual import FlightCommand, ManualController
 from .references import ReferencePoint
 
-DEFAULT_OPTIONS = {
+DEFAULT_OPTIONS: dict[str, Any] = {
     "cruise_altitude_m": 40.0,
     "cruise_airspeed_mps": 22.0,
     # Optional [[seconds after cruise start, airspeed], ...], interpolated
@@ -90,6 +90,17 @@ DEFAULT_OPTIONS = {
 }
 
 
+T = TypeVar("T")
+
+
+def _started(value: T | None, name: str) -> T:
+    """``value``; RuntimeError if a mode uses it before the autopilot has
+    set it (a programming error, not a flight condition)."""
+    if value is None:
+        raise RuntimeError(f"QuadplaneController: {name} used before it was set")
+    return value
+
+
 class QuadplaneController:
     """See module docs. ``options`` override ``DEFAULT_OPTIONS``."""
 
@@ -121,6 +132,24 @@ class QuadplaneController:
         self._cruise_start: float | None = None
         self._pitch_integral = 0.0
         self._return_start: NDArray[np.float64] | None = None
+
+    # -- state set once the autopilot starts ----------------------------------------
+
+    @property
+    def _home_m(self) -> NDArray[np.float64]:
+        return _started(self._home, "home")
+
+    @property
+    def _cruise_start_s(self) -> float:
+        return _started(self._cruise_start, "cruise start")
+
+    @property
+    def _previous_wp_m(self) -> NDArray[np.float64]:
+        return _started(self._previous_wp, "previous waypoint")
+
+    @property
+    def _hover_target_m(self) -> NDArray[np.float64]:
+        return _started(self._hover_target, "back-transition hover target")
 
     # -- RotorController contract -------------------------------------------------
 
@@ -164,7 +193,7 @@ class QuadplaneController:
             )
             self.saturated = self.hover.saturated
             if self.mode == "cruise":
-                elapsed = self._time_s - self._cruise_start
+                elapsed = self._time_s - self._cruise_start_s
                 thrust *= max(0.0, 1.0 - elapsed / self.o["lift_fade_s"])
         else:
             self.saturated = False
@@ -186,17 +215,16 @@ class QuadplaneController:
 
     def _advance_mode(self, state: ControlState) -> None:
         o, p = self.o, state.position_m
-        altitude = self._home[2] + o["cruise_altitude_m"]
+        altitude = self._home_m[2] + o["cruise_altitude_m"]
         airspeed = state.airspeed_mps or 0.0
         if self.mode == "hover":
             close = (
                 abs(p[2] - altitude) < 1.0
                 and np.linalg.norm(state.velocity_world_mps) < 0.5
             )
-            self._settled_since = (
-                (self._settled_since or self._time_s) if close else None
-            )
-            if close and self._time_s - self._settled_since >= o["settle_s"]:
+            settled = (self._settled_since or self._time_s) if close else None
+            self._settled_since = settled
+            if settled is not None and self._time_s - settled >= o["settle_s"]:
                 self._set_mode("transition")
         elif self.mode == "transition" and airspeed >= o["transition_airspeed_mps"]:
             self._previous_wp = p[:2].copy()
@@ -212,17 +240,17 @@ class QuadplaneController:
         ):
             self._return_start = p[:2].copy()
             self._set_mode("return")
-        elif self.mode == "return" and np.linalg.norm(p[:2] - self._home[:2]) < 1.0:
+        elif self.mode == "return" and np.linalg.norm(p[:2] - self._home_m[:2]) < 1.0:
             self.hover.allow_landing()
             self._set_mode("land")
 
     def _hover_reference(self, state: ControlState, dt_s: float) -> ReferencePoint:
         o, p, v = self.o, state.position_m, state.velocity_world_mps
-        altitude = self._home[2] + o["cruise_altitude_m"]
+        altitude = self._home_m[2] + o["cruise_altitude_m"]
         yaw = math.atan2(*(self._heading_vector()[::-1]))
         zero = np.zeros(3)
         if self.mode == "hover":
-            target = np.array([self._home[0], self._home[1], altitude])
+            target = np.array([self._home_m[0], self._home_m[1], altitude])
             return ReferencePoint(target, zero, zero, yaw)
         if self.mode in ("transition", "cruise"):
             # Hold altitude and attitude; no horizontal braking.
@@ -231,14 +259,14 @@ class QuadplaneController:
             )
         if self.mode == "back_transition":
             return ReferencePoint(
-                self._hover_target,
+                self._hover_target_m,
                 zero,
                 zero,
                 float(Rotation.from_quat(state.quaternion_xyzw).as_euler("ZYX")[0]),
             )
         if self.mode == "return":
             # Fly home at up to 5 m/s as a multicopter.
-            offset = self._home[:2] - p[:2]
+            offset = self._home_m[:2] - p[:2]
             step = (
                 offset
                 if np.linalg.norm(offset) < 2.0
@@ -251,7 +279,7 @@ class QuadplaneController:
                 zero,
                 float(Rotation.from_quat(state.quaternion_xyzw).as_euler("ZYX")[0]),
             )
-        target = np.array([self._home[0], self._home[1], self._home[2] - 1.0])
+        target = np.array([self._home_m[0], self._home_m[1], self._home_m[2] - 1.0])
         descent = np.array([0.0, 0.0, -o["land_speed_mps"]])
         target[2] = max(target[2], p[2] - 1.0)
         return ReferencePoint(
@@ -264,12 +292,12 @@ class QuadplaneController:
     def _fading(self) -> bool:
         return (
             self.mode == "cruise"
-            and self._time_s - self._cruise_start < self.o["lift_fade_s"]
+            and self._time_s - self._cruise_start_s < self.o["lift_fade_s"]
         )
 
     def _heading_vector(self) -> NDArray[np.float64]:
         """Direction of the first route leg (transition heading)."""
-        first = self._route[0] - self._home[:2]
+        first = self._route[0] - self._home_m[:2]
         norm = np.linalg.norm(first)
         return np.array([1.0, 0.0]) if norm < 1e-6 else first / norm
 
@@ -279,7 +307,7 @@ class QuadplaneController:
         """Guidance and energy: roll/pitch commands and pusher thrust."""
         o, g = self.o, self._g
         airspeed = max(state.airspeed_mps or 0.0, 1.0)
-        altitude = self._home[2] + o["cruise_altitude_m"]
+        altitude = self._home_m[2] + o["cruise_altitude_m"]
         if self.mode == "transition":
             self._roll_cmd, self._pitch_cmd = 0.0, math.radians(o["trim_pitch_deg"])
             self._pusher = o["transition_thrust_n"]
@@ -310,7 +338,7 @@ class QuadplaneController:
         if not schedule or self._cruise_start is None:
             return self.o["cruise_airspeed_mps"]
         times, speeds = zip(*schedule)
-        return float(np.interp(self._time_s - self._cruise_start, times, speeds))
+        return float(np.interp(self._time_s - self._cruise_start_s, times, speeds))
 
     def _l1_roll(self, state: ControlState, airspeed: float) -> float:
         """L1 lateral guidance toward the current route leg."""
@@ -323,7 +351,7 @@ class QuadplaneController:
             if self._waypoint >= len(self._route):
                 return 0.0
             target = self._route[self._waypoint]
-        start = self._previous_wp
+        start = self._previous_wp_m
         leg = target - start
         length = np.linalg.norm(leg)
         unit = leg / length if length > 1e-6 else np.array([1.0, 0.0])
@@ -391,7 +419,7 @@ class QuadplaneController:
         yaw = float(Rotation.from_quat(quaternion_xyzw).as_euler("ZYX")[0])
         segment = self._path_segment()
         if segment is None:  # altitude hold only
-            altitude = self._home[2] + self.o["cruise_altitude_m"]
+            altitude = self._home_m[2] + self.o["cruise_altitude_m"]
             return ReferencePoint(
                 np.array([p[0], p[1], altitude]),
                 np.array([v[0], v[1], 0.0]),
@@ -409,7 +437,7 @@ class QuadplaneController:
         self,
     ) -> tuple[NDArray[np.float64], NDArray[np.float64]] | None:
         """(start, end) of the segment flown now, or None (altitude hold)."""
-        home = self._home
+        home = self._home_m
         altitude = home[2] + self.o["cruise_altitude_m"]
 
         def at_altitude(xy: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -421,7 +449,7 @@ class QuadplaneController:
             return at_altitude(home[:2]), at_altitude(self._route[0])
         if self.mode == "cruise" and self._waypoint < len(self._route):
             return (
-                at_altitude(self._previous_wp),
+                at_altitude(self._previous_wp_m),
                 at_altitude(self._route[self._waypoint]),
             )
         if self.mode == "return" and self._return_start is not None:

@@ -18,7 +18,8 @@ class ImuPerturbation(Protocol):
     """Any IMU model mapping (specific force, angular rate, time) to new values,
     e.g. ImuErrorModel or ImuFaults."""
 
-    enabled: bool
+    @property
+    def enabled(self) -> bool: ...
 
     def apply(
         self,
@@ -256,18 +257,21 @@ def bus_payload(kind: str, message):
 
     if kind == "imu":
         return ImuReading(
-            _xyz(message.linear_acceleration), _xyz(message.angular_velocity)
+            np.array(_xyz(message.linear_acceleration)),
+            np.array(_xyz(message.angular_velocity)),
         )
     if kind == "gps":
         return GpsReading(
             message.latitude_deg,
             message.longitude_deg,
             message.altitude,
-            velocity_enu_mps=[
-                message.velocity_east,
-                message.velocity_north,
-                message.velocity_up,
-            ],
+            velocity_enu_mps=np.array(
+                [
+                    message.velocity_east,
+                    message.velocity_north,
+                    message.velocity_up,
+                ]
+            ),
         )
     if kind == "baro":
         return BaroReading(message.pressure, pressure_to_altitude(message.pressure))

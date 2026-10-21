@@ -65,9 +65,11 @@ class RotorControlLoop:
         tolerance_ns: int,
     ) -> None:
         # Plain ManualController instances are adapted to the plug-in contract.
-        if isinstance(controller, ManualController):
-            controller = ManualRotorController.wrap(controller)
-        self._controller = controller
+        self._controller: RotorController = (
+            ManualRotorController.wrap(controller)
+            if isinstance(controller, ManualController)
+            else controller
+        )
         self._control = control
         self._handle = handle
         self._timing = timing
@@ -123,6 +125,8 @@ class RotorControlLoop:
         sample = self._states.available(tick.sim_time_ns)
         # Warm-up: no sample is old enough yet, so use the oldest one.
         state = self._first_state if sample is None else sample[1]
+        if state is None:
+            raise RuntimeError("control tick before the first state sample")
         self.stats["max_state_age_ms"] = max(
             self.stats["max_state_age_ms"],
             (tick.sim_time_ns - state.sim_time_ns) * 1e-6,
@@ -208,7 +212,7 @@ class RotorControlLoop:
         self, pending: _Pending, now: int, *, warmup: bool = False
     ) -> dict[str, Any]:
         receipt = self._handle.send(
-            RotorThrusts(pending.thrust_n),
+            RotorThrusts(tuple(map(float, pending.thrust_n))),
             lifetime_sim_s=self._timing["command_lifetime_sim_s"],
         )
         if not warmup:

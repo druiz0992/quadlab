@@ -92,6 +92,8 @@ class ExternalForces:
             velocity, wind, quaternion, rates, deflections
         )
         state = self.fixed_wing.last
+        if state is None:
+            raise RuntimeError("fixed-wing wrench computed without an aero state")
         self._recorder.log_vector(
             "aero/fixed_wing",
             [

@@ -15,7 +15,7 @@ from ...core.measurements import EstimatedState, readonly_array
 
 
 def skew(v: ArrayLike) -> NDArray[np.float64]:
-    x, y, z = v
+    x, y, z = np.asarray(v, float)
     return np.array([[0.0, -z, y], [z, 0.0, -x], [-y, x, 0.0]])
 
 

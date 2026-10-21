@@ -20,9 +20,12 @@ in [README.md](README.md); design, behavior, and reference material are in
 ## 2. Code quality
 
 - **Typed Python.** Annotate every function signature and public attribute
-  with type hints (Python >= 3.11 syntax: `list[float]`, `X | None`). Use
+  with type hints (Python >= 3.12 syntax: `list[float]`, `X | None`). Use
   frozen dataclasses for value types and `Protocol`s for pluggable behavior.
   When you touch existing untyped code, add hints to what you change.
+  `mypy` (configured in `pyproject.toml`, run in CI) must pass on `src`
+  and `tests`; narrow optional state with explicit checks rather than
+  `type: ignore`.
 - **Clear, well-commented code.** Every module, public class, and public
   function gets a docstring stating purpose, units, frames, and failure
   behavior. Comment the *why* of non-obvious steps, math, and conventions;
@@ -97,12 +100,13 @@ in [README.md](README.md); design, behavior, and reference material are in
 
   ```bash
   source .venv/bin/activate
+  black --check src tests && mypy
   PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q
   python -m dronelab --generate-only --output /tmp/dronelab-world-check
   ```
 
-- CI (`.github/workflows/tests.yml`) repeats these checks plus `black
-  --check` on Python 3.12 without Gazebo, ROS, or a display, so unit tests
+- CI (`.github/workflows/tests.yml`) repeats these checks on Python 3.12
+  without Gazebo, ROS, or a display, so unit tests
   must not need them (validate options before checking for `gz` or opening
   windows). Gazebo and GUI suites are not run in CI.
 - Documentation-only changes need command checks where relevant, not tests.
@@ -132,9 +136,10 @@ a new numbered file if a topic truly needs one. Keep links relative and valid.
 
 ## 8. Environment
 
-- Python >= 3.11. Gazebo bindings (`gz.transport13`, `gz.msgs10`) must match
-  the system interpreter: currently Python 3.12 from ROS Jazzy
-  (`source /opt/ros/jazzy/setup.bash`).
+- Python >= 3.12 and scipy >= 1.18 (older scipy rejects the read-only
+  arrays in measurement samples). Gazebo bindings (`gz.transport13`,
+  `gz.msgs10`) must match the system interpreter: currently Python 3.12
+  from ROS Jazzy (`source /opt/ros/jazzy/setup.bash`).
 - RotorPy and Rerun are pinned in `pyproject.toml`; change pins deliberately.
 - `gazebo_plugins/` holds C++ gz-sim system plugins (currently the lockstep
   barrier), built with `dronelab-build-plugins` into `build/` (never

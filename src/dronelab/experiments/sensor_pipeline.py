@@ -226,7 +226,7 @@ class SensorPipeline:
     def _build_imaging(self, sensors: dict[str, Any], weather: dict) -> None:
         camera, lidar = sensors["camera"], sensors["lidar"]
         self.camera_effects = CameraEffects(camera)
-        self.camera_delay = DelayLine(round(camera["latency_s"] * 1e9))
+        self.camera_delay: DelayLine[Any] = DelayLine(round(camera["latency_s"] * 1e9))
         self._camera_mount = _mount_rotation(camera["mount"])
         self.lidar_effects = LidarEffects(lidar, weather)
         self._lidar_offset = np.asarray(lidar["mount"]["position_m"], float)

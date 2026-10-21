@@ -20,7 +20,7 @@ Project rules: [AGENTS.md](AGENTS.md).
 
 ## Setup
 
-Prerequisites: Python >= 3.11, and for simulation Gazebo Harmonic with Python
+Prerequisites: Python >= 3.12, and for simulation Gazebo Harmonic with Python
 bindings matching your interpreter (here: ROS Jazzy, Python 3.12). pip does
 not install Gazebo. Keyboard control needs Tk (`python3-tk`) and a desktop.
 
@@ -292,13 +292,14 @@ let dynamic wind or rendered-sensor runs diverge under load. See
 
 ```bash
 source .venv/bin/activate
+black --check src tests && mypy                               # formatting and static types
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q          # unit + transport-free tests
 python -m dronelab --generate-only --output /tmp/dronelab-world-check   # world generation check
 ```
 
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` avoids third-party ROS pytest plugins.
-GitHub Actions (`.github/workflows/tests.yml`) runs `black --check`, these
-unit tests, and the world generation check on Python 3.12 for every push
+GitHub Actions (`.github/workflows/tests.yml`) runs `black --check`, `mypy`,
+these unit tests, and the world generation check on Python 3.12 for every push
 to `main` and every pull request, without Gazebo, ROS, or a display; the
 Gazebo and GUI suites below stay local.
 Tests needing real Gazebo or a desktop are skipped unless enabled:

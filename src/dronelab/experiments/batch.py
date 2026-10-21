@@ -252,7 +252,7 @@ def check_baseline(
     """
     default = dict(relative=0.05, absolute=1e-6, direction="both")
     default.update(tolerances.get("default", {}))
-    failures = []
+    failures: list[dict[str, Any]] = []
     for group, metrics in baseline.items():
         for metric, expected in metrics.items():
             stats = table.get(group, {}).get(metric, {})

@@ -49,7 +49,7 @@ class EffectiveImuBias:
                 self._nominal.apply(delivered_rate) - self._true.apply(ideal_rate),
             )
         )
-        if self._bias is None:
+        if self._bias is None or self._previous_ns is None:  # set together
             self._bias = error
         else:
             dt = max(sim_time_ns - self._previous_ns, 0) * 1e-9

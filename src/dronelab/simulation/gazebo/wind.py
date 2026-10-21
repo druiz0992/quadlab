@@ -62,7 +62,8 @@ class WindProfile:
         speed = max(0.0, math.hypot(x, y) + self._noise[0] * self._speed_std)
         direction = math.atan2(y, x) + self._noise[1] * self._direction_std
         gusty = np.array([speed * math.cos(direction), speed * math.sin(direction), z])
-        return tuple(map(float, gusty + self._turbulence.velocity_enu(mean)))
+        vx, vy, vz = gusty + self._turbulence.velocity_enu(mean)
+        return (float(vx), float(vy), float(vz))
 
 
 class WindCommands:
@@ -105,7 +106,8 @@ class WindCommands:
         ) = velocity
         if not self._publisher.publish(message):
             raise RuntimeError("Unable to publish wind target")
-        self.velocity_enu_mps = tuple(velocity)
+        vx, vy, vz = velocity
+        self.velocity_enu_mps = (float(vx), float(vy), float(vz))
         return dict(sim_time_ns=sim_time_ns, velocity_enu_mps=list(velocity))
 
 

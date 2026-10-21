@@ -36,7 +36,9 @@ def _cell(entry: Mapping[str, Any] | None) -> str:
     return f"{entry['mean']:.4g} ± {entry['std']:.2g} ({entry['count']})"
 
 
-def _best(row: dict[str, Mapping[str, Any]], direction: str | None) -> str | None:
+def _best(
+    row: dict[str, Mapping[str, Any] | None], direction: str | None
+) -> str | None:
     means = {name: e["mean"] for name, e in row.items() if e and e.get("count")}
     if len(means) < 2 or direction not in ("increase", "decrease"):
         return None

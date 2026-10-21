@@ -59,12 +59,14 @@ class EscModel:
         speeds = self.quantize(np.asarray(speeds, float))
         now = self._clock()
         changed = self._last is None or not np.array_equal(speeds, self._last)
-        limited = self._period_ns is not None and now is not None and changed
+        period_ns = self._period_ns
+        limited = period_ns is not None and now is not None and changed
         if limited and not np.all(speeds == 0):
+            assert now is not None and period_ns is not None  # implied by limited
             if self._next_ns is not None and now < self._next_ns:
                 self.held += 1
                 return None
-            self._next_ns = now + self._period_ns
+            self._next_ns = now + period_ns
         self._last = speeds
         self.forwarded += 1
         return speeds

@@ -95,6 +95,8 @@ def control_state(
     """
     if estimate_source is None:
         return truth
+    if runner is None:
+        raise ValueError("estimate-driven control needs the algorithm runner")
     state = estimate_source.state(now_ns, runner.latest_estimate)
     if state is None and elapsed_s > max_age_s:
         raise StaleEstimate("No state estimate available for control")

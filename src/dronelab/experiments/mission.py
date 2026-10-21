@@ -33,15 +33,18 @@ class MissionRunner:
 
         The first call starts the mission at ``time_s`` from ``position_m``.
         """
-        if self.reference is None:
+        if self.reference is None or self.start_s is None:
+            reference = build_reference(self._settings, position_m)
+            if reference is None:
+                raise ValueError("mission type none has no reference to fly")
             self.start_s = time_s
             self.start_position_m = np.asarray(position_m, float).tolist()
-            self.reference = build_reference(self._settings, position_m)
+            self.reference = reference
         return self.reference.sample(time_s - self.start_s)
 
     def sample(self, time_s: float) -> ReferencePoint | None:
         """Reference at ``time_s`` for evaluation; None before the start."""
-        if self.reference is None or time_s < self.start_s:
+        if self.reference is None or self.start_s is None or time_s < self.start_s:
             return None
         return self.reference.sample(time_s - self.start_s)
 

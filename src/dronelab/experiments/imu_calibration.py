@@ -92,6 +92,8 @@ def write_static_world(config: DroneConfig, output: Path) -> Path:
     )
     tree = ET.parse(path)
     drone = tree.getroot().find(".//model[@name='drone']")
+    if drone is None:
+        raise ValueError(f"{path} has no drone model")
     static = ET.Element("static")
     static.text = "true"
     drone.insert(0, static)
@@ -189,7 +191,7 @@ def _collect(
     session, pipeline, poses, ambients, mount, samples
 ) -> dict[str, np.ndarray]:
     """Mean readings per pose and ambient, with the known specific force."""
-    rows = dict(accel=[], gyro=[], force=[], temperature=[])
+    rows: dict[str, list[Any]] = dict(accel=[], gyro=[], force=[], temperature=[])
     for ambient in ambients:
         if ambient is not None:
             pipeline.temperature.set_ambient(ambient)

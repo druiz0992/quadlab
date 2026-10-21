@@ -133,35 +133,37 @@ class LockstepStepper:
         if self._target_ns is None:
             return False
         if self._grant is not None:
-            return self._regrant_if_due()
+            return self._regrant_if_due(self._target_ns, self._grant)
         if self._now() - self._sent_at < self._resend_after_s:
             return False
         self.resends += 1
         self._send()
         return True
 
-    def _regrant_if_due(self) -> bool:
+    def _regrant_if_due(self, target_ns: int, grant: Callable[[int], None]) -> bool:
         """Plugin mode: repeat the grant; fail on a burst that never ends."""
         if self._now() - self._sent_at > self._plugin_stall_s:
             raise RuntimeError(
-                f"Lockstep burst to {self._target_ns} ns did not finish within "
+                f"Lockstep burst to {target_ns} ns did not finish within "
                 f"{self._plugin_stall_s:g} s (plugin barrier)"
             )
         if self._now() - self._granted_at < self._regrant_after_s:
             return False
         self.regrants += 1
-        self._publish_grant(self._target_ns)
+        self._publish_grant(grant, target_ns)
         return True
 
-    def _publish_grant(self, grant_ns: int) -> None:
-        self._grant(grant_ns)
+    def _publish_grant(self, grant: Callable[[int], None], grant_ns: int) -> None:
+        grant(grant_ns)
         self._granted_at = self._now()
 
     def _burst(self) -> None:
+        if self._target_ns is None:
+            raise RuntimeError("Lockstep burst requested before start()")
         self._target_ns += self._period_ns
         self.bursts += 1
         if self._grant is not None:
-            self._publish_grant(self._target_ns)
+            self._publish_grant(self._grant, self._target_ns)
         self._send()
 
     def _send(self) -> None:

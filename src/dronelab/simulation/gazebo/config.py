@@ -12,6 +12,7 @@ import json
 import math
 from numbers import Real
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -78,7 +79,7 @@ def mount_pose(sensor):
     return [*pose["position_m"], *map(math.radians, pose["rotation_deg"])]
 
 
-DEFAULTS = {
+DEFAULTS: dict[str, Any] = {
     "schema_version": 1,
     "vehicle": {
         "body_mass_kg": 1.5,
@@ -1524,7 +1525,8 @@ def load_drone_config(
     """
     layers = [layer for path in _as_paths(paths) for layer in _expand_layers(path)]
     # Copy: callers may modify the returned settings.
-    data, provenance = deepcopy(DEFAULTS), {}
+    data = deepcopy(DEFAULTS)
+    provenance: dict[str, str] = {}  # dotted key -> layer file
     for source, layer in layers:
         data = merge(data, layer, f"{source}: config")
         _record_provenance(layer, source, provenance)

@@ -43,7 +43,7 @@ from .lidar_returns import (
     weather_clutter,
 )
 
-CLEAR_AIR = {
+CLEAR_AIR: dict[str, Any] = {
     "visibility_m": None,
     "lidar_clutter_per_m": 0.0,
     "lidar_clutter_max_range_m": 10.0,
@@ -67,7 +67,7 @@ class LidarEffects:
         self._detection = effects["detection"]
         self._alpha = extinction_per_m(weather["visibility_m"])
         self._clutter_rate = weather["lidar_clutter_per_m"]
-        self._clutter_range = weather["lidar_clutter_max_range_m"]
+        self._clutter_range = float(weather["lidar_clutter_max_range_m"])
         self._clutter_rho = weather["lidar_clutter_reflectivity"]
         self._mode = effects["return_mode"]
         self._resolution = effects["range_resolution_m"]
@@ -152,7 +152,7 @@ class LidarEffects:
                     self._rng,
                 )
             ]
-            mixed = h[3] | v[3]
+            mixed = np.logical_or(h[3], v[3])
             share = np.where(v[3], v[0], h[0])
             other_r = np.where(v[3], v[1], h[1])
             other_rho = np.where(v[3], v[2], h[2])

@@ -13,7 +13,7 @@ These are diagnostics only: nothing here feeds back into control, and the
 clock is injectable so tests use a fake.
 """
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Callable
 import time
 from typing import Any
@@ -35,8 +35,8 @@ class LoopTiming:
         self._clock = clock
         self._started_wall: float | None = None
         self._kind: str | None = None
-        self.busy_wall_s: Counter = Counter()
-        self.messages: Counter = Counter()
+        self.busy_wall_s: defaultdict[str, float] = defaultdict(float)
+        self.messages: Counter[str] = Counter()
         self.slowest_wall_s: dict[str, float] = {}
         self.odometry_count = 0
         self.odometry_age_sum_s = 0.0

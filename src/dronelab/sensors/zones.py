@@ -22,8 +22,12 @@ class BoxZone:
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, Sequence[float]]) -> "BoxZone":
+        low, high = settings["min_m"], settings["max_m"]
+        if len(low) != 3 or len(high) != 3:
+            raise ValueError("zone min_m and max_m need three values")
         return cls(
-            tuple(map(float, settings["min_m"])), tuple(map(float, settings["max_m"]))
+            (float(low[0]), float(low[1]), float(low[2])),
+            (float(high[0]), float(high[1]), float(high[2])),
         )
 
     def contains(self, position_m: ArrayLike) -> bool:

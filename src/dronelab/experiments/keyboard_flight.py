@@ -51,6 +51,8 @@ def keyboard_effects(
 
     def payload_toggle(on: bool, stamp: int) -> Any:
         """Payload switch: off drops, on tries a pickup."""
+        if payload is None:
+            raise RuntimeError("payload effect toggled without a payload")
         if not on:
             return payload.drop(stamp)
         return payload.pickup(stamp, truth.position_m, truth.attitude.as_quat())

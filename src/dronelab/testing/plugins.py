@@ -40,7 +40,7 @@ good algorithm; judge that with Gazebo runs and ``dronelab-replay``.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 import json
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -134,7 +134,7 @@ def enu_to_gps(position_m: tuple[float, float, float]) -> GpsReading:
             ]
         )
         guess = guess + np.linalg.solve(jacobian, target - here)
-    return GpsReading(*guess, np.zeros(3))
+    return GpsReading(float(guess[0]), float(guess[1]), float(guess[2]), np.zeros(3))
 
 
 def hover_samples(duration_s: float = 10.0, seed: int = 0) -> list[tuple[str, Sample]]:
@@ -210,11 +210,14 @@ def _run_estimator(factory, options, duration_s) -> dict[str, Any]:
 
     context = synthetic_context(log=log)
     estimator = factory(context, dict(options))
-    inputs = getattr(estimator, "inputs", None)
+    declared = getattr(estimator, "inputs", None)
     _fail(
-        isinstance(inputs, tuple) and inputs and all(k in STREAMS for k in inputs),
-        f"inputs must be a non-empty tuple of {sorted(STREAMS)}, got {inputs!r}",
+        isinstance(declared, tuple)
+        and len(declared) > 0
+        and all(k in STREAMS for k in declared),
+        f"inputs must be a non-empty tuple of {sorted(STREAMS)}, got {declared!r}",
     )
+    inputs = cast(tuple[str, ...], declared)  # validated just above
     states, innovations, newest_ns, last = [], 0, -1, None
     delivered = 0
     for kind, sample in hover_samples(duration_s):
@@ -238,7 +241,7 @@ def _run_estimator(factory, options, duration_s) -> dict[str, Any]:
         len(states),
         innovations,
         debug_entries[0],
-        None if final is None else tuple(float(v) for v in final),
+        None if final is None else (float(final[0]), float(final[1]), float(final[2])),
         error,
         summary,
     )

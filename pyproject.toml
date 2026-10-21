@@ -6,11 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "dronelab"
 version = "0.1.0"
 description = "Drone simulation lab for testing estimation and control algorithms"
-requires-python = ">=3.11"
-dependencies = ["numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7", "rotorpy==3.0.0"]
+requires-python = ">=3.12"
+dependencies = ["numpy>=1.24", "scipy>=1.18", "matplotlib>=3.7", "rotorpy==3.0.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "black>=24"]
+dev = ["pytest>=8", "black>=24", "mypy>=1.10"]
 gazebo = ["rerun-sdk==0.24.1", "protobuf>=4.25,<6"]
 
 [project.scripts]
@@ -28,3 +28,16 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/dronelab", "tests"]
+mypy_path = "src"
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+# No type information: ROS-provided Gazebo bindings, RotorPy, and SciPy
+# (typed via the separate scipy-stubs package, not a dependency).
+module = ["gz.*", "rotorpy.*", "scipy.*"]
+ignore_missing_imports = true
+
