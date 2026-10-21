@@ -50,10 +50,33 @@ The stage order is part of the behaviour (seeded models draw per call), so
 lockstep runs stay byte-identical across refactors. Mission duration is measured from the first odometry
 timestamp. Loss of odometry for 30 wall-clock seconds raises an error
 (rotor-thrust modes use a stricter 1 s watchdog, see [4 Control](4_control.md)).
-Cleanup sends a zero command, terminates the child, and writes summary and
+Cleanup sends a zero command, stops Gazebo, and writes summary and
 recording data; interrupted missions are marked incomplete. A completed run
 missing a required sensor stream raises an error. Contacts never stop a
 mission, and there is no obstacle avoidance.
+
+### Stopping and cleanup
+
+Gazebo is a child process owned by the run
+(`simulation/gazebo/process.py`). `gz sim` is a launcher: server-only it
+runs the server itself; with the GUI it forks `gz sim server` and
+`gz sim gui` into their own process groups. SIGTERM to the launcher stops
+both, but if the launcher or Python is killed outright they kept running.
+Now:
+
+| Event | What happens |
+| --- | --- |
+| Ctrl-C or SIGTERM to `dronelab`, `dronelab-magcal`, `dronelab-imucal` | Treated alike (`experiments/interrupts.py`): the mission saves `summary.json` (`exit_reason: interrupted`, health warning), Gazebo is stopped; exit status 130 (Ctrl-C) or 143 (SIGTERM). A second signal during this cleanup is ignored, so it cannot leave Gazebo or half-written results behind. |
+| Python killed (SIGKILL, out of memory) | Gazebo is launched under `setpriv --pdeathsig TERM` (util-linux), so the kernel sends it SIGTERM and it exits. No summary is written. Without `setpriv` (non-Linux) Gazebo keeps running. |
+| Gazebo ignores SIGTERM for 10 s | The launcher and every descendant process are killed. |
+| Gazebo exits during start-up | Lockstep runs fail at once ("Gazebo exited during start-up") instead of after the 60 s subscriber timeout; real-time runs already checked liveness every loop iteration. |
+| Gazebo exits during a calibration | `dronelab-magcal`/`-imucal` fail at once, naming `gazebo.log`, instead of after a 10 s sensor timeout. |
+| Runtime error | The command prints the error, the output directory, and the health verdict, and exits 1 (invalid options or configuration still print usage and exit 2). |
+
+Verified on the reference desktop (gz sim 8, Jazzy): SIGTERM and SIGKILL
+to headless and GUI missions leave no `gz` processes; SIGTERM to a
+2-parallel batch stops both children, which save their summaries; killing
+Gazebo during lockstep start-up fails in 1.6 s.
 
 ## Ground start and take-off
 

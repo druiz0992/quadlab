@@ -273,3 +273,19 @@ def test_keyboard_polled_at_most_every_period(monkeypatch):
     now[0] += KEYBOARD_POLL_PERIOD_WALL_S
     keyboard.closed = True
     assert not loop._poll_keyboard() and keyboard.polls == 2
+
+
+# calibration_session -----------------------------------------------------------
+
+
+def test_calibration_session_fails_fast_when_gazebo_exits(tmp_path):
+    from queue import Queue
+
+    from dronelab.experiments.calibration_session import CalibrationSession
+
+    session = CalibrationSession.__new__(CalibrationSession)
+    session.messages = Queue()
+    session._log_path = tmp_path / "gazebo.log"
+    session.process = SimpleNamespace(poll=lambda: 1, returncode=1)
+    with pytest.raises(RuntimeError, match="Gazebo exited"):
+        session.fresh(3, timeout_s=3600)

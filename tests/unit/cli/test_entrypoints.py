@@ -110,3 +110,32 @@ def test_value_error_shows_usage(monkeypatch, capsys):
         gazebo.main()
     assert exit_info.value.code == 2
     assert "usage:" in capsys.readouterr().err
+
+
+def test_interrupt_and_absorbed_sigterm_exit_statuses(capsys):
+    import argparse
+    import os
+    import signal
+
+    from dronelab.cli.common import run_reporting_errors
+
+    parser = argparse.ArgumentParser(prog="dronelab")
+
+    def interrupted():
+        raise KeyboardInterrupt
+
+    with pytest.raises(SystemExit) as exit_info:
+        run_reporting_errors(parser, interrupted)
+    assert exit_info.value.code == 130
+    assert "interrupted" in capsys.readouterr().err
+
+    def mission_absorbs_sigterm():
+        try:
+            os.kill(os.getpid(), signal.SIGTERM)
+            signal.pause()  # interrupted by the handler
+        except KeyboardInterrupt:
+            return "saved"  # like MissionLoop.run after an interruption
+
+    with pytest.raises(SystemExit) as exit_info:
+        run_reporting_errors(parser, mission_absorbs_sigterm)
+    assert exit_info.value.code == 143

@@ -267,6 +267,11 @@ the health verdict (`ok`/`warning`/`failed`, printed after the run),
 completion, message counts, and dropped counters in `summary.json` before
 trusting a dataset. Details: [2 Simulation](docs/2_simulation.md#run-artifacts).
 
+Ctrl-C or SIGTERM stops a run (or a whole batch) gracefully: results are
+saved, Gazebo is stopped, and the exit status is 130 or 143; a failed run
+exits 1. Gazebo also stops if the Python process is killed outright
+(Linux, via `setpriv`). Details: [2 Simulation](docs/2_simulation.md#stopping-and-cleanup).
+
 ## Gazebo plugin (lockstep barrier)
 
 Lockstep runs are deterministic only if Gazebo reads each period's commands

@@ -96,7 +96,7 @@ document and update the status below.
 | Gazebo-side lockstep barrier (`DronelabLockstep` gz-sim plugin) so commands are read before each step | Implemented ([2 Simulation](2_simulation.md#lockstep-simulation)) |
 | Audit remaining Gazebo defaults (atmosphere, magnetic table, solver and contact settings) | Future (simulation robustness) |
 | Lockstep performance on large worlds (pose-message volume) | Future (simulation robustness) |
-| Gazebo process cleanup and hang detection | Future (simulation robustness) |
+| Gazebo process cleanup and hang detection | Implemented ([2 Simulation](2_simulation.md#stopping-and-cleanup)); a simulator-side command timeout (for attaching to a running Gazebo) remains future |
 | Sensor delivery latency, jitter, clock offsets, cross-stream reordering | Implemented ([7 Experiments](7_experiments.md#sensor-bus-and-delivery-timing-sensor_timing)) |
 | Waypoint-sequence missions / circuit laps; step, circle, figure-eight, chirp, doublet references | Implemented ([7 Experiments](7_experiments.md#reference-missions-mission)) |
 | Allocation helpers exposing achieved wrench and residuals | Future |

@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 import os
 import shutil
-import subprocess
 import uuid
 
 import numpy as np
@@ -19,6 +18,7 @@ from .sensor_pipeline import SensorPipeline, TruthSnapshot
 from .vehicle_forces import ExternalForces
 from .keyboard_flight import keyboard_effects
 from .mission_loop import MissionLoop, MissionParts
+from ..simulation.gazebo.process import GazeboProcess
 from ..simulation.gazebo.stepping import TrackedNode
 from ..simulation.gazebo.plugins import lockstep_barrier
 from ..simulation.gazebo.ingress import (
@@ -103,6 +103,18 @@ def _scheduled_periods_ns(settings: dict, pipeline: SensorPipeline) -> dict[str,
     return periods
 
 
+def _edit_world(world) -> None:
+    """Gazebo with the GUI on ``world`` until its window closes; stopped
+    completely on Ctrl-C or SIGTERM. Raises if Gazebo fails."""
+    process = GazeboProcess(["gz", "sim", str(world)], None, gazebo_environment())
+    try:
+        code = process.wait()
+    finally:
+        process.stop()
+    if code != 0:
+        raise RuntimeError(f"Gazebo exited with status {code}")
+
+
 def _print_health(health: dict) -> None:
     """One line per health finding after the run (see evaluation/health.py)."""
     print(f"Health: {health['verdict']}")
@@ -155,7 +167,7 @@ def _run(args, keyboard, command_source):
     if args.edit:
         if args.headless:
             raise ValueError("--edit needs a desktop window; omit --headless")
-        subprocess.run(["gz", "sim", str(world)], check=True, env=gazebo_environment())
+        _edit_world(world)
         return
 
     try:

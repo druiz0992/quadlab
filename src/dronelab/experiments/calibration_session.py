@@ -4,12 +4,14 @@ Starts ``gz sim`` on a prepared world in a private transport partition,
 subscribes to one sensor topic and to odometry, and moves the drone with the
 UserCommands ``set_pose`` service. Replies from Python are unreliable, so
 odometry confirming the attitude is the evidence that a pose took effect.
+Every wait fails at once, naming the log, if Gazebo has exited; ``close``
+stops Gazebo completely (see ``simulation/gazebo/process.py``) and cannot be
+interrupted half-way by a second Ctrl-C or SIGTERM.
 """
 
 import os
 from pathlib import Path
 from queue import Empty, Queue
-import subprocess
 import time
 from typing import Any
 import uuid
@@ -18,6 +20,8 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from ..simulation.gazebo.environment import gazebo_environment
+from ..simulation.gazebo.process import GazeboProcess
+from .interrupts import shielded
 
 HOLD_POSITION_M = (0.0, 0.0, 10.0)
 SET_POSE_SERVICE = "/world/dronelab/set_pose"
@@ -40,13 +44,20 @@ class CalibrationSession:
         self.attitude: np.ndarray | None = None
         self.node.subscribe(message_type, topic, lambda m: self.messages.put(m))
         self.node.subscribe(Odometry, "/dronelab/odometry", self._on_odometry)
+        self._log_path = log
         self._log = log.open("w")
-        self.process = subprocess.Popen(
+        self.process = GazeboProcess(
             ["gz", "sim", "-s", "-r", "-v", "2", str(world)],
-            stdout=self._log,
-            stderr=subprocess.STDOUT,
-            env=gazebo_environment(),
+            self._log,
+            gazebo_environment(),
         )
+
+    def _check_alive(self) -> None:
+        """Raise if Gazebo has exited (instead of waiting out a timeout)."""
+        if self.process.poll() is not None:
+            raise RuntimeError(
+                f"Gazebo exited ({self.process.returncode}); see {self._log_path}"
+            )
 
     def _on_odometry(self, message: Any) -> None:
         q = message.pose.orientation
@@ -62,6 +73,7 @@ class CalibrationSession:
         request.orientation.z, request.orientation.w = z, w
         deadline = time.monotonic() + timeout_s
         while time.monotonic() < deadline:
+            self._check_alive()
             self.node.request(
                 SET_POSE_SERVICE, request, self._pose_type, self._boolean, 100
             )
@@ -77,20 +89,24 @@ class CalibrationSession:
         """``count`` sensor messages published after this call."""
         while not self.messages.empty():
             self.messages.get_nowait()
-        self.messages.get(timeout=timeout_s)  # may predate the pose: discard
-        received = []
-        while len(received) < count:
+        self._next(timeout_s)  # may predate the pose: discard
+        return [self._next(timeout_s) for _ in range(count)]
+
+    def _next(self, timeout_s: float) -> Any:
+        """Next sensor message; checks Gazebo is alive every 0.5 s."""
+        deadline = time.monotonic() + timeout_s
+        while True:
+            self._check_alive()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError(f"No sensor data; see {self._log_path}")
             try:
-                received.append(self.messages.get(timeout=timeout_s))
+                return self.messages.get(timeout=min(0.5, remaining))
             except Empty:
-                raise RuntimeError("No sensor data; see gazebo log") from None
-        return received
+                pass
 
     def close(self) -> None:
-        self.process.terminate()
-        try:
-            self.process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait()
-        self._log.close()
+        """Stop Gazebo (SIGTERM, then kill after 10 s) and close the log."""
+        with shielded():
+            self.process.stop(timeout_s=10)
+            self._log.close()

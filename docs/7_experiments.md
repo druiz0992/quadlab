@@ -317,7 +317,7 @@ value seen), `subject` (e.g. the obstacle's model), and a `message`.
 | `below_ground` | failed | body centre more than `below_ground_margin_m` below the ground or terrain surface |
 | `no_liftoff` | failed | commanded thrust ≥ `no_liftoff_thrust_ratio` × weight for `no_liftoff_s` while the vehicle neither rose 5 cm nor moved faster than 0.2 m/s (commands not reaching the motors, a pinned vehicle) |
 | `incomplete` | failed | the run ended on an error before its duration (e.g. a stale estimate) |
-| `interrupted` | warning | Ctrl-C (closing the keyboard window is a normal end) |
+| `interrupted` | warning | Ctrl-C or SIGTERM (closing the keyboard window is a normal end) |
 | `ground_contact` | warning | a touchdown after at least `touchdown_gap_s` without contact; resting on the ground from the start is not one |
 | `tracking_lost` | warning | mission position error above `tracking_lost_m` for `tracking_lost_s`; a warning on purpose, so poor tracking stays in batch aggregates as a result |
 | `left_ground_area` | warning | flew past the ground plane's edge (also `left_ground_area_s`) |
@@ -427,6 +427,11 @@ How runs are built and executed:
 - Runs are separate `dronelab` processes, `parallel` at a time, each with a
   fresh output directory (non-empty ones are refused) and a private Gazebo
   transport partition.
+- Ctrl-C or SIGTERM stops the batch: no further runs start, running ones are
+  sent SIGTERM and save their results (marked `interrupted`), any still
+  running after 60 s are killed, and `dronelab-batch` exits with 130
+  (Ctrl-C) or 143 (SIGTERM) without aggregating. Children also stop if the
+  batch itself is killed (see [2 Simulation](2_simulation.md#stopping-and-cleanup)).
 
 `comparison.md` (also printed) puts the groups side by side, one row per
 metric with `mean ± std (n)`, marking the best group where the metric's

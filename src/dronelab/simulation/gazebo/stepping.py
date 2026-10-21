@@ -227,18 +227,26 @@ def wait_for_subscribers(
     poll_s: float = 0.05,
     monotonic: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
+    alive: Callable[[], bool] | None = None,
 ) -> None:
     """Block until every publisher has a connected subscriber.
 
     Raises RuntimeError naming the unconnected topics after ``timeout_s``
     (wall seconds): a command topic nobody subscribes to is a configuration
-    or SDF error, never something to ignore.
+    or SDF error, never something to ignore. With ``alive`` (is Gazebo still
+    running?) it fails at once when Gazebo exits during start-up instead of
+    waiting out the timeout.
     """
     deadline = monotonic() + timeout_s
     while True:
         missing = sorted(t for t, p in publishers if not p.has_connections())
         if not missing:
             return
+        if alive is not None and not alive():
+            raise RuntimeError(
+                "Gazebo exited during start-up (see gazebo.log); "
+                f"unconnected command topics: {missing}"
+            )
         if monotonic() > deadline:
             raise RuntimeError(
                 f"Gazebo did not subscribe to command topics within {timeout_s:g} s: "

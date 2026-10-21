@@ -189,3 +189,19 @@ def test_wait_for_subscribers_blocks_until_connected_or_names_topics():
         wait_for_subscribers(
             never, timeout_s=0.01, monotonic=clock, sleep=lambda s: None
         )
+
+
+def test_wait_for_subscribers_fails_fast_when_gazebo_exits():
+    clock = FakeClock()
+    never = [("/motors", FakePublisher(10**9))]
+    checks = []
+
+    def alive():
+        checks.append(clock())
+        return len(checks) < 3  # Gazebo dies on the third check
+
+    with pytest.raises(RuntimeError, match="exited during start-up"):
+        wait_for_subscribers(
+            never, timeout_s=3600, monotonic=clock, sleep=lambda s: None, alive=alive
+        )
+    assert len(checks) == 3

@@ -37,7 +37,8 @@ truth; it is used only to synthesize measurements and to score runs.
 src/dronelab/
 ├── cli/                    # Argument parsing: `dronelab` (gazebo.py), `dronelab-batch`
 │                           #   (batch.py), `dronelab-replay` (replay.py), `dronelab-magcal`
-│                           #   (magcal.py), `dronelab-imucal`
+│                           #   (magcal.py), `dronelab-imucal` (imucal.py); shared exit
+│                           #   statuses and SIGTERM handling (common.py)
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
 │                           #   measurement samples, rotor commands, JSON codec
 │                           #   (serialization.py)
@@ -91,6 +92,7 @@ src/dronelab/
 │       ├── wind.py         # Seeded wind targets and native wind commands
 │       ├── sdf.py          # XML-building helpers
 │       ├── environment.py  # Child-process library environment (Snap fix)
+│       ├── process.py      # Owned gz sim process: parent-death signal, complete stop
 │       ├── ingress.py      # Topic subscriptions into one bounded, counted queue; gz command
 │       ├── stepping.py     # Lockstep stepping, start-up subscriber barrier
 │       ├── plugins.py      # DroneLab Gazebo plugins: location, build, barrier choice
@@ -114,6 +116,7 @@ src/dronelab/
 │   ├── mission.py          # Mission clock and reference sampling
 │   ├── run_evaluation.py   # Per-run metrics (metrics.json)
 │   ├── batch.py            # Seed/parameter sweeps, aggregation, baselines
+│   ├── interrupts.py       # SIGTERM as Ctrl-C; cleanup shielded from repeated signals
 │   ├── magnetometer_calibration.py  # Automated calibration run (dronelab-magcal)
 │   ├── imu_calibration.py  # Automated IMU calibration run (dronelab-imucal)
 │   ├── calibration_session.py  # Shared Gazebo pose/sensor session for calibrations

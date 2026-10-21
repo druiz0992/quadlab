@@ -17,6 +17,7 @@ from ..experiments.batch import (
     resolved_seed_paths,
     DEFAULT_METRICS,
 )
+from .common import run_reporting_errors
 
 
 def main() -> None:
@@ -50,11 +51,15 @@ def main() -> None:
             print(run.name, run.group, json.dumps(run.overrides))
         return
     output = Path(args.output)
-    results = execute(
-        experiment,
-        runs,
-        output,
-        parallel=args.parallel or experiment.get("parallel", 1),
+    # Ctrl-C/SIGTERM stop the running children, which save their results.
+    results = run_reporting_errors(
+        parser,
+        lambda: execute(
+            experiment,
+            runs,
+            output,
+            parallel=args.parallel or experiment.get("parallel", 1),
+        ),
     )
     metrics = list(experiment.get("metrics") or DEFAULT_METRICS)
     table = aggregate(results, metrics)

@@ -4,6 +4,7 @@ import argparse
 import json
 
 from ..experiments.imu_calibration import run_imu_calibration
+from .common import run_reporting_errors
 
 
 def main() -> None:
@@ -24,17 +25,17 @@ def main() -> None:
     )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
-    try:
-        report = run_imu_calibration(
+    report = run_reporting_errors(
+        parser,
+        lambda: run_imu_calibration(
             args.drone,
             args.output,
             extra_poses=args.extra_poses,
             samples=args.samples,
             startup_gyro_s=args.startup_gyro_s,
             seed=args.seed,
-        )
-    except (ValueError, RuntimeError) as error:
-        parser.error(str(error))
+        ),
+    )
     print(json.dumps(report["evaluation"], indent=2))
     print(f"Calibration layer: {args.output}/imu-calibration.json")
 

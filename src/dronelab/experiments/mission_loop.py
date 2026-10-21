@@ -26,7 +26,6 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 from queue import Empty
-import subprocess
 import time
 from typing import Any, TextIO
 
@@ -38,7 +37,9 @@ from ..control.manual import FlightCommand
 from ..control.waypoint import waypoint_velocity
 from ..simulation.gazebo.environment import gazebo_environment
 from ..simulation.gazebo.messages import timestamp, timestamp_ns, vector
+from ..simulation.gazebo.process import GazeboProcess
 from ..simulation.gazebo.stepping import wait_for_subscribers
+from .interrupts import shielded
 from .keyboard_flight import apply_keyboard_effects
 from .loop_timing import LoopTiming
 from .rotor_loop import RotorControlLoop
@@ -50,6 +51,8 @@ from .run_summary import build_summary, final_exit_reason
 NO_TELEMETRY_TIMEOUT_WALL_S = 30.0
 # Gazebo start-up allowance for command-topic subscriptions (wall s).
 STARTUP_TIMEOUT_WALL_S = 60.0
+# Time Gazebo gets to exit after SIGTERM before it is killed (wall s).
+GAZEBO_STOP_TIMEOUT_WALL_S = 10.0
 # Native velocity-mode command period (s, simulation time).
 VELOCITY_COMMAND_PERIOD_S = 0.04
 # Keyboard window service period (wall s). A Tk update with redraw costs
@@ -190,7 +193,7 @@ class MissionLoop:
         self.control_loop: RotorControlLoop | None = None
         self.stepper: Any | None = None
         self.rotor: RotorMission | None = None
-        self.process: subprocess.Popen | None = None
+        self.process: GazeboProcess | None = None
         self.files: RunFiles | None = None
         self.summary: dict[str, Any] | None = None
 
@@ -200,22 +203,21 @@ class MissionLoop:
         """Fly the mission; return ``summary.json`` (also written on failure)."""
         with ExitStack() as stack:
             self.files = self._open_files(stack)
-            self.process = subprocess.Popen(
-                self.parts.command,
-                stdout=self.files.gazebo_log,
-                stderr=subprocess.STDOUT,
-                env=gazebo_environment(),
-            )
             try:
+                self.process = GazeboProcess(
+                    self.parts.command, self.files.gazebo_log, gazebo_environment()
+                )
                 self._start_control()
                 while self._step():
                     pass
-            except KeyboardInterrupt:
+            except KeyboardInterrupt:  # Ctrl-C, or SIGTERM via interrupts.py
                 self.exit_reason = "interrupted"
                 print("Interrupted; saving received data.")
             finally:
-                self._shutdown()
-                self._write_results()
+                # A second Ctrl-C/SIGTERM must not leave Gazebo or results behind.
+                with shielded():
+                    self._shutdown()
+                    self._write_results()
         return self.summary
 
     def _open_files(self, stack: ExitStack) -> RunFiles:
@@ -271,9 +273,14 @@ class MissionLoop:
             # Commands published before Gazebo subscribes are lost: connect
             # every command topic (and the plugin's grant topic) first.
             wait_for_subscribers(
-                parts.node.publishers, timeout_s=STARTUP_TIMEOUT_WALL_S
+                parts.node.publishers,
+                timeout_s=STARTUP_TIMEOUT_WALL_S,
+                alive=self._gazebo_alive,
             )
             self.stepper.start()
+
+    def _gazebo_alive(self) -> bool:
+        return self.process is not None and self.process.poll() is None
 
     def _rotor_parts(self) -> RotorMissionParts:
         parts = self.parts
@@ -323,12 +330,8 @@ class MissionLoop:
                 self.stepper.release()  # a held world must be free to exit
             except Exception:
                 pass
-        self.process.terminate()
-        try:
-            self.process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait()
+        if self.process is not None:
+            self.process.stop(GAZEBO_STOP_TIMEOUT_WALL_S)
         if self.thrust_control is not None:
             self._drain_command_events()
         if parts.live_ekf is not None:

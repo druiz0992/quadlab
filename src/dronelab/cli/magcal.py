@@ -4,6 +4,7 @@ import argparse
 import json
 
 from ..experiments.magnetometer_calibration import run_calibration
+from .common import run_reporting_errors
 
 
 def main() -> None:
@@ -20,16 +21,16 @@ def main() -> None:
     )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
-    try:
-        report = run_calibration(
+    report = run_reporting_errors(
+        parser,
+        lambda: run_calibration(
             args.drone,
             args.output,
             orientations=args.orientations,
             samples=args.samples,
             seed=args.seed,
-        )
-    except (ValueError, RuntimeError) as error:
-        parser.error(str(error))
+        ),
+    )
     print(json.dumps(report["evaluation"], indent=2))
     print(f"Calibration layer: {args.output}/magnetometer-calibration.json")
 

@@ -430,7 +430,9 @@ class RunHealth:
         self, completed: bool, exit_reason: str, dropped: Mapping[str, int]
     ) -> None:
         if not completed and exit_reason == "interrupted":
-            self._report("interrupted", WARNING, None, "run interrupted by the user")
+            self._report(
+                "interrupted", WARNING, None, "run interrupted (Ctrl-C or SIGTERM)"
+            )
         elif not completed and exit_reason not in USER_EXITS:
             self._report("incomplete", FAILED, None, f"run ended early ({exit_reason})")
         if self._commands:

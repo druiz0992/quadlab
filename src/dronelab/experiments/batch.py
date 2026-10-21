@@ -54,10 +54,15 @@ import math
 from pathlib import Path
 import subprocess
 import sys
+import threading
+import time
 import zlib
 from typing import Any
 
 import numpy as np
+
+from ..simulation.gazebo.process import parent_death_prefix
+from .interrupts import shielded
 
 DEFAULT_METRICS = (
     "control.tracking.position_m.rmse",
@@ -301,10 +306,16 @@ def execute(
     parallel: int = 1,
     runner: Callable[[list[str], Path], int] | None = None,
 ) -> list[dict[str, Any]]:
-    """Run every spec (``parallel`` at a time) and collect metrics."""
+    """Run every spec (``parallel`` at a time) and collect metrics.
+
+    On Ctrl-C or SIGTERM (``KeyboardInterrupt``) running children are
+    stopped gracefully and the interruption is re-raised; finished runs
+    keep their outputs.
+    """
     metrics = list(experiment.get("metrics") or DEFAULT_METRICS)
     output.mkdir(parents=True, exist_ok=True)
-    runner = runner or _subprocess_runner
+    children = ChildRuns()
+    runner = runner or children.run
 
     def one(spec: RunSpec) -> dict[str, Any]:
         run_dir = output / spec.name
@@ -324,12 +335,65 @@ def execute(
         )
 
     with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
-        return list(pool.map(one, runs))
+        try:
+            return list(pool.map(one, runs))
+        except KeyboardInterrupt:
+            # Leaving the pool waits for running workers, whose children
+            # would fly on to their full duration: stop them first.
+            pool.shutdown(wait=False, cancel_futures=True)
+            with shielded():
+                children.stop_all()
+            raise
 
 
-def _subprocess_runner(command: list[str], run_dir: Path) -> int:
-    with (run_dir / "batch.log").open("w") as log:
-        return subprocess.run(command, stdout=log, stderr=subprocess.STDOUT).returncode
+class ChildRuns:
+    """The batch's running ``dronelab`` processes (thread-safe).
+
+    Children start under ``parent_death_prefix`` so they get SIGTERM if the
+    batch dies; each turns SIGTERM into a graceful stop that saves its
+    results (see interrupts.py).
+    """
+
+    def __init__(self, stop_timeout_wall_s: float = 60.0) -> None:
+        self._lock = threading.Lock()
+        self._running: set[subprocess.Popen] = set()
+        self._stopping = False
+        self._stop_timeout_wall_s = stop_timeout_wall_s
+
+    def run(self, command: list[str], run_dir: Path) -> int:
+        """Run one child to completion; output to ``run_dir/batch.log``.
+        Raises RuntimeError once the batch is stopping."""
+        with (run_dir / "batch.log").open("w") as log:
+            with self._lock:
+                if self._stopping:
+                    raise RuntimeError("batch interrupted before this run started")
+                process = subprocess.Popen(
+                    [*parent_death_prefix(), *command],
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                )
+                self._running.add(process)
+            try:
+                return process.wait()
+            finally:
+                with self._lock:
+                    self._running.discard(process)
+
+    def stop_all(self) -> None:
+        """Start no more runs; SIGTERM running ones (they save results), and
+        kill any still running after ``stop_timeout_wall_s``."""
+        with self._lock:
+            self._stopping = True
+            running = list(self._running)
+        for process in running:
+            process.terminate()
+        deadline = time.monotonic() + self._stop_timeout_wall_s
+        for process in running:
+            try:
+                process.wait(timeout=max(0.0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
 
 
 def load_experiment(path: str | Path) -> dict[str, Any]:

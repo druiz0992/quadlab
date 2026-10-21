@@ -1,9 +1,9 @@
 """Command-line options for Gazebo experiments and world editing."""
 
 import argparse
-import sys
 
 from ..experiments.gazebo import GazeboConfig, run
+from .common import run_reporting_errors
 
 
 def main():
@@ -72,15 +72,8 @@ def main():
     args = parser.parse_args()
     if args.duration is None:
         args.duration = 3600.0 if args.keyboard else 20.0
-    try:
-        run(GazeboConfig(**vars(args)))
-    except ValueError as error:
-        # Invalid options or configuration: show usage.
-        parser.error(str(error))
-    except RuntimeError as error:
-        # A failed run, not a usage problem; results were reported above.
-        print(f"{parser.prog}: error: {error}", file=sys.stderr)
-        sys.exit(1)
+    # A failed run's results and health were reported above (see common.py).
+    run_reporting_errors(parser, lambda: run(GazeboConfig(**vars(args))))
 
 
 if __name__ == "__main__":
