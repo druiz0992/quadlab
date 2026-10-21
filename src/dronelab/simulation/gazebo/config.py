@@ -605,6 +605,10 @@ DEFAULTS: dict[str, Any] = {
         "gyro_bias_walk": 0.0001,
         "gps_std_m": [0.5, 0.5, 0.8],
         "gps_gate_squared": 25.0,
+        # First time-aligned GPS fix sets the position (and its covariance).
+        "initialize_position_from_gps": True,
+        # GPS covariance from the fix's own GpsStatus accuracies when present.
+        "use_receiver_gps_accuracy": True,
         "reorder_capacity": 4096,
         "max_sensor_lag_sim_s": 1.0,
         "sensor_watchdog_wall_s": 5.0,

@@ -44,7 +44,9 @@ def test_reordering_and_intermediate_gps_without_truth():
         assert [sample.sim_time_ns for sample in samples] == sorted(
             sample.sim_time_ns for sample in samples
         )
-        assert live.node.ekf.accepted_gps == 3
+        # The first fix initializes the position; the other three correct.
+        assert live.node.position_initialized_ns is not None
+        assert live.node.ekf.accepted_gps == 3 - 1
         assert live.node.rejected_gps_timing == 0
         np.testing.assert_allclose(samples[-1].payload.position_m, 0, atol=1e-10)
         assert "no simulator truth" in live.summary()["initialization"]
@@ -122,11 +124,10 @@ def test_stale_queue_receipt_is_not_treated_as_fresh():
 
 def test_modeled_gps_outage_keeps_imu_prediction_and_recovers_without_sequence_gap():
     now = [0.0]
-    live = LiveEkf(
-        load_drone_config().data,
-        GpsReading(40, -3, 650),
-        monotonic=lambda: now[0],
-    )
+    settings = load_drone_config().data
+    # Compares covariance growth with the declared prior: no fix replaces it.
+    settings["ekf"]["initialize_position_from_gps"] = False
+    live = LiveEkf(settings, GpsReading(40, -3, 650), monotonic=lambda: now[0])
     reader = live.estimates.subscribe(capacity=4096)
     initial_covariance = None
     try:

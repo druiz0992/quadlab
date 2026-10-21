@@ -47,7 +47,18 @@ None of the numerical modules depend on Gazebo transport or Rerun.
   (m/s²)/√s and `gyro_bias_walk` in (rad/s)/√s; bias-walk increments have
   variance `walk² · dt` at interval ends.
 - **Initialization:** position, velocity, normalized attitude, bias priors,
-  and a positive-definite covariance, all supplied explicitly.
+  and a positive-definite covariance, all supplied explicitly. By default
+  (`initialize_position_from_gps`) the first time-aligned GPS fix then
+  replaces the position prior: position = antenna fix minus the lever arm,
+  position covariance = that fix's covariance, cross-covariances cleared.
+  It counts as an initialization, not a correction (`gps_updates` and the
+  innovations start with the second fix).
+- **GPS covariance:** by default (`use_receiver_gps_accuracy`) each fix uses
+  the receiver's own 1-σ estimates from its `GpsStatus` (horizontal for
+  east/north, vertical for up, uncorrelated); fixes without valid ones fall
+  back to `gps_std_m`. The default receiver reports 1.35 m horizontal
+  (HDOP 0.9 × UERE 1.5 m) even though the default simulated GPS is
+  error-free, so the filter then weights GPS conservatively.
 
 The right attitude error follows the error-state approach of
 [Solà, Quaternion kinematics for the error-state Kalman filter](https://arxiv.org/abs/1711.02508).
@@ -165,11 +176,19 @@ The `ekf` section of the drone JSON (all defaults listed in
 
 - Position/velocity priors are local ENU at the world's geodetic origin;
   attitude is body-to-ENU roll/pitch/yaw in degrees; bias priors are body
-  axes. The default position prior is zero, not the true spawn; GPS corrects it.
+  axes. The default position prior is zero, not the true spawn; with
+  `initialize_position_from_gps` (default) the first fix replaces it.
 - Initial uncertainties are scalar standard deviations per axis (attitude in
   degrees), squared into the covariance.
-- `gps_std_m` gives three positive ENU standard deviations;
-  `gps_gate_squared` is the squared Mahalanobis threshold.
+- `gps_std_m` gives three positive ENU standard deviations (used for fixes
+  without valid receiver accuracies, or for all fixes with
+  `use_receiver_gps_accuracy: false`); `gps_gate_squared` is the squared
+  Mahalanobis threshold.
+- *Migration (2026-10-22):* set `initialize_position_from_gps` and
+  `use_receiver_gps_accuracy` to false to reproduce earlier EKF results.
+  On `step_wind_seeds` the change lowered attitude RMSE from 2.23° to
+  2.05° and mean NEES from 137 to 110; GPS NIS fell from 0.27 to 0.18
+  (more conservative GPS weighting); the batch baseline was re-saved.
 - `reorder_capacity` bounds pending samples (default 4096);
   `max_sensor_lag_sim_s` limits source-time separation (default 1 s, keep it
   above a GPS period); `sensor_watchdog_wall_s` catches stalled streams

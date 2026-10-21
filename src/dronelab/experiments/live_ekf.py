@@ -69,6 +69,8 @@ class LiveEkf:
             ).as_quat(),
             gps_position_body_m=gps["mount"]["position_m"],
             allow_intermediate_gps=True,
+            initialize_from_gps=self.settings["initialize_position_from_gps"],
+            use_receiver_accuracy=self.settings["use_receiver_gps_accuracy"],
         )
         self.estimates = self.node.estimates
         self.sensors = {

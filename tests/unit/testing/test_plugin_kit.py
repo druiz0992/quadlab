@@ -26,7 +26,8 @@ def test_templates_and_builtins_pass():
     assert template.debug_entries == 100  # one gps_error entry per fix
     ekf_options = dict(load_drone_config().data["ekf"], initial_position_m=[0, 0, 1])
     ekf = check_estimator(GpsImuEkfEstimator, ekf_options)
-    assert ekf.innovations == 100 and ekf.final_position_error_m < 0.1
+    # 100 fixes: the first initializes the position, 99 correct.
+    assert ekf.innovations == 99 and ekf.final_position_error_m < 0.1
     for factory in (TemplateController, ManualRotorController):
         report = check_controller(factory)
         assert report.total_thrust_n == pytest.approx(report.weight_n, rel=0.01)

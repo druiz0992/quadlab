@@ -98,6 +98,8 @@ class GpsImuEkfEstimator:
             imu_quaternion_body_xyzw=imu.mount_quaternion_xyzw,
             gps_position_body_m=gps.mount_position_m,
             allow_intermediate_gps=True,
+            initialize_from_gps=options["initialize_position_from_gps"],
+            use_receiver_accuracy=options["use_receiver_gps_accuracy"],
         )
         self._estimates = self.node.estimates.subscribe(
             capacity=1, overflow="drop_oldest"
@@ -148,6 +150,17 @@ class GpsImuEkfEstimator:
             gps_updates=ekf.accepted_gps,
             gps_outliers=ekf.rejected_gps,
             rejected_gps_timing=self.node.rejected_gps_timing,
-            initialization="declared ekf priors; no simulator truth",
+            initialization=(
+                "position from the first GPS fix; other states from declared "
+                "ekf priors; no simulator truth"
+                if self.node.initialize_from_gps
+                else "declared ekf priors; no simulator truth"
+            ),
+            position_initialized_from_gps_s=(
+                None
+                if self.node.position_initialized_ns is None
+                else self.node.position_initialized_ns * 1e-9
+            ),
+            receiver_covariance_fixes=self.node.receiver_covariance_fixes,
             priors=self.priors,
         )

@@ -115,6 +115,28 @@ class GpsImuEkf:
         self.P = F @ self.P @ F.T + Q
         self.P = (self.P + self.P.T) / 2
 
+    def initialize_position(
+        self,
+        position_enu_m: ArrayLike,
+        measurement_covariance: ArrayLike,
+        *,
+        receiver_position_body_m: ArrayLike = (0, 0, 0),
+    ) -> None:
+        """Set the position from one GPS fix instead of correcting a prior.
+
+        Position becomes the antenna fix minus the lever arm (rotated by the
+        current attitude); its covariance block becomes the measurement
+        covariance and its cross-covariances are cleared, so the fix replaces
+        the declared initial position and ``initial_position_std_m``.
+        """
+        observation = readonly_array(position_enu_m, (3,))
+        lever = readonly_array(receiver_position_body_m, (3,))
+        noise = covariance(measurement_covariance, 3)
+        self.position = observation - self.rotation.as_matrix() @ lever
+        self.P[:3, :] = 0.0
+        self.P[:, :3] = 0.0
+        self.P[:3, :3] = noise
+
     def correct_gps(
         self,
         position_enu_m: ArrayLike,

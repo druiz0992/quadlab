@@ -33,6 +33,13 @@ class GpsImuEkfNode:
     With allow_intermediate_gps, a newer GPS timestamp advances prediction
     using the previous IMU sample. Other timing mismatches are counted/rejected;
     timestamps are never changed. There is no rewind/repropagation.
+
+    With ``initialize_from_gps`` the first time-aligned fix sets the position
+    (``GpsImuEkf.initialize_position``) instead of correcting the declared
+    prior. With ``use_receiver_accuracy`` a fix's covariance is the
+    receiver's own 1-σ estimate (``GpsStatus`` horizontal and vertical
+    accuracy, assumed uncorrelated) when the fix carries valid ones, else
+    ``gps_covariance_m2``.
     """
 
     def __init__(
@@ -46,6 +53,8 @@ class GpsImuEkfNode:
         gps_position_body_m: ArrayLike = (0, 0, 0),
         epoch: int = 0,
         allow_intermediate_gps: bool = False,
+        initialize_from_gps: bool = False,
+        use_receiver_accuracy: bool = False,
     ) -> None:
         if np.any(readonly_array(imu_position_body_m, (3,)) != 0):
             raise ValueError(
@@ -77,6 +86,10 @@ class GpsImuEkfNode:
         self._lock = threading.RLock()
         self._epoch = epoch
         self.allow_intermediate_gps = allow_intermediate_gps
+        self.initialize_from_gps = initialize_from_gps
+        self.use_receiver_accuracy = use_receiver_accuracy
+        self.position_initialized_ns: int | None = None
+        self.receiver_covariance_fixes = 0
         # A non-None state time implies that a previous IMU sample exists.
         self._time: int | None = None
         self._previous_imu: ImuValues | None = None
@@ -156,11 +169,18 @@ class GpsImuEkfNode:
             if self._time is None or sample.sim_time_ns != self._time:
                 self.rejected_gps_timing += 1
                 return False
-            accepted = self.ekf.correct_gps(
-                gps_to_enu(sample.payload, self.reference),
-                self.gps_covariance,
-                receiver_position_body_m=self.gps_position,
-            )
+            position = gps_to_enu(sample.payload, self.reference)
+            noise = self._fix_covariance(sample.payload)
+            if self.initialize_from_gps and self.position_initialized_ns is None:
+                self.ekf.initialize_position(
+                    position, noise, receiver_position_body_m=self.gps_position
+                )
+                self.position_initialized_ns = sample.sim_time_ns
+                accepted = True
+            else:
+                accepted = self.ekf.correct_gps(
+                    position, noise, receiver_position_body_m=self.gps_position
+                )
             if accepted:
                 self._publish(
                     sample,
@@ -171,6 +191,17 @@ class GpsImuEkfNode:
                     ),
                 )
             return accepted
+
+    def _fix_covariance(self, fix: GpsReading) -> NDArray[np.float64]:
+        """The receiver's own covariance for this fix if enabled and valid
+        (finite, positive accuracies), else the configured one."""
+        status = fix.status
+        if self.use_receiver_accuracy and status is not None:
+            h, v = status.horizontal_accuracy_m, status.vertical_accuracy_m
+            if np.isfinite([h, v]).all() and h > 0 and v > 0:
+                self.receiver_covariance_fixes += 1
+                return np.diag([h * h, h * h, v * v])
+        return self.gps_covariance
 
     def _publish(
         self,
