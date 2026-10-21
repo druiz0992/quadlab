@@ -20,6 +20,7 @@ from .vehicle_forces import ExternalForces
 from .keyboard_flight import keyboard_effects
 from .mission_loop import MissionLoop, MissionParts
 from ..simulation.gazebo.stepping import TrackedNode
+from ..simulation.gazebo.plugins import lockstep_barrier
 from ..simulation.gazebo.ingress import (
     LockstepOrderer,
     MessageIngress,
@@ -87,21 +88,14 @@ def _step_ns(settings: dict) -> int:
 def _scheduled_periods_ns(settings: dict, pipeline: SensorPipeline) -> dict[str, float]:
     """Sample period (ns) of every transported stream with a fixed schedule.
 
-    Poses (throttled by wall time) and contacts (only while touching) have
-    none. Gazebo publishes rotor joint states every physics step.
+    Poses (throttled by wall time), contacts (only while touching), and
+    rendered sensors (frames shift with rendering speed) have none. Gazebo
+    publishes rotor joint states every physics step.
     """
     sensors = settings["sensors"]
     periods = {
         kind: 1e9 / sensors[kind]["rate_hz"]
-        for kind in (
-            "imu",
-            "gps",
-            "baro",
-            "magnetometer",
-            "rangefinder",
-            "camera",
-            "lidar",
-        )
+        for kind in ("imu", "gps", "baro", "magnetometer")
         if sensors[kind]["enabled"]
     }
     if pipeline.esc_telemetry.enabled:
@@ -139,6 +133,7 @@ def _run(args, keyboard, command_source):
         keyboard.pilot_rates = settings["pilot"]
     mode = validate_run(args, settings, command_source is not None)
     rotor_mode, lockstep = mode.rotor_mode, mode.lockstep
+    barrier = lockstep_barrier(settings)
     prepared = prepare_world(args, config, rotor_mode)
     true_config, randomization_draws = (
         prepared.true_config,
@@ -171,6 +166,26 @@ def _run(args, keyboard, command_source):
         raise ValueError(
             f"{error}. Install .[gazebo] and source the Gazebo/ROS environment."
         )
+
+    # Reject mode conflicts before the recorder exists: it opens the Rerun viewer.
+    powertrain = Powertrain(
+        config.properties,
+        settings["battery"],
+        settings["aerodynamics"]["ground_effect"],
+        settings["motors"]["faults"],
+        overridable=bool(args.keyboard),
+        aerodynamics=settings["aerodynamics"],
+        terrain=terrain,
+        ambient_c=settings["environment"]["ambient_temperature_c"],
+        forward_figure_of_merit=settings["motors"]["forward_figure_of_merit"],
+    )
+    if powertrain.enabled and not rotor_mode:
+        raise ValueError(
+            "battery, ground effect, motor faults, translational lift, and vortex "
+            "ring state require rotor-thrust or keyboard mode"
+        )
+    if settings["fixed_wing"]["enabled"] and not rotor_mode:
+        raise ValueError("fixed_wing needs rotor-thrust mode")
 
     live_ekf = None
     estimate_reader = None
@@ -223,22 +238,6 @@ def _run(args, keyboard, command_source):
         or (args.keyboard and settings["wind"]["enabled"])
         else None
     )
-    powertrain = Powertrain(
-        config.properties,
-        settings["battery"],
-        settings["aerodynamics"]["ground_effect"],
-        settings["motors"]["faults"],
-        overridable=bool(args.keyboard),
-        aerodynamics=settings["aerodynamics"],
-        terrain=terrain,
-        ambient_c=settings["environment"]["ambient_temperature_c"],
-        forward_figure_of_merit=settings["motors"]["forward_figure_of_merit"],
-    )
-    if powertrain.enabled and not rotor_mode:
-        raise ValueError(
-            "battery, ground effect, motor faults, translational lift, and vortex "
-            "ring state require rotor-thrust or keyboard mode"
-        )
     esc_settings = settings["motors"]["esc"]
     esc = EscModel(
         esc_settings,
@@ -277,8 +276,6 @@ def _run(args, keyboard, command_source):
         if scene.get("moving_obstacles") or keyboard is not None
         else None
     )
-    if settings["fixed_wing"]["enabled"] and not rotor_mode:
-        raise ValueError("fixed_wing needs rotor-thrust mode")
     body_force = None
     if ExternalForces.needed(settings):
         from ..simulation.gazebo.body_drag import BodyForce
@@ -389,13 +386,15 @@ def _run(args, keyboard, command_source):
     ingress.subscribe(node, subscriptions(sensors, pipeline.esc_telemetry.enabled))
     command = gz_sim_command(
         world,
-        lockstep=lockstep,
+        paused=lockstep,
         headless=args.headless,
         render_sensors=config.render_sensors,
     )
     orderer = (
         LockstepOrderer(
-            ingress, _scheduled_periods_ns(settings, pipeline), _step_ns(settings)
+            ingress,
+            _scheduled_periods_ns(settings, pipeline),
+            _step_ns(settings),
         )
         if lockstep
         else None
@@ -409,6 +408,7 @@ def _run(args, keyboard, command_source):
             output=output,
             rotor_mode=rotor_mode,
             lockstep=lockstep,
+            barrier=barrier,
             keyboard=keyboard,
             command_source=command_source,
             recorder=recorder,

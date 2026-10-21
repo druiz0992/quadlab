@@ -164,3 +164,58 @@ def _run(
     metrics = dict(estimation=evaluation.summary()["estimation"])
     (output / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
     return counts
+
+
+# Comparing estimators on one recording ------------------------------------------
+
+COMPARISON_METRICS = (
+    "errors.position_m.rmse",
+    "errors.horizontal_m.rmse",
+    "errors.vertical_m.rmse",
+    "errors.velocity_mps.rmse",
+    "errors.attitude_deg.rmse",
+    "errors.yaw_deg.rmse",
+    "nees.mean",
+)
+
+
+def estimator_label(spec: str, taken: set[str]) -> str:
+    """Directory/column name for an estimator spec (unique within ``taken``)."""
+    base = spec.rpartition(":")[2] or spec
+    label, index = base, 2
+    while label in taken:
+        label, index = f"{base}-{index}", index + 1
+    taken.add(label)
+    return label
+
+
+def compare_estimators(
+    log_path: str | Path,
+    output: str | Path,
+    estimators: list[str],
+    overrides: Mapping[str, Any] | None = None,
+) -> str:
+    """Replay each estimator into ``output/<label>``; write ``comparison.md``.
+
+    Lower errors are marked best; NEES is shown unmarked (consistent means
+    equal to its degrees of freedom, not minimal). Returns the table.
+    """
+    from .batch import lookup
+    from .comparison import comparison_markdown, stats
+
+    output = Path(output)
+    if output.exists() and any(output.iterdir()):
+        raise ValueError(f"{output} is not empty; use a fresh replay output")
+    columns: dict[str, dict[str, Any]] = {}
+    taken: set[str] = set()
+    for spec in estimators:
+        label = estimator_label(spec, taken)
+        settings = dict(overrides or {}, **{"algorithms.estimator": spec})
+        replay(log_path, output / label, settings)
+        metrics = json.loads((output / label / "metrics.json").read_text())
+        estimation = metrics["estimation"] or {}
+        columns[label] = {m: stats([lookup(estimation, m)]) for m in COMPARISON_METRICS}
+    directions = {m: "increase" for m in COMPARISON_METRICS if m.startswith("errors.")}
+    table = comparison_markdown(columns, COMPARISON_METRICS, directions)
+    (output / "comparison.md").write_text(table)
+    return table

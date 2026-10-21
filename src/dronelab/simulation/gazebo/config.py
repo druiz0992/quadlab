@@ -748,6 +748,9 @@ DEFAULTS = {
         # Python advances a paused Gazebo per odometry period; see
         # simulation/gazebo/stepping.py.
         "lockstep": False,
+        # How Gazebo waits for Python in lockstep: auto | plugin | service;
+        # see simulation/gazebo/plugins.py.
+        "lockstep_barrier": "auto",
         "spawn_position_m": [0.0, 0.0, 1.0],
         # Rest on the ground at spawn x, y (z ignored) and take off automatically.
         "start_on_ground": False,
@@ -1532,6 +1535,10 @@ def load_drone_config(paths: ConfigPaths = None, *, render_sensors: bool = False
     HealthThresholds.from_settings(data["health"])
     algorithms = data["algorithms"]
     from ...experiments.replay_log import RECORD_MODES
+    from .plugins import BARRIERS
+
+    if data["simulation"]["lockstep_barrier"] not in BARRIERS:
+        raise ValueError(f"simulation.lockstep_barrier must be one of {BARRIERS}")
 
     if algorithms["record_bus"] not in RECORD_MODES:
         raise ValueError(f"algorithms.record_bus must be one of {RECORD_MODES}")

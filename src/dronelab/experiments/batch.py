@@ -365,3 +365,30 @@ def resolved_seed_paths(experiment: Mapping[str, Any]) -> list[str]:
     layers = list(experiment.get("drone", []))
     data = deepcopy(load_drone_config(layers).data)
     return seed_keys(data)
+
+
+def batch_comparison(
+    table: Mapping[str, Mapping[str, Any]],
+    metric_paths: Sequence[str],
+    tolerances: Mapping[str, Mapping[str, Any]],
+) -> str:
+    """``comparison.md``: groups side by side (see experiments/comparison.py).
+
+    Best values are marked using each metric's tolerance ``direction``.
+    """
+    from .comparison import comparison_markdown
+
+    default = tolerances.get("default", {}).get("direction")
+    directions = {
+        m: tolerances.get(m, {}).get("direction", default) for m in metric_paths
+    }
+    columns = {
+        group: {m: s for m, s in metrics.items() if m != "excluded_runs"}
+        for group, metrics in table.items()
+    }
+    notes = {
+        group: f"excluded (health failed): {', '.join(metrics['excluded_runs'])}"
+        for group, metrics in table.items()
+        if metrics.get("excluded_runs")
+    }
+    return comparison_markdown(columns, metric_paths, directions, notes)

@@ -1,0 +1,29 @@
+{
+  "name": "controllers_square",
+  "scene": "worlds/training.json",
+  "drone": [
+    "configs/vehicles/randomized.json",
+    "configs/missions/square.json",
+    "configs/control/lockstep.json"
+  ],
+  "control_mode": "rotor-thrust",
+  "duration_s": 45,
+  "seeds": [1, 2, 3],
+  "parameters": {
+    "algorithms.controller": ["", "dronelab.control.template:TemplateController"]
+  },
+  "metrics": [
+    "control.tracking.position_m.rmse",
+    "control.tracking.position_m.max",
+    "control.max_tilt_deg",
+    "control.effort.rms_thrust_deviation_n",
+    "control.effort.mean_rotor_slew_n_per_s",
+    "control.saturated_fraction",
+    "summary.completed"
+  ],
+  "tolerances": {
+    "default": {"relative": 0.05, "absolute": 1e-3, "direction": "increase"},
+    "summary.completed": {"direction": "decrease"}
+  },
+  "parallel": 3
+}

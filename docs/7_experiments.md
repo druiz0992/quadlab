@@ -127,6 +127,51 @@ filter's prior.
 `--ekf` keeps the older live-EKF path ([5 Estimation](5_estimation.md)); it
 cannot be combined with `algorithms.estimator`.
 
+### Writing a plug-in: templates and the contract test kit
+
+Start from a template; both are short and commented, and pass the kit:
+
+| Template | Selects with | What it does |
+| --- | --- | --- |
+| `estimation/template.py` | `dronelab.estimation.template:TemplateEstimator` | Complementary filter: gyro-integrated attitude pulled towards the accelerometer's gravity direction, GPS-blended position and velocity; fixed reported covariance (NEES not meaningful); logs `template/gps_error` |
+| `control/template.py` | `dronelab.control.template:TemplateController` | Cascaded PD: position → tilt-limited acceleration → desired attitude (geometric attitude error, Lee et al. 2010) → torque → pseudo-inverse allocation over the lift rotors |
+
+Both reject unknown option keys. Verified in lockstep on the training
+square (two laps, 45 s): the template controller tracked with 0.148 m
+RMSE (built-in 0.101 m), peak tilt 8.7°, health `ok`; the template
+estimator, as observer on the same flight, had 1.4 cm position and 1.4°
+attitude RMSE.
+
+`dronelab.testing.plugins` checks a plug-in's contract without Gazebo, in
+a unit test:
+
+```python
+from dronelab.testing.plugins import check_controller, check_estimator
+
+def test_my_filter():
+    report = check_estimator(MyFilter, {"gain": 2.0})
+    assert report.final_position_error_m < 0.5
+
+def test_my_controller():
+    check_controller(MyController, {})
+```
+
+- **`check_estimator`** feeds a seeded synthetic hover (IMU 200 Hz, GPS
+  10 Hz, small white noise) and checks: known `inputs`; estimates that are
+  `Sample[EstimatedState]`, never ahead of the newest sample and never
+  going back in time; finite values, unit quaternion, symmetric positive
+  semi-definite covariance; valid innovations and `context.log` entries;
+  a JSON-serializable `summary()`; identical results on a second run.
+- **`check_controller`** runs the hover reference on the nominal vehicle
+  and checks: one finite, non-negative thrust per rotor, within the limit
+  unless `saturated` is set; total thrust within 10 % of the weight;
+  a valid `setpoint_m`; `allow_landing()`; identical results on a rerun.
+
+Failures raise `PluginContractError` (an `AssertionError`) with the reason;
+exceptions from the plug-in itself propagate unchanged. Passing means the
+plug-in fits the harness, not that it is good; judge that with Gazebo runs,
+`dronelab-replay`, and batches.
+
 ## Sensor bus and delivery timing (`sensor_timing`)
 
 `sensors/bus.py` turns each processed measurement into an immutable
@@ -333,6 +378,12 @@ dronelab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:
 dronelab-replay outputs/rec --output outputs/rec-tuned --set 'ekf.gps_std_m=[1,1,2]'
 ```
 
+Repeat `--estimator` to compare several on the same recording: each
+replays into `<output>/<class name>`, and `comparison.md` lists their
+estimation errors (lowest marked) and NEES. `--set` applies to all of
+them, so give estimator-specific options only when comparing one at a
+time.
+
 `dronelab-replay` (`experiments/replay.py`) builds the estimator from the
 recorded settings plus `--set` overrides (dotted keys, JSON values,
 validated like any config layer) and the recorded context, feeds it the
@@ -376,6 +427,17 @@ How runs are built and executed:
 - Runs are separate `dronelab` processes, `parallel` at a time, each with a
   fresh output directory (non-empty ones are refused) and a private Gazebo
   transport partition.
+
+`comparison.md` (also printed) puts the groups side by side, one row per
+metric with `mean ± std (n)`, marking the best group where the metric's
+tolerance `direction` is `increase` (lowest best) or `decrease` (highest
+best; ties are not marked), and listing excluded runs. Sweeping
+`algorithms.estimator` or `algorithms.controller` as a parameter therefore
+compares algorithms: `configs/experiments/controllers_square.json` flies
+the built-in and template controllers on three randomized vehicles each
+(52 s wall). Result: tracking RMSE 0.67 ± 0.08 m (built-in) against
+1.30 ± 0.20 m (template), peak tilt 8.5° against 9.8°, while the template
+commands smoother thrust (rotor slew 0.56 against 0.86 N/s).
 
 `batch-results.json` holds every run, with its health verdict and
 findings, and, per parameter group, the count, mean, standard deviation,

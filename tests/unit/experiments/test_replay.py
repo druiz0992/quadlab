@@ -212,3 +212,21 @@ def test_cli_override_parsing():
     }
     with pytest.raises(ValueError):
         parse_overrides(["novalue"])
+
+
+def test_compare_estimators_side_by_side(recorded, tmp_path):
+    from dronelab.experiments.replay import compare_estimators, estimator_label
+
+    taken = set()
+    assert estimator_label("a.b:Echo", taken) == "Echo"
+    assert estimator_label("other:Echo", taken) == "Echo-2"
+    table = compare_estimators(
+        recorded,
+        tmp_path / "cmp",
+        ["replay_echo:Echo", "replay_echo:Echo"],
+        {"algorithms.estimator_options": {"offset": 0.0}},
+    )
+    assert (tmp_path / "cmp" / "Echo" / "metrics.json").exists()
+    assert (tmp_path / "cmp" / "Echo-2" / "estimates.jsonl").exists()
+    assert "| Metric | Echo | Echo-2 |" in table
+    assert (tmp_path / "cmp" / "comparison.md").read_text() == table

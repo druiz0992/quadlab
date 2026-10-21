@@ -12,11 +12,6 @@ Controllers fly on simulator truth by default, or on an estimator's output
 when configured. Vehicles are simplified, plausible models, not calibrated
 hardware.
 
-*Renamed from QuadLab (2026-10-21): the package, commands (`dronelab`,
-`dronelab-batch`), Gazebo world name, topics (`/dronelab/...`), and test
-variables (`DRONELAB_TEST_*`) changed accordingly. Existing outputs, saved
-worlds, and scripts using the old names need updating.*
-
 Documentation (read in order): [1 Overview](docs/1_overview.md) ·
 [2 Simulation](docs/2_simulation.md) · [3 Configuration](docs/3_configuration.md) ·
 [4 Control](docs/4_control.md) · [5 Estimation](docs/5_estimation.md) ·
@@ -190,6 +185,10 @@ dronelab --headless --control-mode rotor-thrust --drone configs/control/lockstep
   --drone configs/algorithms/record_replay.json --duration 30 --output outputs/rec
 dronelab-replay outputs/rec --output outputs/rec-ekf
 dronelab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:MyFilter
+dronelab-replay outputs/rec --output outputs/rec-cmp --estimator gps_imu_ekf \
+  --estimator mypkg.filters:MyFilter            # side by side: comparison.md
+# Start new algorithms from estimation/template.py or control/template.py and
+# test them with dronelab.testing.plugins.check_estimator / check_controller
 
 # Magnetometer calibration (compass dance + throttle sweep in Gazebo), then fly with it
 dronelab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal
@@ -267,6 +266,22 @@ that log debug series add `algorithm-debug.jsonl`. Check
 the health verdict (`ok`/`warning`/`failed`, printed after the run),
 completion, message counts, and dropped counters in `summary.json` before
 trusting a dataset. Details: [2 Simulation](docs/2_simulation.md#run-artifacts).
+
+## Gazebo plugin (lockstep barrier)
+
+Lockstep runs are deterministic only if Gazebo reads each period's commands
+before stepping. The small `DronelabLockstep` system plugin guarantees it;
+build it once (cmake, g++, and the Gazebo development files from ROS Jazzy):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+dronelab-build-plugins          # → build/gazebo_plugins/libdronelab-lockstep.so
+```
+
+Lockstep runs use it automatically when built (`simulation.lockstep_barrier:
+auto`); without it they fall back to the control-service barrier, which can
+let dynamic wind or rendered-sensor runs diverge under load. See
+[2 Simulation](docs/2_simulation.md#lockstep-simulation).
 
 ## Tests
 

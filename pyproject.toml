@@ -20,6 +20,7 @@ dronelab-batch = "dronelab.cli.batch:main"
 dronelab-magcal = "dronelab.cli.magcal:main"
 dronelab-imucal = "dronelab.cli.imucal:main"
 dronelab-replay = "dronelab.cli.replay:main"
+dronelab-build-plugins = "dronelab.cli.build_plugins:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

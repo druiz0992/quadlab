@@ -132,3 +132,8 @@ a new numbered file if a topic truly needs one. Keep links relative and valid.
   the system interpreter: currently Python 3.12 from ROS Jazzy
   (`source /opt/ros/jazzy/setup.bash`).
 - RotorPy and Rerun are pinned in `pyproject.toml`; change pins deliberately.
+- `gazebo_plugins/` holds C++ gz-sim system plugins (currently the lockstep
+  barrier), built with `dronelab-build-plugins` into `build/` (never
+  committed). Python must keep working without them (fallback and a clear
+  error when one is required). Keep them small; numerical algorithms stay
+  in Python.

@@ -961,6 +961,7 @@
     "step_s": 0.002,
     "real_time_factor": 1.0,
     "lockstep": false,
+    "lockstep_barrier": "auto",
     "spawn_position_m": [
       0.0,
       0.0,

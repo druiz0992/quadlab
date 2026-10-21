@@ -52,6 +52,7 @@ src/dronelab/
 │                           #   magnetic anomalies, lidar returns
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
+│   ├── template.py         # Copyable template estimator (complementary filter)
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
 │   ├── imu_calibration.py  # Static IMU fit and calibration driver
 │   ├── dead_reckoning.py   # Retained IMU dead-reckoning baseline
@@ -64,6 +65,7 @@ src/dronelab/
 │                           #   verdict (health.py)
 ├── control/
 │   ├── interface.py        # RotorController plug-in contract, ControlState
+│   ├── template.py         # Copyable template controller (cascaded PD)
 │   ├── references.py       # Mission reference trajectories (analytic derivatives)
 │   ├── waypoint.py         # Waypoint → body-velocity feedback (native mode)
 │   ├── manual.py           # Position and attitude loops → four rotor thrusts
@@ -90,6 +92,8 @@ src/dronelab/
 │       ├── sdf.py          # XML-building helpers
 │       ├── environment.py  # Child-process library environment (Snap fix)
 │       ├── ingress.py      # Topic subscriptions into one bounded, counted queue; gz command
+│       ├── stepping.py     # Lockstep stepping, start-up subscriber barrier
+│       ├── plugins.py      # DroneLab Gazebo plugins: location, build, barrier choice
 │       └── messages.py     # Gazebo timestamp/vector adapters
 ├── experiments/
 │   ├── gazebo.py           # Compose a Gazebo mission (run entry point, wiring)
@@ -103,6 +107,7 @@ src/dronelab/
 │   ├── replay_log.py       # Record bus deliveries and truth (replay.jsonl)
 │   ├── replay.py           # Offline estimator replay and scoring (dronelab-replay)
 │   ├── algorithm_debug.py  # Plug-in debug channel (algorithm-debug.jsonl, Rerun)
+│   ├── comparison.py       # Side-by-side metric tables (comparison.md)
 │   ├── rotor_loop.py       # Fixed-rate rotor-thrust control loop with latency
 │   ├── algorithms.py       # Plug-in loading, context, runner, estimate-driven state
 │   ├── mission.py          # Mission clock and reference sampling
@@ -112,12 +117,16 @@ src/dronelab/
 │   ├── imu_calibration.py  # Automated IMU calibration run (dronelab-imucal)
 │   ├── calibration_session.py  # Shared Gazebo pose/sensor session for calibrations
 │   └── live_ekf.py         # Bounded live IMU/GPS ordering and EKF composition
+├── testing/
+│   └── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo)
 └── visualization/
     ├── gazebo_rerun.py     # Gazebo-message-to-Rerun recording adapter
     ├── keyboard.py         # Tk keyboard window (key/focus state only)
     ├── live.py             # Matplotlib live drone view (retained)
     └── plotting.py         # Static flight plots (retained)
 
+gazebo_plugins/             # C++ gz-sim system plugins (lockstep barrier); built into
+                            #   build/gazebo_plugins by dronelab-build-plugins
 configs/                    # Layerable drone JSON configurations, by topic:
 ├── vehicles/               #   airframes: micro, racing_5in, 10in_4s, heavy_lift, battery_low
 │                           #   (quad_x.json lists every default)
@@ -162,11 +171,16 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
 
 ## Adding an algorithm
 
-Write an estimator or controller class following the plug-in contracts in
-[7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms), put it in
+Copy `estimation/template.py` or `control/template.py`, following the
+plug-in contracts in
+[7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms); put it in
 `estimation/<name>.py` or `control/<name>.py` (or any importable package)
-with tests in `tests/unit/<package>/`, and select it with
-`algorithms.estimator`/`algorithms.controller` as `package.module:Class`.
+with tests in `tests/unit/<package>/` that call
+`dronelab.testing.plugins.check_estimator`/`check_controller`, and select
+it with `algorithms.estimator`/`algorithms.controller` as
+`package.module:Class`. Develop estimators against recorded runs with
+`dronelab-replay` (several at once for a comparison table), then confirm
+in Gazebo and with batches.
 At the algorithm boundary use the bus samples (decoded measurements with
 explicit timestamps and frames) and the `AlgorithmContext`; never simulator
 messages, viewer state, or hidden truth.
@@ -203,11 +217,3 @@ protobuf. The `gz` executable and `gz.transport13`/`gz.msgs10` bindings are
 system prerequisites (ROS Jazzy, Python 3.12 here). The `dev` extra adds
 pytest and black.
 
-## History
-
-`dronelab`, `dronelab-gazebo`, and `python -m dronelab` all invoke `cli.gazebo`.
-The former fixed-step flight experiment (`experiments.flight`,
-`experiments.artifacts`, `cli.flight`, `--backend`), its NPZ/CSV artifacts,
-and the synthetic EKF demo were retired. Retained backend, plotting,
-synthetic-sensor, and dead-reckoning modules remain as tested library code
-without a maintained CLI.

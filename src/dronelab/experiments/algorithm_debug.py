@@ -46,7 +46,7 @@ class AlgorithmDebugLog:
         values: Sequence[float],
         labels: Sequence[str] | None = None,
     ) -> None:
-        values, labels = _validated(name, sim_time_ns, values, labels)
+        values, labels = validate_debug_entry(name, sim_time_ns, values, labels)
         if self._stream is None:
             self._stream = self._path.open("w")
         self._stream.write(
@@ -60,9 +60,10 @@ class AlgorithmDebugLog:
             self._rerun(name, sim_time_ns, values, labels)
 
 
-def _validated(
+def validate_debug_entry(
     name: Any, sim_time_ns: Any, values: Any, labels: Any
 ) -> tuple[list[float], list[str]]:
+    """Checked values and labels of one entry; ValueError if invalid."""
     if not isinstance(name, str) or not NAME_PATTERN.match(name):
         raise ValueError(f"Debug name {name!r}: use letters, digits, _ . / -")
     if isinstance(sim_time_ns, bool) or not isinstance(sim_time_ns, int):

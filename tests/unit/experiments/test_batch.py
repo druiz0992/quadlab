@@ -142,3 +142,41 @@ def test_failed_health_runs_are_excluded_from_aggregates(tmp_path):
         ]["count"]
         == 2
     )
+
+
+def test_comparison_markdown_marks_best_by_direction():
+    from dronelab.experiments.comparison import comparison_markdown, stats
+
+    columns = {
+        "ekf": {"err": stats([0.1, 0.3]), "nees": stats([15.0])},
+        "mine": {"err": stats([0.5]), "nees": stats([])},
+    }
+    table = comparison_markdown(
+        columns, ["err", "nees"], {"err": "increase"}, {"mine": "excluded: g00-s2"}
+    )
+    lines = table.splitlines()
+    assert lines[0] == "| Metric | ekf | mine |"
+    assert lines[2] == "| `err` | **0.2 ± 0.14 (2)** | 0.5 ± 0 (1) |"
+    assert lines[3] == "| `nees` | 15 ± 0 (1) | — |"  # no direction: unmarked
+    assert "mine: excluded: g00-s2" in table
+    tie = comparison_markdown(
+        {"a": {"x": stats([0.0])}, "b": {"x": stats([0.0])}}, ["x"], {"x": "increase"}
+    )
+    assert "**" not in tie
+
+
+def test_batch_comparison_uses_tolerance_directions(tmp_path):
+    from dronelab.experiments.batch import batch_comparison
+
+    runs = expand_runs(EXPERIMENT, [])
+    table = aggregate(
+        execute(EXPERIMENT, runs, tmp_path, runner=fake_runner), EXPERIMENT["metrics"]
+    )
+    report = batch_comparison(
+        table,
+        EXPERIMENT["metrics"],
+        {"control.tracking.position_m.rmse": {"direction": "increase"}},
+    )
+    calm, windy = runs[0].group, runs[2].group
+    assert f"| Metric | {calm} | {windy} |" in report
+    assert "| `control.tracking.position_m.rmse` | **" in report  # calm group wins

@@ -91,8 +91,9 @@ document and update the status below.
 | Split the Gazebo mission loop (`experiments/gazebo.py`) into pipeline stages under the regression suite | Implemented ([2 Simulation](2_simulation.md#mission-lifecycle)); verified byte-identical lockstep outputs |
 | Lockstep determinism: command-topic start-up barrier, deterministic message order with duplicate removal, simulation-time thrust republishing; `no_liftoff` and `tracking_lost` health findings | Implemented ([2 Simulation](2_simulation.md#lockstep-simulation), [7 Experiments](7_experiments.md#run-health-verdict-health)) |
 | Offline estimator replay of recorded runs (`dronelab-replay`); plug-in debug channel (`context.log`) | Implemented ([7 Experiments](7_experiments.md#offline-replay)) |
-| Plug-in contract test kit and template; algorithm comparison report for batches; validated plug-in options | Proposed (next for algorithm development) |
-| Gazebo-side lockstep barrier (small gz-sim system plugin) so commands are guaranteed to be read before each step; today dynamic wind and rendered-sensor runs can diverge under load | Proposed, awaiting a decision on adding a C++ build step |
+| Plug-in contract test kit and templates; comparison reports for batches and multi-estimator replay | Implemented ([7 Experiments](7_experiments.md#writing-a-plug-in-templates-and-the-contract-test-kit)) |
+| Typed, validated plug-in options declared by each plug-in (templates reject unknown keys today) | Proposed |
+| Gazebo-side lockstep barrier (`DronelabLockstep` gz-sim plugin) so commands are read before each step | Implemented ([2 Simulation](2_simulation.md#lockstep-simulation)) |
 | Audit remaining Gazebo defaults (atmosphere, magnetic table, solver and contact settings) | Future (simulation robustness) |
 | Lockstep performance on large worlds (pose-message volume) | Future (simulation robustness) |
 | Gazebo process cleanup and hang detection | Future (simulation robustness) |

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import sys
 
-from ..experiments.replay import replay
+from ..experiments.replay import compare_estimators, replay
 
 
 def parse_overrides(items: list[str]) -> dict:
@@ -29,7 +29,11 @@ def main() -> None:
     parser.add_argument("run", help="Run directory or replay.jsonl file")
     parser.add_argument("--output", required=True, help="Fresh output directory")
     parser.add_argument(
-        "--estimator", help="Estimator: gps_imu_ekf or package.module:Class"
+        "--estimator",
+        action="append",
+        default=[],
+        help="Estimator: gps_imu_ekf or package.module:Class; repeat to compare "
+        "several on the same recording (comparison.md)",
     )
     parser.add_argument(
         "--set",
@@ -44,8 +48,12 @@ def main() -> None:
         log = log / "replay.jsonl"
     try:
         overrides = parse_overrides(args.set)
+        if len(args.estimator) > 1:
+            print(compare_estimators(log, args.output, args.estimator, overrides))
+            print(f"Comparison: {Path(args.output) / 'comparison.md'}")
+            return
         if args.estimator:
-            overrides["algorithms.estimator"] = args.estimator
+            overrides["algorithms.estimator"] = args.estimator[0]
         summary = replay(log, args.output, overrides)
     except (ValueError, OSError) as error:
         parser.error(str(error))

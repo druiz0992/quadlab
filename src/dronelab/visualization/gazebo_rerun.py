@@ -233,7 +233,7 @@ class GazeboRerunRecorder:
     }
 
     def _log_sensor_marker(self, name, pose):
-        """Labelled marker at a sensor mount; an arrow shows the sensor +x axis."""
+        """Marker at a sensor mount; an arrow shows the sensor +x axis."""
         rr = self.rr
         color, directional = self.SENSOR_STYLE[name]
         path = f"world/drone/sensors/{name}"
@@ -247,7 +247,7 @@ class GazeboRerunRecorder:
         )
         rr.log(
             f"{path}/marker",
-            rr.Points3D([[0, 0, 0]], radii=0.02, colors=[color], labels=[name]),
+            rr.Points3D([[0, 0, 0]], radii=0.02, colors=[color]),
             static=True,
         )
         if directional:

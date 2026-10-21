@@ -12,8 +12,8 @@ of each burst is the barrier. On an unloaded machine a motor command
 published just before a step request is applied in that step (identical
 trajectories with and without an added 5 ms delivery delay). Under heavy
 load it can arrive after the steps started: topics and the service use
-separate connections, so their order is not guaranteed (see
-docs/2_simulation.md, lockstep limitation). Gazebo still paces bursts by the world's
+separate connections, so their order is not guaranteed. The
+DronelabLockstep plugin barrier (``grant``, see plugins.py) fixes that. Gazebo still paces bursts by the world's
 real_time_factor; 0 runs them as fast as possible.
 
 The service reply is unreliable from Python: in a probe of 300 bursts, 22 %
@@ -46,6 +46,21 @@ class LockstepStepper:
 
     ``request`` is ``Node.request``-compatible and ``messages`` provides the
     WorldControl/Boolean types; both are injected so tests can use fakes.
+
+    With the DronelabLockstep plugin, ``grant(target_ns)`` is called before
+    each step request: it publishes the period's grant on the commands'
+    ordered transport connection, and the plugin holds the burst's first
+    step until the grant (hence every earlier command) has been read. The
+    world stays paused between bursts, so Gazebo keeps iterating and
+    rendered sensors keep publishing while Python waits for them.
+
+    A grant published just after the plugin's subscription appears can
+    still be lost (the subscriber socket finishes connecting a moment
+    later), so ``check_stalled`` re-publishes it every
+    ``regrant_after_s``; grants only grow, so that is harmless. In plugin
+    mode step requests are never re-sent (they add steps, and they have
+    always arrived; only replies are lost): a burst without its barrier
+    after ``plugin_stall_s`` raises RuntimeError.
     """
 
     def __init__(
@@ -58,7 +73,15 @@ class LockstepStepper:
         reply_timeout_ms: int = 10,
         resend_after_s: float = 2.0,
         monotonic: Callable[[], float] = time.monotonic,
+        grant: Callable[[int], None] | None = None,
+        regrant_after_s: float = 0.25,
+        plugin_stall_s: float = 10.0,
     ) -> None:
+        self._grant = grant
+        self._regrant_after_s = regrant_after_s
+        self._plugin_stall_s = plugin_stall_s
+        self._granted_at = 0.0
+        self.regrants = 0
         self._request = request
         self._messages = messages
         self.steps = steps
@@ -107,18 +130,38 @@ class LockstepStepper:
 
         Call while waiting for messages. Returns True when a burst was re-sent.
         """
-        if (
-            self._target_ns is None
-            or self._now() - self._sent_at < self._resend_after_s
-        ):
+        if self._target_ns is None:
+            return False
+        if self._grant is not None:
+            return self._regrant_if_due()
+        if self._now() - self._sent_at < self._resend_after_s:
             return False
         self.resends += 1
         self._send()
         return True
 
+    def _regrant_if_due(self) -> bool:
+        """Plugin mode: repeat the grant; fail on a burst that never ends."""
+        if self._now() - self._sent_at > self._plugin_stall_s:
+            raise RuntimeError(
+                f"Lockstep burst to {self._target_ns} ns did not finish within "
+                f"{self._plugin_stall_s:g} s (plugin barrier)"
+            )
+        if self._now() - self._granted_at < self._regrant_after_s:
+            return False
+        self.regrants += 1
+        self._publish_grant(self._target_ns)
+        return True
+
+    def _publish_grant(self, grant_ns: int) -> None:
+        self._grant(grant_ns)
+        self._granted_at = self._now()
+
     def _burst(self) -> None:
         self._target_ns += self._period_ns
         self.bursts += 1
+        if self._grant is not None:
+            self._publish_grant(self._target_ns)
         self._send()
 
     def _send(self) -> None:
@@ -138,8 +181,15 @@ class LockstepStepper:
         )
         return bool(ok and reply.data)
 
-    def summary(self) -> dict[str, int]:
+    def release(self) -> None:
+        """Lift the plugin barrier so the world can always exit."""
+        if self._grant is not None:
+            self._grant(RELEASE_NS)
+
+    def summary(self) -> dict[str, Any]:
         return dict(
+            barrier="service" if self._grant is None else "plugin",
+            regrants=self.regrants,
             bursts=self.bursts,
             steps_per_burst=self.steps,
             lost_replies=self.lost_replies,
@@ -195,3 +245,7 @@ def wait_for_subscribers(
                 f"{missing}"
             )
         sleep(poll_s)
+
+
+GRANT_TOPIC = "/dronelab/lockstep/grant"
+RELEASE_NS = 2**63 - 1

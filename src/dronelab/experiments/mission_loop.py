@@ -69,6 +69,7 @@ class MissionParts:
     output: Path
     rotor_mode: bool
     lockstep: bool
+    barrier: str | None
     keyboard: Any | None
     command_source: Any | None
     recorder: Any
@@ -117,14 +118,36 @@ class RunFiles:
     wind: TextIO | None
 
 
-def lockstep_stepper(node: Any, settings: dict[str, Any]) -> Any:
-    """Stepper advancing the paused world one odometry period per burst."""
+def lockstep_stepper(node: Any, settings: dict[str, Any], barrier: str) -> Any:
+    """Stepper advancing the paused world one odometry period per burst.
+
+    Bursts are multi-step requests to the world control service. With the
+    ``plugin`` barrier each request is preceded by a grant on the
+    DronelabLockstep topic (advertised here, so the start-up barrier also
+    waits for the plugin's subscription).
+    """
     from types import SimpleNamespace
 
     from gz.msgs10.boolean_pb2 import Boolean
     from gz.msgs10.world_control_pb2 import WorldControl
 
-    from ..simulation.gazebo.stepping import LockstepStepper, steps_per_period
+    from ..simulation.gazebo.stepping import (
+        GRANT_TOPIC,
+        LockstepStepper,
+        steps_per_period,
+    )
+
+    grant = None
+    if barrier == "plugin":
+        from gz.msgs10.int64_pb2 import Int64
+
+        publisher = node.advertise(GRANT_TOPIC, Int64)
+
+        def publish_grant(sim_time_ns: int) -> None:
+            if not publisher.publish(Int64(data=sim_time_ns)):
+                raise RuntimeError("Unable to publish lockstep grant")
+
+        grant = publish_grant
 
     period_s = 1 / settings["control"]["odometry_rate_hz"]
     return LockstepStepper(
@@ -132,6 +155,7 @@ def lockstep_stepper(node: Any, settings: dict[str, Any]) -> Any:
         SimpleNamespace(WorldControl=WorldControl, Boolean=Boolean),
         steps=steps_per_period(period_s, settings["simulation"]["step_s"]),
         period_ns=round(period_s * 1e9),
+        grant=grant,
     )
 
 
@@ -235,12 +259,12 @@ class MissionLoop:
             )
             self.rotor = RotorMission(self._rotor_parts())
         if parts.lockstep:
+            self.stepper = lockstep_stepper(parts.node, settings, parts.barrier)
             # Commands published before Gazebo subscribes are lost: connect
-            # every command topic before the first step.
+            # every command topic (and the plugin's grant topic) first.
             wait_for_subscribers(
                 parts.node.publishers, timeout_s=STARTUP_TIMEOUT_WALL_S
             )
-            self.stepper = lockstep_stepper(parts.node, settings)
             self.stepper.start()
 
     def _rotor_parts(self) -> RotorMissionParts:
@@ -286,6 +310,11 @@ class MissionLoop:
                 parts.publisher.publish(Twist())
         except Exception:
             pass
+        if self.stepper is not None:
+            try:
+                self.stepper.release()  # a held world must be free to exit
+            except Exception:
+                pass
         self.process.terminate()
         try:
             self.process.wait(timeout=10)

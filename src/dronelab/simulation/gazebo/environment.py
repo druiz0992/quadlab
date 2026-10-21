@@ -22,4 +22,9 @@ def gazebo_environment(environ=None):
                 env[key] = separator.join(paths)
             else:
                 env.pop(key)
+    # DroneLab's own system plugins (lockstep barrier).
+    from .plugins import plugin_dir
+
+    search = [p for p in env.get("GZ_SIM_SYSTEM_PLUGIN_PATH", "").split(":") if p]
+    env["GZ_SIM_SYSTEM_PLUGIN_PATH"] = ":".join(search + [str(plugin_dir())])
     return env

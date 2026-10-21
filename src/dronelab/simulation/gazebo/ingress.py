@@ -103,10 +103,10 @@ class MessageIngress:
 
 
 def gz_sim_command(
-    world: Path, *, lockstep: bool, headless: bool, render_sensors: bool
+    world: Path, *, paused: bool, headless: bool, render_sensors: bool
 ) -> list[str]:
-    """``gz sim`` command line; lockstep starts paused (Python steps it)."""
-    command = ["gz", "sim", "-v", "3"] if lockstep else ["gz", "sim", "-r", "-v", "3"]
+    """``gz sim`` command line; ``paused`` for service-stepped lockstep."""
+    command = ["gz", "sim", "-v", "3"] if paused else ["gz", "sim", "-r", "-v", "3"]
     if headless:
         command.append("-s")
         if render_sensors:
@@ -169,6 +169,14 @@ class LockstepOrderer:
     anyway and counted in ``barrier_timeouts`` (determinism is then not
     guaranteed for that period). ``get`` has the ``MessageIngress.get``
     contract.
+
+
+    Rendered streams (camera, lidar, GPU rangefinder) are not scheduled:
+    Gazebo renders them asynchronously and shifts or skips frames depending
+    on rendering speed, so their stamps cannot be predicted (measured: a
+    30 Hz camera at 464 ms instead of 468 ms) and waiting for them could
+    stall. They are ordered with everything else but their data is not
+    reproducible bit-for-bit.
     """
 
     def __init__(

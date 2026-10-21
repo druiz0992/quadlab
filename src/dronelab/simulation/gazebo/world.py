@@ -10,6 +10,7 @@ import numpy as np
 from .sdf import element, plugin, box
 from ..moving_obstacles import validate_moving_obstacle
 from ..terrain import Terrain, validate_terrain
+from .plugins import LOCKSTEP_FILENAME, LOCKSTEP_NAME, lockstep_barrier
 from .vehicle import add_payload, build_drone
 from .config import load_drone_config, wind_effects_enabled
 
@@ -144,6 +145,9 @@ def build_world(
     physics = element(world, "physics", name="fixed", type="ignored")
     element(physics, "max_step_size", config.data["simulation"]["step_s"])
     element(physics, "real_time_factor", config.data["simulation"]["real_time_factor"])
+    if lockstep_barrier(config.data) == "plugin":
+        # First system: its PreUpdate holds each step until Python grants it.
+        element(world, "plugin", filename=LOCKSTEP_FILENAME, name=LOCKSTEP_NAME)
     for library, system in [
         ("physics", "Physics"),
         ("user-commands", "UserCommands"),

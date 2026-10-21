@@ -125,19 +125,43 @@ with IMU vibration; battery, ESC, ground start and rotor aerodynamics on
 the square; sensor errors with magnetometer interference and the EKF on the
 circle; static wind; Python body drag.
 
-**Known limitation.** Commands reach Gazebo as topic messages and the step
-request as a service call on a separate connection, so under heavy load
-Gazebo can run a step before it has read that period's commands, which
-then take effect one period late. Seen with dynamically published wind
-(turbulence, gusts, schedules: 1 of 6 runs under full load) and with
-rendered sensors (camera, lidar), where every run diverged at a different
-time. Python cannot verify receipt; a Gazebo-side barrier (a small system
-plugin) would close this. Until then, keep regression comparisons of those
-configurations to unloaded machines and expect occasional divergence. `simulation.real_time_factor` caps the
-speed: 1 is no faster than real time (for watching live), 0 is as fast as
-possible (allowed only in lockstep). Measured speeds with 0: 3.5× real time
-for a 50 Hz hover mission; 0.83× for the racing preset at 250 Hz with a
-30 Hz FPV camera, where real-time mode intermittently flipped the vehicle.
+**Command barrier (`simulation.lockstep_barrier`).** Commands reach Gazebo
+as topic messages and step requests through the control service, a
+separate connection, so under heavy load Gazebo could start a burst before
+reading that period's commands, which then took effect one period late
+(seen with dynamic wind and with rendered sensors). The `DronelabLockstep`
+system plugin (`gazebo_plugins/lockstep/`, C++) closes this: before each
+step request Python publishes a grant (the period's end time) on the
+commands' own ordered connection, and the plugin, first in the world,
+holds the burst's first step until the grant, and so every earlier
+command, has been read. Paused iterations are never held, so rendered
+sensors keep publishing between bursts. Lost early grants are re-sent
+every 0.25 s (harmless: grants only grow); step requests are never
+re-sent in this mode, and a burst that does not finish within 10 s is an
+error.
+
+| `lockstep_barrier` | Behaviour |
+| --- | --- |
+| `auto` (default) | Plugin when built, else service |
+| `plugin` | Plugin; error if not built |
+| `service` | Control service only; commands can apply one period late under load, and a stalled burst is re-sent after 2 s, which can double-step |
+
+Build the plugin once with `dronelab-build-plugins` (needs cmake, a C++17
+compiler, and the Gazebo development files; output in
+`build/gazebo_plugins`, or set `DRONELAB_PLUGIN_DIR`).
+`DRONELAB_LOCKSTEP_DEBUG=1` makes the plugin report grants and holds in
+`gazebo.log`. `summary.json.lockstep.barrier` records the mode used.
+
+Verified under full CPU load with the plugin: turbulence (6 of 6 runs
+identical; 1 of 6 diverged with the service barrier) and the circuit with
+camera, 3D lidar, rangefinder, and rain (4 of 4 flights identical; every
+run diverged before).
+
+**Rendered sensors** (camera, lidar, GPU rangefinder) are rendered
+asynchronously, and Gazebo shifts or skips frames with rendering speed
+(a 30 Hz camera produced a frame at 464 ms instead of 468 ms), so their
+data is not reproducible bit-for-bit and the orderer does not wait for
+them. The flight stays deterministic as long as they do not feed control.
 
 Implementation notes, measured on gz-sim 8:
 
@@ -210,7 +234,7 @@ link-level rotations are not fully synchronized. Gazebo stays authoritative
 for geometry, rendering, and contacts. Close the Rerun viewer yourself.
 Replay with `rerun <output>/flight.rrd` using the `rerun` from the same venv.
 
-**Sensor indicators.** Each enabled sensor has a labelled, coloured marker at
+**Sensor indicators.** Each enabled sensor has a coloured marker (no text label) at
 its mount on the drone; directional sensors (camera, rangefinder, optical
 flow) also show an arrow along their +x axis, and the rangefinder draws its
 ray to the measured hit (hidden when out of range). The **Sensor status**

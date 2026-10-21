@@ -142,7 +142,7 @@ also recorded in the summary. A configuration cannot be applied to a saved
 | `wind` | Native wind velocity, force scale (drag coefficient), smoothing, gusts, random and scheduled changes, still-air drag, turbulence |
 | `battery` | LiPo pack: cells, capacity, internal resistance, initial charge, powertrain efficiency, avionics power (rotor-thrust mode) |
 | `aerodynamics` | Air density; ground effect, translational lift, vortex ring state (rotor-thrust mode); quadratic body drag (all modes) |
-| `simulation` | Physics step (s), real-time factor (0 = unlimited, lockstep only), lockstep, initial world position (m), start on ground |
+| `simulation` | Physics step (s), real-time factor (0 = unlimited, lockstep only), lockstep, lockstep command barrier (`auto` \| `plugin` \| `service`, [2 Simulation](2_simulation.md#lockstep-simulation)), initial world position (m), start on ground |
 
 ### Vehicle and motors
 

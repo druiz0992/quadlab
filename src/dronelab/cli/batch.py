@@ -8,6 +8,7 @@ import sys
 from ..experiments.batch import (
     aggregate,
     baseline_from,
+    batch_comparison,
     check_baseline,
     execute,
     expand_runs,
@@ -88,6 +89,9 @@ def main() -> None:
         print("Baseline check:", "FAILED" if failed_check else "passed")
         status = 1 if failed_check else status
     (output / "batch-results.json").write_text(json.dumps(report, indent=2) + "\n")
+    comparison = batch_comparison(table, metrics, experiment.get("tolerances", {}))
+    (output / "comparison.md").write_text(comparison)
+    print(comparison)
     for group, metrics_table in table.items():
         print(f"[{group}]")
         for metric, stats in metrics_table.items():
@@ -98,7 +102,7 @@ def main() -> None:
                 print(
                     f"  {metric}: mean {stats['mean']:.6g} ± {stats['std']:.3g} (n={stats['count']})"
                 )
-    print(f"Results: {output / 'batch-results.json'}")
+    print(f"Results: {output / 'batch-results.json'}, {output / 'comparison.md'}")
     sys.exit(status)
 
 

@@ -230,15 +230,26 @@ def test_esc_telemetry_matches_commanded_speeds(tmp_path, monkeypatch):
             "configs/missions/square.json",
             "configs/algorithms/ekf_observer.json",
         ],
+        # Python-published wind needs the DronelabLockstep plugin barrier.
+        ["configs/environment/turbulence.json", "configs/missions/step_x.json"],
     ],
-    ids=["ekf-step", "ground-battery-esc-errors"],
+    ids=["ekf-step", "ground-battery-esc-errors", "turbulence-plugin"],
 )
 def test_lockstep_runs_are_deterministic(tmp_path, layers):
+    from dronelab.simulation.gazebo.plugins import lockstep_plugin_available
+
+    if "turbulence" in layers[0] and not lockstep_plugin_available():
+        pytest.skip("needs the lockstep plugin (dronelab-build-plugins)")
     first = fly(tmp_path / "a", layers, 8)
     second = fly(tmp_path / "b", layers, 8)
+    compared = 0
     for name in ("telemetry.jsonl", "commands.jsonl", "estimates.jsonl"):
-        a = (tmp_path / "a" / "run" / name).read_text()
-        assert a and a == (tmp_path / "b" / "run" / name).read_text(), name
+        a, b = (tmp_path / side / "run" / name for side in ("a", "b"))
+        assert a.exists() == b.exists(), name
+        if a.exists():
+            assert a.read_text() and a.read_text() == b.read_text(), name
+            compared += 1
+    assert compared >= 2
     assert first["metrics"] == second["metrics"]
     assert first["health"] == second["health"]
 

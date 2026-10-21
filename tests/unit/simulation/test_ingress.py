@@ -49,9 +49,9 @@ def test_subscribe_failure_is_an_error(monkeypatch):
 def test_gz_sim_command():
     world = Path("/w/world.sdf")
     assert gz_sim_command(
-        world, lockstep=False, headless=False, render_sensors=False
+        world, paused=False, headless=False, render_sensors=False
     ) == ["gz", "sim", "-r", "-v", "3", "/w/world.sdf"]
-    assert gz_sim_command(world, lockstep=True, headless=True, render_sensors=True) == [
+    assert gz_sim_command(world, paused=True, headless=True, render_sensors=True) == [
         "gz",
         "sim",
         "-v",
