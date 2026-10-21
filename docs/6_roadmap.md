@@ -102,6 +102,16 @@ document and update the status below.
 | Allocation helpers exposing achieved wrench and residuals | Future |
 | Perception, planning (behavior → global → local), obstacle avoidance, RL | Future (placeholder packages) |
 | Spatial wind and calibrated aerodynamics | Future |
+| GPS receiver accuracy consistent with the configured GPS error model (default receiver reports 1.35 m while the default GPS is error-free, so the EKF under-weights GPS: NIS 0.18) | Proposed (review 2026-10-22; first priority) |
+| Lift-rotor thrust depending on axial inflow (climb, descent, forward flight), as pushers already do | Proposed (review 2026-10-22) |
+| Calibrated landing contacts (friction, restitution, contact softness) | Proposed (review 2026-10-22) |
+| Site-accurate magnetic declination and local gravity (Gazebo table gives 0° vs about +1°; project uses 9.81 vs about 9.80 m/s²) | Proposed (review 2026-10-22; gravity is a project convention) |
+| Pose ingress only for needed models (each poses message costs about 0.7 ms in Python) | Proposed (review 2026-10-22; see lockstep performance on large worlds) |
+| Batched telemetry/command JSONL writes (250 Hz loop still about 1.5 ms per odometry tick) | Proposed (review 2026-10-22) |
+| Typed `MissionParts` (about 40 `Any` fields hide the mission wiring from mypy) | Proposed (review 2026-10-22) |
+| Split `simulation/gazebo/config.py` (defaults, schema, validation per section) and the mission set-up in `experiments/gazebo.py` | Proposed (review 2026-10-22) |
+| Short "Sensors and noise assumptions" section for plug-in authors, and an optional per-sensor `datasheet` (`context.sensors[kind].datasheet`) with a covariance helper | Proposed (review 2026-10-22; datasheet is a schema addition, needs approval) |
+| Generated API reference for the plug-in contract (context, samples, protocols) | Proposed (review 2026-10-22) |
 
 ## Gazebo session
 
