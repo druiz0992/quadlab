@@ -97,6 +97,7 @@ class GazeboRerunRecorder:
         self.counts = Counter()
         self._time_s = 0.0
         self._scalars = ScalarBatch(self._send_scalars)
+        self._obstacle_poses: dict[str, tuple[float, ...]] = {}
         rr.init("dronelab_gazebo")
         sinks = [rr.FileSink(str(output / "flight.rrd"))]
         if not headless:
@@ -338,6 +339,7 @@ class GazeboRerunRecorder:
 
     def remove_obstacle(self, name):
         self.obstacle_names.discard(name)
+        self._obstacle_poses.pop(name, None)
         self.rr.log(f"world/obstacles/{name}", self.rr.Clear(recursive=True))
 
     def log_lidar_points(self, points_body, t, reflectivity=None):
@@ -479,13 +481,24 @@ class GazeboRerunRecorder:
                     )
                 if pose.name in self.obstacle_names:
                     q = pose.orientation
-                    rr.log(
-                        f"world/obstacles/{pose.name}",
-                        rr.Transform3D(
-                            translation=vector(pose.position),
-                            quaternion=[q.x, q.y, q.z, q.w],
-                        ),
+                    key = (
+                        pose.position.x,
+                        pose.position.y,
+                        pose.position.z,
+                        q.x,
+                        q.y,
+                        q.z,
+                        q.w,
                     )
+                    # Log a transform only when the obstacle moved.
+                    if self._obstacle_poses.get(pose.name) != key:
+                        self._obstacle_poses[pose.name] = key
+                        rr.log(
+                            f"world/obstacles/{pose.name}",
+                            rr.Transform3D(
+                                translation=key[:3], quaternion=list(key[3:])
+                            ),
+                        )
         elif kind == "odometry":
             p = vector(message.pose.position)
             q = message.pose.orientation

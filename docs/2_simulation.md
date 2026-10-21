@@ -302,9 +302,12 @@ sample. The ground is drawn as the 3D view's 1 m line grid rather than a
 logged 100 m box, so the initial camera frames the drone and nearby
 obstacles instead of the whole ground. Scalar time series are buffered and sent in batches covering 0.1 s
 of simulation time (every sample and timestamp is kept), so a live viewer
-shows them up to that much later than 3D poses. Rerun loads box visuals from the world at startup and tracks model
-poses; objects added or removed during flight, meshes, non-box shapes, and
-link-level rotations are not fully synchronized. Gazebo stays authoritative
+shows them up to that much later than 3D poses. Rerun loads box visuals from the world at startup and tracks the
+poses of non-static models (DroneLab subscribes to Gazebo's
+`dynamic_pose/info`, 6 entries per message on the training world instead
+of 26, so static models moved in the Gazebo GUI during flight are not
+followed); objects added or removed during flight, meshes, non-box shapes,
+and link-level rotations are not fully synchronized. Gazebo stays authoritative
 for geometry, rendering, and contacts. Close the Rerun viewer yourself.
 Replay with `rerun <output>/flight.rrd` using the `rerun` from the same venv.
 

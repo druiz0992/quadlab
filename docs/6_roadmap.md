@@ -107,7 +107,8 @@ document and update the status below.
 | Lift-rotor thrust depending on axial inflow (climb, descent, forward flight), as pushers already do | Proposed (review 2026-10-22) |
 | Calibrated landing contacts (friction, restitution, contact softness) | Proposed (review 2026-10-22) |
 | Site-accurate magnetic declination and local gravity (Gazebo table gives 0° vs about +1°; project uses 9.81 vs about 9.80 m/s²) | Proposed (review 2026-10-22; gravity is a project convention) |
-| Pose ingress only for needed models (each poses message costs about 0.7 ms in Python) | Proposed (review 2026-10-22; see lockstep performance on large worlds) |
+| Pose ingress only for needed models | Implemented: `dynamic_pose/info` (non-static models) and obstacle transforms logged only when they move; pose handling 1.33 → 0.79 ms per message on the tethered payload flight |
+| Deterministic contacts in lockstep (the `moving.json` collision diverges between identical runs from the contact on) | Proposed (found 2026-10-22) |
 | Batched telemetry/command JSONL writes (250 Hz loop still about 1.5 ms per odometry tick) | Proposed (review 2026-10-22) |
 | Typed `MissionParts` (about 40 `Any` fields hide the mission wiring from mypy) | Proposed (review 2026-10-22) |
 | Split `simulation/gazebo/config.py` (defaults, schema, validation per section) and the mission set-up in `experiments/gazebo.py` | Proposed (review 2026-10-22) |

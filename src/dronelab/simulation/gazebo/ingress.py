@@ -53,7 +53,11 @@ def subscriptions(
     """``(message type, topic, kind)`` for truth, enabled sensors, and ESCs."""
     topics = [
         ("odometry_pb2.Odometry", "/dronelab/odometry", "odometry"),
-        ("pose_v_pb2.Pose_V", "/world/dronelab/pose/info", "poses"),
+        # Non-static entities only (drone links, payload, moving and spawned
+        # obstacles): 6 entries per message on the training world instead
+        # of 26 on pose/info, at the same rate. Static models moved in the
+        # Gazebo GUI during flight are therefore not followed in Rerun.
+        ("pose_v_pb2.Pose_V", "/world/dronelab/dynamic_pose/info", "poses"),
     ]
     if esc_telemetry:
         topics.append(("model_pb2.Model", ROTOR_STATE_TOPIC, "esc"))
