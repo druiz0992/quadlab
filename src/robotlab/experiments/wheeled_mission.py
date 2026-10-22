@@ -59,6 +59,7 @@ from .mission_loop import (
 )
 from .replay_log import estimate_record
 from .run_summary import final_exit_reason
+from .schedule import next_due_ns
 
 # Wheel telemetry is written to wheels.jsonl at most at this rate (Hz).
 WHEEL_LOG_RATE_HZ = 50.0
@@ -439,13 +440,19 @@ class WheeledMissionLoop:
         if self._next_encoder_ns is not None and stamp < self._next_encoder_ns:
             return
         model = self.parts.model
+        rows = model.rows(0)  # the ego's wheels (opponents follow)
         self._encoder = self.parts.encoders.read(
             stamp,
-            model.wheel_angle_rad,
-            model.wheel_speed_rad_s,
-            model.actuators.steer_rad,
+            model.wheel_angle_rad[rows],
+            model.wheel_speed_rad_s[rows],
+            model.actuators.steer_rad[rows],
         )
-        self._next_encoder_ns = stamp + self.encoder_period_ns
+        self._next_encoder_ns = next_due_ns(
+            self._next_encoder_ns, stamp, self.encoder_period_ns
+        )
+        bus = self.parts.stack.bus
+        if bus is not None and self.parts.encoders.enabled:
+            bus.submit("wheel_encoders", self._encoder, stamp)
 
     def _control(self, stamp: int, chassis: ChassisState) -> None:
         """One controller tick: state, driver request, commands to actuators."""
@@ -456,7 +463,9 @@ class WheeledMissionLoop:
             else (stamp - self._last_control_ns) * 1e-9
         )
         self._last_control_ns = stamp
-        self._next_control_ns = stamp + self.control_period_ns
+        self._next_control_ns = next_due_ns(
+            self._next_control_ns, stamp, self.control_period_ns
+        )
         request = self._driver_request(chassis, dt_s)
         state = self._control_state(stamp, chassis)
         if parts.controller is None or state is None:
@@ -584,7 +593,8 @@ class WheeledMissionLoop:
         period is missing steps from its previous state (counted)."""
         parts = self.parts
         states = [chassis]
-        for opponent in parts.opponents:
+        dynamic = [o for o in parts.opponents if o.dynamic]
+        for opponent in dynamic:
             if opponent.chassis is None or opponent.stamp_ns != stamp:
                 self.counts["stale_opponent_states"] += 1
             states.append(opponent.chassis if opponent.chassis is not None else chassis)
@@ -599,7 +609,7 @@ class WheeledMissionLoop:
         if parts.trailer is not None:
             self._step_trailer(stamp, chassis)
         evaluate_laps = stamp >= self._next_lap_ns
-        for opponent, opponent_wrench in zip(parts.opponents, wrenches[1:]):
+        for opponent, opponent_wrench in zip(dynamic, wrenches[1:]):
             if opponent.chassis is not None:
                 opponent.after_step(opponent_wrench, parts.model, evaluate_laps)
         telemetry = parts.model.telemetry

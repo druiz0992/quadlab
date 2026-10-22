@@ -217,3 +217,31 @@ def test_opponent_odometry_precedes_ego_odometry_in_name_order():
     )
     assert kind_priority("opponent:car_1") == kind_priority("opponent:car_2")
     assert kind_priority("unknown") == KIND_PRIORITY["odometry"]
+
+
+def test_publisher_stamps_start_one_period_after_start():
+    from robotlab.simulation.gazebo.ingress import publisher_stamp_ns
+
+    # Measured with gz-sim 8: a 50 Hz OdometryPublisher on a 2 ms step
+    # publishes at 20, 40, 60 ms (nothing at the first step).
+    stamps = [
+        publisher_stamp_ns(20e6, STEP, t * 1_000_000) for t in (2, 18, 20, 38, 40)
+    ]
+    assert stamps == [-1, -1, 20_000_000, 20_000_000, 40_000_000]
+
+
+def test_publisher_kinds_are_not_waited_for_before_their_first_period():
+    ingress, source = orderer(
+        {"opponent:car_1": 20e6},
+        publisher_kinds=frozenset({"opponent:car_1"}),
+        wait_timeout_s=3600,
+    )
+    ingress.callback("odometry")(msg(4_000_000, "o4"))
+    assert drain(source) == [("odometry", "o4")]
+    ingress.callback("odometry")(msg(20_000_000, "o20"))
+    assert drain(source) == []  # waits for the opponent's 20 ms message
+    ingress.callback("opponent:car_1")(msg(20_000_000, "c20"))
+    assert drain(source) == [("opponent:car_1", "c20"), ("odometry", "o20")]
+    assert source.barrier_timeouts == 0
+    with pytest.raises(ValueError, match="without a period"):
+        orderer({}, publisher_kinds=frozenset({"opponent:car_1"}))

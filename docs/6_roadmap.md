@@ -29,9 +29,10 @@ document and update the status below.
 | Acro (rate-mode) controller for racing and freestyle handling (flips, rolls) | Future |
 | Freestyle/acrobatic 5-inch preset | Implemented ([3 Configuration](3_configuration.md#vehicle-presets)) |
 | Ground vehicles: rover, race car, tractor (`--robot`), Python tyre/suspension model, wheel encoders, keyboard driver, wheeled controller contract | Implemented ([8 Ground vehicles](8_ground_vehicles.md)) |
-| Race circuit world with track, lap timing, track limits; opponent cars with the track follower | Implemented ([8 Ground vehicles](8_ground_vehicles.md#race-circuit-and-opponents)) |
+| Race circuit world with track, lap timing, track limits; opponent cars with the track follower (kinematic obstacles or full dynamic cars) | Implemented ([8 Ground vehicles](8_ground_vehicles.md#race-circuit-and-opponents)) |
 | Farm field and off-road rover worlds; tractor implement (ASABE D497 draft) and towed trailer | Implemented ([8 Ground vehicles](8_ground_vehicles.md#tractor-implement-and-trailer)) |
-| Wheel encoders on the sensor bus (estimator input), wheeled randomization, mission references for wheeled robots | Future |
+| Wheel encoders on the sensor bus (estimator input) | Implemented ([8 Ground vehicles](8_ground_vehicles.md)) |
+| Wheeled randomization, mission references for wheeled robots | Future |
 | ApplyLinkWrench persistent wrenches accumulate (multirotor body drag and fixed-wing aerodynamics publish a delta every period, so long runs slow down quadratically); wheeled robots use one-step impulses | Known issue; fix proposed below |
 | Reversible (3D) motors with negative thrust | Future (schema change) |
 | Hexa/octocopter layouts | Implemented: general `vehicle.rotors`, hexa preset |

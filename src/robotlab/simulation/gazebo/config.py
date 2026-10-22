@@ -742,6 +742,7 @@ DEFAULTS: dict[str, Any] = {
         "esc": stream_timing(),
         "lidar": stream_timing(),
         "camera": stream_timing(),
+        "wheel_encoders": stream_timing(),
     },
     # Reference trajectory for rotor-thrust missions; see control/references.py.
     # Each type uses a subset of the keys. Mission time starts at the first

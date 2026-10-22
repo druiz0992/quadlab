@@ -5,6 +5,7 @@ from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.simulation.wheeled.ground import GroundModel
 from robotlab.simulation.wheeled.spawn import (
     SPAWN_DROP_M,
+    kinematic_spawn_pose,
     spawn_pose,
     spawn_xy_yaw,
     validate_spawn_points,
@@ -49,3 +50,17 @@ def test_spawn_outside_ground_rejected():
 def test_invalid_spawn_points(points):
     with pytest.raises(ValueError):
         validate_spawn_points(points)
+
+
+def test_kinematic_spawn_puts_wheel_visuals_on_the_ground():
+    car = load_drone_config(robot="car").wheeled
+    pose = kinematic_spawn_pose(car, GroundModel(None, [], 100.0), 1.0, 2.0, 0.5)
+    drop = min(car.ride_drop_m, car.suspension.travel_m)
+    lowest = (
+        pose.position_m[2]
+        + car.hub_positions_m()[:, 2].min()
+        + drop
+        - car.tyre.radius_m
+    )
+    assert lowest == pytest.approx(0.0)
+    assert pose.position_m[:2] == (1.0, 2.0) and pose.yaw_rad == 0.5

@@ -44,6 +44,8 @@ OPPONENT_COLORS = (
     ".95 .95 .95 1",
 )
 OPPONENT_ODOMETRY_TOPIC = "/robotlab/opponents/{name}/odometry"
+# Body-frame velocity commands of a kinematic opponent (VelocityControl).
+OPPONENT_COMMAND_TOPIC = "/robotlab/opponents/{name}/cmd_vel"
 IMPLEMENT_LIFT_TOPIC = "/robotlab/implement/lift"
 IMPLEMENT_COLOR = ".75 .2 .1 1"
 # Implement lift servo: joint velocity = gain × position error (1/s), capped.
@@ -231,24 +233,28 @@ def _cylinder(link, name, kind, radius, length, pose):
     return shape
 
 
-def _add_wheels(base: ET.Element, properties: WheeledProperties) -> None:
-    """Bump-stop collisions at full compression; visuals at ride height."""
+def _add_wheels(
+    base: ET.Element, properties: WheeledProperties, collisions: bool = True
+) -> None:
+    """Bump-stop collisions at full compression (unless ``collisions`` is
+    False); visuals at ride height."""
     radius, width = properties.tyre.radius_m, properties.wheel_width_m
     travel, sag = properties.suspension.travel_m, properties.ride_drop_m
     for wheel in properties.wheels:
         x, y, z = wheel.position_m
         # Cylinder axis is its z: roll by 90° puts it along body y.
-        stop = _cylinder(
-            base,
-            f"wheel_{wheel.name}",
-            "collision",
-            radius,
-            width,
-            _pose((x, y, z + travel, 1.5707963, 0, 0)),
-        )
-        friction = element(element(element(stop, "surface"), "friction"), "ode")
-        element(friction, "mu", BUMP_STOP_FRICTION)
-        element(friction, "mu2", BUMP_STOP_FRICTION)
+        if collisions:
+            stop = _cylinder(
+                base,
+                f"wheel_{wheel.name}",
+                "collision",
+                radius,
+                width,
+                _pose((x, y, z + travel, 1.5707963, 0, 0)),
+            )
+            friction = element(element(element(stop, "surface"), "friction"), "ode")
+            element(friction, "mu", BUMP_STOP_FRICTION)
+            element(friction, "mu2", BUMP_STOP_FRICTION)
         visual = _cylinder(
             base,
             f"wheel_{wheel.name}_visual",
@@ -272,11 +278,14 @@ def build_wheeled_vehicle(
     sensors: bool = True,
     odometry_topic: str = "/robotlab/odometry",
     color: str | None = None,
+    kinematic_rate_hz: float | None = None,
 ) -> ET.Element:
     """Add the vehicle model to ``world`` (see module docs).
 
     Opponents pass their ``name``, ``sensors=False`` (truth odometry only,
-    on ``odometry_topic``), and a body ``color``.
+    on ``odometry_topic``), and a body ``color``. Kinematic opponents also
+    pass ``kinematic_rate_hz``: no gravity, a VelocityControl system on
+    ``OPPONENT_COMMAND_TOPIC``, and odometry at that rate.
     """
     model = element(world, "model", name=name or properties.model_name)
     element(model, "pose", _pose((*pose.position_m, 0, 0, pose.yaw_rad)))
@@ -312,7 +321,9 @@ def build_wheeled_vehicle(
         ),
         collision=False,
     )
-    _add_wheels(base, properties)
+    # Kinematic opponents are obstacles: the body box is their only
+    # collision (fewer contact pairs for Gazebo).
+    _add_wheels(base, properties, collisions=kinematic_rate_hz is None)
     if sensors:
         add_body_sensors(base, settings["sensors"])
     implement = settings["ground_vehicle"]["implement"]
@@ -321,8 +332,18 @@ def build_wheeled_vehicle(
     trailer = settings["ground_vehicle"]["trailer"]
     if sensors and trailer["enabled"]:
         add_trailer(model, trailer, properties)
+    rate_hz = settings["control"]["odometry_rate_hz"]
+    if kinematic_rate_hz is not None:
+        # Moving obstacle: Python commands the body velocity (including the
+        # vertical ground-following term), so gravity stays off.
+        element(base, "gravity", "false")
+        velocity = plugin(model, "velocity-control", "VelocityControl")
+        element(
+            velocity, "topic", OPPONENT_COMMAND_TOPIC.format(name=model.get("name"))
+        )
+        rate_hz = kinematic_rate_hz
     odometry = plugin(model, "odometry-publisher", "OdometryPublisher")
     element(odometry, "dimensions", 3)
-    element(odometry, "odom_publish_frequency", settings["control"]["odometry_rate_hz"])
+    element(odometry, "odom_publish_frequency", rate_hz)
     element(odometry, "odom_topic", odometry_topic)
     return model

@@ -166,6 +166,21 @@ def scheduled_stamp_ns(period_ns: float, step_ns: int, barrier_ns: int) -> int:
     return max(step_ns, steps * step_ns)
 
 
+def publisher_stamp_ns(period_ns: float, step_ns: int, barrier_ns: int) -> int:
+    """Stamp of an OdometryPublisher's last message at or before
+    ``barrier_ns``, or -1 when none is due yet.
+
+    Unlike sensors, gz-sim's OdometryPublisher first publishes one full
+    period after start (measured with gz-sim 8: a 50 Hz publisher on a 2 ms
+    step gives stamps 20, 40, 60 ms), then at the first step at or after
+    each k·P.
+    """
+    k = int(barrier_ns / period_ns + 1e-9)
+    if k < 1:
+        return -1
+    return -(-round(k * period_ns) // step_ns) * step_ns
+
+
 class LockstepOrderer:
     """Deterministic message order for lockstep runs.
 
@@ -184,8 +199,9 @@ class LockstepOrderer:
     contacts) are ordered but not waited for. If a scheduled sample does
     not arrive within ``wait_timeout_s`` (wall), the period is released
     anyway and counted in ``barrier_timeouts`` (determinism is then not
-    guaranteed for that period). ``get`` has the ``MessageIngress.get``
-    contract.
+    guaranteed for that period). Streams in ``publisher_kinds`` come from
+    an OdometryPublisher and follow ``publisher_stamp_ns`` instead of the
+    sensor schedule. ``get`` has the ``MessageIngress.get`` contract.
 
 
     Rendered streams (camera, lidar, GPU rangefinder) are not scheduled:
@@ -204,9 +220,14 @@ class LockstepOrderer:
         *,
         wait_timeout_s: float = 5.0,
         clock: Callable[[], float] = time.monotonic,
+        publisher_kinds: frozenset[str] = frozenset(),
     ) -> None:
+        unknown = publisher_kinds - set(periods_ns)
+        if unknown:
+            raise ValueError(f"publisher_kinds without a period: {sorted(unknown)}")
         self._ingress = ingress
         self._periods_ns = dict(periods_ns)
+        self._publisher_kinds = publisher_kinds
         self._step_ns = step_ns
         self._wait_timeout_s = wait_timeout_s
         self._clock = clock
@@ -271,9 +292,14 @@ class LockstepOrderer:
         return [
             kind
             for kind, period in self._periods_ns.items()
-            if self._last_ns.get(kind, -1)
-            < scheduled_stamp_ns(period, self._step_ns, barrier_ns)
+            if self._last_ns.get(kind, -1) < self._due_ns(kind, period, barrier_ns)
         ]
+
+    def _due_ns(self, kind: str, period_ns: float, barrier_ns: int) -> int:
+        schedule = (
+            publisher_stamp_ns if kind in self._publisher_kinds else scheduled_stamp_ns
+        )
+        return schedule(period_ns, self._step_ns, barrier_ns)
 
     def _release_if_complete(self) -> None:
         if not self._barriers:

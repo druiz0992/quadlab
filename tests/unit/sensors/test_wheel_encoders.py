@@ -43,3 +43,50 @@ def test_steering_noise_is_seeded_and_disabled_passes_truth():
     reading = off.read(0, np.array([3.0]), np.array([4.0]), np.array([0.2]))
     assert reading.wheel_speed_rad_s[0] == 4.0 and reading.steer_angle_rad[0] == 0.2
     assert off.summary()["readings"] == 1
+
+
+def test_readings_are_read_only():
+    for enabled in (True, False):
+        model = WheelEncoderModel({**SETTINGS, "enabled": enabled}, 4)
+        reading = model.read(0, np.zeros(4), np.zeros(4), np.zeros(4))
+        for array in (reading.wheel_speed_rad_s, reading.steer_angle_rad):
+            with pytest.raises(ValueError):
+                array[0] = 1.0
+
+
+def test_encoder_readings_travel_on_the_sensor_bus():
+    from robotlab.core.serialization import decode, encode
+    from robotlab.sensors.bus import SensorBus
+    from robotlab.simulation.gazebo.config import load_drone_config
+
+    config = load_drone_config(robot="car")
+    bus = SensorBus(config.data["sensor_timing"], ["wheel_encoders"])
+    model = WheelEncoderModel(SETTINGS, 4)
+    model.read(0, np.zeros(4), np.zeros(4), np.zeros(4))
+    reading = model.read(10_000_000, np.full(4, 1.0), np.zeros(4), np.zeros(4))
+    bus.submit("wheel_encoders", reading, 10_000_000)
+    ((kind, sample),) = bus.advance(20_000_000)
+    assert kind == "wheel_encoders" and sample.frame_id == "vehicle/wheels"
+    assert sample.payload is reading and sample.sim_time_ns == 10_000_000
+    restored = decode(encode(sample))
+    np.testing.assert_array_equal(
+        restored.payload.wheel_speed_rad_s, reading.wheel_speed_rad_s
+    )
+
+
+def test_wheeled_runs_carry_encoders_and_drones_do_not():
+    from types import SimpleNamespace
+
+    from robotlab.experiments.sensor_pipeline import SensorPipeline
+    from robotlab.simulation.gazebo.config import load_drone_config
+
+    def kinds(config):
+        fake = SimpleNamespace(
+            _sensors=config.data["sensors"],
+            esc_telemetry=SimpleNamespace(enabled=False),
+            gps_heading=SimpleNamespace(enabled=False),
+        )
+        return SensorPipeline.bus_kinds(fake)
+
+    assert "wheel_encoders" in kinds(load_drone_config(robot="car"))
+    assert "wheel_encoders" not in kinds(load_drone_config())

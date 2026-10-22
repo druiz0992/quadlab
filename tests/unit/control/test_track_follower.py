@@ -3,7 +3,7 @@ import dataclasses
 import numpy as np
 import pytest
 
-from robotlab.control.track_follower import TrackFollower
+from robotlab.control.track_follower import KinematicTrackDriver, TrackFollower
 from robotlab.control.wheeled import WheeledControlState
 from robotlab.core.track import Track
 from robotlab.evaluation.laps import LapTimer
@@ -97,3 +97,65 @@ def test_car_laps_an_oval_on_the_reference_integrator():
     assert summary["laps_completed"] >= 1
     assert summary["off_track_episodes"] == 0
     assert summary["max_lateral_offset_m"] < 2.0
+
+
+def state_at(x, y, yaw, speed=0.0):
+    return WheeledControlState(
+        0,
+        np.array([x, y, 0.4]),
+        np.array([speed * np.cos(yaw), speed * np.sin(yaw), 0.0]),
+        np.array([0.0, 0.0, np.sin(yaw / 2), np.cos(yaw / 2)]),
+        np.zeros(3),
+        np.zeros(4),
+        np.zeros(4),
+    )
+
+
+def test_kinematic_driver_ramps_speed_at_the_grip_limit():
+    driver = KinematicTrackDriver(context("car", oval()), {"max_speed_mps": 10.0})
+    braking, accelerating = driver.follower.acceleration_limits_mps2()
+    vehicle = nominal_wheeled("car")
+    grip = 0.7 * vehicle.tyre.friction_longitudinal * 9.81
+    assert braking == pytest.approx(grip)
+    driven = sum(w.driven for w in vehicle.wheels)
+    assert accelerating == pytest.approx(grip * driven / vehicle.wheel_count)
+    first = driver.update(state_at(0.0, -15.0, 0.0), 0.0)
+    assert first.speed_mps == 0.0  # no time elapsed
+    command = driver.update(state_at(0.0, -15.0, 0.0), 0.1)
+    assert command.speed_mps == pytest.approx(accelerating * 0.1)
+    for _ in range(100):
+        command = driver.update(state_at(0.0, -15.0, 0.0), 0.1)
+    assert command.speed_mps == pytest.approx(10.0)
+    with pytest.raises(ValueError, match="dt_s"):
+        driver.update(state_at(0.0, -15.0, 0.0), -0.1)
+
+
+def test_kinematic_driver_turns_toward_the_path():
+    driver = KinematicTrackDriver(context("car", oval()), {})
+    driver.speed_mps = 5.0
+    # On the bottom straight heading +x but 2 m right of the line (y < -15):
+    # the look-ahead point is to the left, so the yaw rate is positive and
+    # equals v κ.
+    command = driver.update(state_at(0.0, -17.0, 0.0, 5.0), 0.0)
+    guidance = driver.follower.guidance(state_at(0.0, -17.0, 0.0, 5.0))
+    assert command.yaw_rate_rad_s > 0
+    assert command.yaw_rate_rad_s == pytest.approx(5.0 * guidance.curvature_per_m)
+
+
+def test_kinematic_driver_laps_an_oval():
+    """Integrate the commands as an ideal unicycle: the path stays on the
+    track and the speed respects the curvature limit."""
+    track = oval()
+    driver = KinematicTrackDriver(context("car", track), {"max_speed_mps": 20.0})
+    timer = LapTimer(track)
+    x, y, yaw, dt = -10.0, -15.0, 0.0, 0.02
+    for step in range(int(30.0 / dt)):
+        command = driver.update(state_at(x, y, yaw, driver.speed_mps), dt)
+        x += command.speed_mps * np.cos(yaw) * dt
+        y += command.speed_mps * np.sin(yaw) * dt
+        yaw += command.yaw_rate_rad_s * dt
+        timer.on_truth(step * dt, np.array([x, y, 0.0]), np.array([[x, y]]))
+    summary = timer.summary()
+    assert summary["laps_completed"] >= 2
+    assert summary["off_track_episodes"] == 0
+    assert summary["max_lateral_offset_m"] < 1.0

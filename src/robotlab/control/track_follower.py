@@ -24,9 +24,15 @@ baseline for traffic, not a racing algorithm:
 
 Uses only ``state`` (own truth or estimate), ``context.wheeled``, and
 ``context.track``; raises ValueError without a track.
+
+``KinematicTrackDriver`` turns the same guidance (steps 1-3) into a speed
+and yaw-rate command for kinematic opponents (moving obstacles without a
+wheel model): the speed follows the target at the grip-limited
+acceleration and the yaw rate is v κ.
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -46,6 +52,25 @@ DEFAULTS = dict(
     max_speed_mps=40.0,
     speed_gain_per_s=1.5,
 )
+
+
+@dataclass(frozen=True)
+class Guidance:
+    """One guidance evaluation: measured forward speed (m/s), pure-pursuit
+    path curvature (1/m, positive left), and target speed (m/s)."""
+
+    forward_mps: float
+    curvature_per_m: float
+    target_speed_mps: float
+
+
+@dataclass(frozen=True)
+class KinematicCommand:
+    """Body-frame motion command of a kinematic vehicle: forward speed
+    (m/s) and yaw rate (rad/s, positive left)."""
+
+    speed_mps: float
+    yaw_rate_rad_s: float
 
 
 class TrackFollower:
@@ -104,7 +129,17 @@ class TrackFollower:
         request: DriverCommand | None,
         dt_s: float,
     ) -> WheelCommands:
-        o, v = self.options, self.vehicle
+        guidance = self.guidance(state)
+        return self._commands(
+            guidance.forward_mps,
+            guidance.curvature_per_m,
+            guidance.target_speed_mps,
+            state,
+        )
+
+    def guidance(self, state: WheeledControlState) -> Guidance:
+        """Path curvature and target speed at ``state`` (steps 1-3)."""
+        o = self.options
         x, y, z, w = state.quaternion_xyzw
         yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
         heading = np.array([np.cos(yaw), np.sin(yaw)])
@@ -118,7 +153,15 @@ class TrackFollower:
         curvature = 2 * np.sin(bearing) / max(np.linalg.norm(target), 1e-3)
         speed = self._target_speed(s_here)
         self.last_target_mps = speed
-        return self._commands(forward, curvature, speed, state)
+        return Guidance(forward, float(curvature), speed)
+
+    def acceleration_limits_mps2(self) -> tuple[float, float]:
+        """(braking, acceleration) magnitudes (m/s²): the grip caps of
+        step 3, acceleration scaled by the driven wheels' share."""
+        v, o = self.vehicle, self.options
+        grip = o["grip_fraction"] * v.tyre.friction_longitudinal * 9.81
+        driven = max(int(self._driven.sum()), 1)
+        return grip, grip * driven / v.wheel_count
 
     def _target_speed(self, s_here: float) -> float:
         """Speed limit from the largest curvature within ``preview_m`` ahead."""
@@ -146,15 +189,11 @@ class TrackFollower:
         self, forward: float, curvature: float, speed: float, state: WheeledControlState
     ) -> WheelCommands:
         v, o = self.vehicle, self.options
-        grip = o["grip_fraction"] * v.tyre.friction_longitudinal * 9.81
+        braking, accelerating = self.acceleration_limits_mps2()
         driven = max(int(self._driven.sum()), 1)
         braked = max(int(self._braked.sum()), 1)
         acceleration = float(
-            np.clip(
-                o["speed_gain_per_s"] * (speed - forward),
-                -grip,
-                grip * driven / v.wheel_count,
-            )
+            np.clip(o["speed_gain_per_s"] * (speed - forward), -braking, accelerating)
         )
         force = acceleration * v.mass_kg
         limit = v.drive.max_torque_nm
@@ -181,6 +220,36 @@ class TrackFollower:
 
     def summary(self) -> dict[str, Any]:
         return dict(options=self.options, path_length_m=self._length)
+
+
+class KinematicTrackDriver:
+    """Speed and yaw-rate commands from ``TrackFollower`` guidance (see
+    module docs); same options. Used by kinematic opponents."""
+
+    def __init__(self, context: AlgorithmContext, options: Mapping[str, Any]) -> None:
+        self.follower = TrackFollower(context, options)
+        self.speed_mps = 0.0
+
+    def update(self, state: WheeledControlState, dt_s: float) -> KinematicCommand:
+        """Advance the commanded speed by ``dt_s`` toward the target (rate
+        limited by grip) and return the command."""
+        if dt_s < 0:
+            raise ValueError("KinematicTrackDriver: dt_s must be >= 0")
+        guidance = self.follower.guidance(state)
+        braking, accelerating = self.follower.acceleration_limits_mps2()
+        self.speed_mps = float(
+            np.clip(
+                guidance.target_speed_mps,
+                self.speed_mps - braking * dt_s,
+                self.speed_mps + accelerating * dt_s,
+            )
+        )
+        return KinematicCommand(
+            self.speed_mps, self.speed_mps * guidance.curvature_per_m
+        )
+
+    def summary(self) -> dict[str, Any]:
+        return self.follower.summary()
 
 
 def _curvature(path: NDArray[np.float64]) -> NDArray[np.float64]:

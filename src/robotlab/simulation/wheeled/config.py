@@ -200,9 +200,14 @@ GROUND_VEHICLE_DEFAULTS: dict[str, Any] = {
     # Other cars of the same kind on the scene's next spawn points, each
     # with its own controller (default: the centreline follower); see
     # experiments/opponents.py. per_opponent_options (one dict per
-    # opponent, optional) merge over controller_options.
+    # opponent, optional) merge over controller_options. mode "kinematic"
+    # (moving obstacles: Gazebo velocity commands from the track
+    # follower's guidance at update_rate_hz, no wheel model) or "dynamic"
+    # (full wheel model every period, any WheeledController).
     "opponents": {
         "count": 0,
+        "mode": "kinematic",
+        "update_rate_hz": 50.0,
         "controller": "track_follower",
         "controller_options": {},
         "per_opponent_options": [],
@@ -461,6 +466,7 @@ def trailer_properties(
 
 
 MAX_OPPONENTS = 7
+OPPONENT_MODES = ("kinematic", "dynamic")
 SIGNED_KEYS = {"spawn_yaw_deg", "cg_below_hitch_m"}
 ZERO_ALLOWED = {
     "rolling_resistance",
@@ -517,7 +523,7 @@ def validate_ground_vehicle(data: Mapping[str, Any]) -> None:
     ):
         raise ValueError("ground_vehicle.model_name must be an identifier")
     _check_layout(g, layout)
-    _check_opponents(g["opponents"])
+    _check_opponents(g["opponents"], data["control"]["odometry_rate_hz"])
     _check_implement(g["implement"], data["robot"]["kind"])
     _check_trailer(g)
     for key in ("c", "e"):
@@ -554,7 +560,26 @@ def _check_layout(g: Mapping[str, Any], layout: str) -> None:
         raise ValueError("ground_vehicle.steering.max_angle_rad must be < 1.2 rad")
 
 
-def _check_opponents(opponents: Mapping[str, Any]) -> None:
+def _check_opponents(opponents: Mapping[str, Any], odometry_rate_hz: float) -> None:
+    if opponents["mode"] not in OPPONENT_MODES:
+        raise ValueError(
+            f"ground_vehicle.opponents.mode must be one of {OPPONENT_MODES}"
+        )
+    if opponents["mode"] == "kinematic":
+        # Kinematic opponents follow the track follower's guidance; other
+        # controllers produce wheel torques, which need the wheel model.
+        if opponents["count"] and opponents["controller"] != "track_follower":
+            raise ValueError(
+                "ground_vehicle.opponents: kinematic mode drives with "
+                "track_follower; use mode 'dynamic' for other controllers"
+            )
+        ratio = odometry_rate_hz / opponents["update_rate_hz"]
+        # Integer ratio: opponent updates coincide with ego periods.
+        if abs(ratio - round(ratio)) > 1e-9 or round(ratio) < 1:
+            raise ValueError(
+                "ground_vehicle.opponents.update_rate_hz must divide "
+                f"control.odometry_rate_hz ({odometry_rate_hz:g})"
+            )
     if opponents["count"] > MAX_OPPONENTS:
         raise ValueError(f"ground_vehicle.opponents.count must be <= {MAX_OPPONENTS}")
     per = opponents["per_opponent_options"]

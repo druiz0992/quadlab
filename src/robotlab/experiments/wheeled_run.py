@@ -17,6 +17,7 @@ is checked for or any window opens.
 
 import os
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -26,6 +27,7 @@ from ..control.wheeled import WheeledController
 from ..control.wheeled_keyboard import DriverInput, KeyboardDriver
 from ..core.algorithms import AlgorithmContext
 from ..core.track import Track
+from ..core.wheeled_vehicle import WheeledProperties
 from ..evaluation.laps import LapTimer
 from ..evaluation.health import HealthThresholds, RunHealth
 from ..sensors.wheel_encoders import WheelEncoderModel
@@ -38,11 +40,17 @@ from ..simulation.gazebo.ingress import (
     subscriptions,
 )
 from ..simulation.gazebo.wheeled_vehicle import (
+    OPPONENT_COMMAND_TOPIC,
     OPPONENT_ODOMETRY_TOPIC,
     TRAILER_JOINT_TOPIC,
     opponent_name,
 )
-from .opponents import Opponent, build_opponent_controller, opponent_options
+from .opponents import (
+    KinematicOpponent,
+    Opponent,
+    build_opponent_controller,
+    opponent_options,
+)
 from ..simulation.gazebo.odometry import OdometryVelocityFix
 from ..simulation.gazebo.plugins import lockstep_barrier
 from ..simulation.gazebo.world import world_elevation_m
@@ -259,21 +267,23 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
                     if trailer is not None
                     else {}
                 ),
-                # Opponents publish every period; wait for each of them.
+                # Wait for each opponent's odometry at its rate.
                 **{
-                    OPPONENT_KIND_PREFIX
-                    + name: 1e9 / settings["control"]["odometry_rate_hz"]
+                    OPPONENT_KIND_PREFIX + name: _opponent_period_ns(settings)
                     for name in names
                 },
             },
             _step_ns(settings),
+            publisher_kinds=frozenset(OPPONENT_KIND_PREFIX + name for name in names),
         ),
         barrier=lockstep_barrier(settings),
         recorder=recorder,
         pipeline=pipeline,
         stack=stack,
         controller=controller,
-        model=WheeledVehicleModel(vehicle, ground, vehicles=1 + len(opponents)),
+        model=WheeledVehicleModel(
+            vehicle, ground, vehicles=1 + sum(o.dynamic for o in opponents)
+        ),
         wrench=ego_wrench,
         encoders=WheelEncoderModel(
             settings["sensors"]["wheel_encoders"], vehicle.wheel_count
@@ -368,10 +378,12 @@ def _opponents(settings, vehicle, context, ground, Wrench, node, publisher):
     from ..simulation.gazebo.stepping import steps_per_period
 
     section = settings["ground_vehicle"]["opponents"]
+    if section["mode"] == "kinematic":
+        return _kinematic_opponents(settings, vehicle, context, ground, node)
     control = settings["control"]
     period_s = 1 / control["odometry_rate_hz"]
     steps = steps_per_period(period_s, settings["simulation"]["step_s"])
-    opponents = []
+    opponents: list[Any] = []
     for index in range(section["count"]):
         name = opponent_name(vehicle, index + 1)
         opponents.append(
@@ -391,6 +403,65 @@ def _opponents(settings, vehicle, context, ground, Wrench, node, publisher):
             )
         )
     return opponents
+
+
+def _opponent_period_ns(settings: dict) -> float:
+    """Odometry period of the opponents (ns): every ego period when
+    dynamic, the update period when kinematic."""
+    section = settings["ground_vehicle"]["opponents"]
+    if section["mode"] == "kinematic":
+        return 1e9 / section["update_rate_hz"]
+    return 1e9 / settings["control"]["odometry_rate_hz"]
+
+
+def _kinematic_opponents(
+    settings: dict,
+    vehicle: WheeledProperties,
+    context: AlgorithmContext,
+    ground: GroundModel,
+    node: Any,
+) -> list[Any]:
+    """Kinematic opponents (experiments/opponents.py), each with its own
+    twist publisher to Gazebo's VelocityControl."""
+    from ..control.track_follower import KinematicTrackDriver
+
+    section = settings["ground_vehicle"]["opponents"]
+    hubs = vehicle.hub_positions_m()[:, :2]
+    opponents: list[Any] = []
+    for index in range(section["count"]):
+        name = opponent_name(vehicle, index + 1)
+        opponents.append(
+            KinematicOpponent(
+                name=name,
+                driver=KinematicTrackDriver(context, opponent_options(settings, index)),
+                publish=_twist_publisher(
+                    node, OPPONENT_COMMAND_TOPIC.format(name=name)
+                ),
+                height_m=ground.height,
+                hub_xy_m=hubs,
+                laps=LapTimer(context.track) if context.track else None,
+                odometry_fix=OdometryVelocityFix(),
+            )
+        )
+    return opponents
+
+
+def _twist_publisher(node: Any, topic: str) -> Callable[[dict], None]:
+    """``publish(fields)`` sending ``dict(linear=(x, y, z), angular=(x, y,
+    z))`` as a gz Twist on ``topic``; raises RuntimeError if it fails."""
+    from gz.msgs10.twist_pb2 import Twist
+
+    publisher = node.advertise(topic, Twist)
+
+    def publish(fields: dict) -> None:
+        message = Twist()
+        for part in ("linear", "angular"):
+            target = getattr(message, part)
+            target.x, target.y, target.z = fields[part]
+        if not publisher.publish(message):
+            raise RuntimeError(f"Unable to publish {topic}")
+
+    return publish
 
 
 def _sensor_pipeline(settings, config, scene, terrain, world, recorder, truth):

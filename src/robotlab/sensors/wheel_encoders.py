@@ -6,9 +6,11 @@ reported speed is the count difference over the time since the previous
 reading, so it carries the encoder's quantization (2π / cpr rad per
 interval) and averages over the interval, like a real speed estimate from
 counts. Steering angles are the true actuator angles plus seeded white
-noise of ``steering_noise_std_rad`` (per sample). Readings are produced at
-the control ticks (the controller's sampling); the first reading reports
-zero speed. Units: rad, rad/s, s.
+noise of ``steering_noise_std_rad`` (per sample). Readings are taken at
+``rate_hz`` on the odometry periods; the controller gets the latest one and
+the sensor bus carries every one as ``sensors/wheel_encoders`` (estimator
+input). The first reading reports zero speed. Units: rad, rad/s, s.
+Reading arrays are read-only (bus samples are immutable).
 """
 
 from collections.abc import Mapping
@@ -58,8 +60,8 @@ class WheelEncoderModel:
             return EncoderReading(
                 sim_time_ns,
                 (0,) * self._count,
-                np.array(wheel_speed_rad_s, float),
-                np.array(steer_rad, float),
+                _frozen(wheel_speed_rad_s),
+                _frozen(steer_rad),
             )
         scale = self.counts_per_revolution / (2 * np.pi)
         counts = np.floor(np.asarray(wheel_angle_rad) * scale).astype(np.int64)
@@ -75,7 +77,7 @@ class WheelEncoderModel:
             noise if self.steering_noise_std_rad > 0 else 0.0
         )
         return EncoderReading(
-            sim_time_ns, tuple(int(c) for c in counts), speed, np.asarray(steer)
+            sim_time_ns, tuple(int(c) for c in counts), _frozen(speed), _frozen(steer)
         )
 
     def summary(self) -> dict[str, Any]:
@@ -85,3 +87,10 @@ class WheelEncoderModel:
             steering_noise_std_rad=self.steering_noise_std_rad,
             readings=self.readings,
         )
+
+
+def _frozen(values: Any) -> NDArray[np.float64]:
+    """Read-only float copy (readings are shared through the sensor bus)."""
+    array = np.array(values, dtype=float)
+    array.flags.writeable = False
+    return array

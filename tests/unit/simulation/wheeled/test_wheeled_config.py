@@ -78,8 +78,24 @@ def test_layer_overrides_preset(tmp_path):
         ),
         (
             {"ground_vehicle": {"opponents": {"count": 1, "controller": ""}}},
+            "kinematic mode",
+        ),
+        (
+            {
+                "ground_vehicle": {
+                    "opponents": {"count": 1, "mode": "dynamic", "controller": ""}
+                }
+            },
             "name a controller",
         ),
+        ({"ground_vehicle": {"opponents": {"mode": "ghost"}}}, "mode must be"),
+        (
+            {"ground_vehicle": {"opponents": {"count": 1, "controller": "x:Y"}}},
+            "kinematic mode",
+        ),
+        ({"ground_vehicle": {"opponents": {"update_rate_hz": 60.0}}}, "divide"),
+        ({"ground_vehicle": {"opponents": {"update_rate_hz": 500.0}}}, "divide"),
+        ({"ground_vehicle": {"opponents": {"update_rate_hz": 0}}}, "update_rate_hz"),
     ],
 )
 def test_invalid_wheeled_settings(tmp_path, layer, message):

@@ -93,3 +93,19 @@ def spawn_pose(
     ground_z = float(np.max(high - hits.distance_m))
     z = ground_z + properties.tyre.radius_m - float(hubs[:, 2].min()) + SPAWN_DROP_M
     return SpawnPose((x, y, z), yaw_rad)
+
+
+def kinematic_spawn_pose(
+    properties: WheeledProperties,
+    ground: GroundModel,
+    x: float,
+    y: float,
+    yaw_rad: float,
+) -> SpawnPose:
+    """Pose of a kinematic vehicle (no suspension): wheel visuals, drawn at
+    the ride drop below their hubs, touch the highest ground point under
+    any wheel."""
+    pose = spawn_pose(properties, ground, x, y, yaw_rad)
+    drop = min(properties.ride_drop_m, properties.suspension.travel_m)
+    z = pose.position_m[2] - SPAWN_DROP_M - drop
+    return SpawnPose((pose.position_m[0], pose.position_m[1], z), yaw_rad)

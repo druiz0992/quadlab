@@ -205,6 +205,7 @@ plug-in fits the harness, not that it is good; judge that with Gazebo runs,
 | `esc` | `EscTelemetry` (rotor speeds) | `drone/esc` |
 | `lidar` | `LidarPoints` (body-axis points, reflectivity) | `drone/body` |
 | `camera` | `CameraFrame` (RGB) | `drone/camera` |
+| `wheel_encoders` | `EncoderReading` (wheeled robots: counts, wheel speeds, steering angles) | `vehicle/wheels` |
 
 Measurements enter after the error and fault models; a dropped GPS fix never
 enters. The bus is created when an estimator is configured.

@@ -136,30 +136,101 @@ def test_wheeled_lockstep_is_deterministic(tmp_path):
     assert first == second
 
 
-RACE = {
-    **FAST,
-    "algorithms": {"controller": "track_follower"},
-    "ground_vehicle": {
-        "opponents": {
-            "count": 2,
-            "per_opponent_options": [{"grip_fraction": 0.6}, {"grip_fraction": 0.55}],
-        }
-    },
-}
+def race(mode: str) -> dict:
+    return {
+        **FAST,
+        "algorithms": {"controller": "track_follower"},
+        "ground_vehicle": {
+            "opponents": {
+                "count": 2,
+                "mode": mode,
+                "per_opponent_options": [
+                    {"grip_fraction": 0.6},
+                    {"grip_fraction": 0.55},
+                ],
+            }
+        },
+    }
 
 
-def test_race_with_opponents_is_deterministic(tmp_path):
-    first, rows_a = drive(tmp_path / "a", "car", RACE, 8.0, "worlds/race_circuit.json")
-    second, rows_b = drive(tmp_path / "b", "car", RACE, 8.0, "worlds/race_circuit.json")
+@pytest.mark.parametrize("mode", ["kinematic", "dynamic"])
+def test_race_with_opponents_is_deterministic(tmp_path, mode):
+    layer = race(mode)
+    first, rows_a = drive(tmp_path / "a", "car", layer, 8.0, "worlds/race_circuit.json")
+    second, rows_b = drive(
+        tmp_path / "b", "car", layer, 8.0, "worlds/race_circuit.json"
+    )
     assert rows_a == rows_b
     assert first["opponents"] == second["opponents"]
-    assert first["messages"]["opponent:car_1"] == first["messages"]["odometry"]
+    odometry = first["messages"]["odometry"]
+    # Kinematic opponents report at 50 Hz, dynamic ones every 4 ms period.
+    expected = odometry if mode == "dynamic" else (odometry - 1) // 5
+    assert first["messages"]["opponent:car_1"] == expected
     assert first["message_ordering"]["barrier_timeouts"] == 0
     assert "stale_opponent_states" not in first["messages"]
     assert first["track"]["progress_m"] > 150
     for opponent in first["opponents"]:
+        assert opponent["mode"] == mode
         assert opponent["track"]["progress_m"] > 100
         assert opponent["track"]["off_track_episodes"] == 0
+
+
+class EncoderCounter:
+    """Test estimator: counts wheel-encoder samples (no estimate)."""
+
+    inputs = ("wheel_encoders",)
+
+    def __init__(self, context, options):
+        self.samples = 0
+        self.max_speed_rad_s = 0.0
+        self.last_ns = -1
+        self.wheels = 0
+
+    def on_sample(self, kind, sample):
+        assert sample.sim_time_ns > self.last_ns
+        self.last_ns = sample.sim_time_ns
+        self.samples += 1
+        self.wheels = len(sample.payload.wheel_speed_rad_s)
+        self.max_speed_rad_s = max(
+            self.max_speed_rad_s, float(np.max(sample.payload.wheel_speed_rad_s))
+        )
+
+    def latest(self):
+        return None
+
+    def drain_innovations(self):
+        return []
+
+    def summary(self):
+        return dict(
+            samples=self.samples,
+            wheels=self.wheels,
+            max_speed_rad_s=self.max_speed_rad_s,
+        )
+
+
+def test_wheel_encoders_reach_an_estimator_on_the_bus(tmp_path):
+    layer = {
+        **CRUISE,
+        "algorithms": {
+            **CRUISE["algorithms"],
+            "estimator": "test_gazebo_wheeled:EncoderCounter",
+        },
+        # A dynamic opponent shares the wheel model: the bus must carry
+        # only the ego's four wheels.
+        "ground_vehicle": {"opponents": {"count": 1, "mode": "dynamic"}},
+    }
+    summary, _ = drive(tmp_path, "car", layer, 3.0, "worlds/race_circuit.json")
+    encoders = summary["sensor_bus"]
+    assert (
+        encoders["submitted"]["wheel_encoders"] == summary["wheel_encoders"]["readings"]
+    )
+    counter = summary["algorithms"]["estimator_summary"]
+    assert counter["samples"] == encoders["delivered"]["wheel_encoders"]
+    assert counter["samples"] >= 290  # 100 Hz for 3 s
+    assert counter["wheels"] == 4
+    # 10 m/s cruise on 0.33 m tyres: about 30 rad/s once up to speed.
+    assert counter["max_speed_rad_s"] > 15
 
 
 class PloughDriver:

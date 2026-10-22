@@ -82,6 +82,13 @@ def test_opponents_get_models_on_the_next_spawn_points(tmp_path):
         assert not model.findall("link/sensor")
         topic = model.find("plugin/odom_topic").text
         assert topic == f"/robotlab/opponents/{name}/odometry"
+        # Kinematic (default): velocity control, no gravity, body-only
+        # collision, odometry at the update rate.
+        velocity = model.find('plugin[@name="gz::sim::systems::VelocityControl"]')
+        assert velocity.findtext("topic") == f"/robotlab/opponents/{name}/cmd_vel"
+        assert model.findtext("link/gravity") == "false"
+        assert [c.get("name") for c in model.findall("link/collision")] == ["body"]
+        assert float(model.find("plugin/odom_publish_frequency").text) == 50.0
     scene["spawn_points"].pop()
     with pytest.raises(ValueError, match="spawn points"):
         build_world(scene, tmp_path / "w2.sdf", config=config)
@@ -91,6 +98,27 @@ def test_opponents_get_models_on_the_next_spawn_points(tmp_path):
     }
     with pytest.raises(ValueError, match="opponent"):
         build_world(scene, tmp_path / "w3.sdf", config=config)
+
+
+def test_dynamic_opponents_keep_the_full_vehicle_model(tmp_path):
+    layer = tmp_path / "layer.json"
+    layer.write_text(
+        '{"ground_vehicle": {"opponents": {"count": 1, "mode": "dynamic"}}}'
+    )
+    config = load_drone_config(layer, robot="car")
+    scene = {
+        "obstacles": [],
+        "spawn_points": [{"position_m": [0, 0]}, {"position_m": [-8, 3]}],
+    }
+    root = ET.parse(build_world(scene, tmp_path / "world.sdf", config=config))
+    model = root.find('./world/model[@name="car_1"]')
+    ego = root.find('./world/model[@name="car"]')
+    assert model.find('plugin[@name="gz::sim::systems::VelocityControl"]') is None
+    assert model.find("link/gravity") is None
+    assert len(model.findall("link/collision")) == len(ego.findall("link/collision"))
+    assert float(model.find("plugin/odom_publish_frequency").text) == float(
+        ego.find("plugin/odom_publish_frequency").text
+    )
 
 
 def test_zone_mesh_ribbon():

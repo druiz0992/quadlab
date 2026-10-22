@@ -46,6 +46,7 @@ from .airspeed import AirspeedReading
 from .battery_monitor import BatteryReading
 from .optical_flow import OpticalFlowReading
 from .streams import Channel, Publisher
+from .wheel_encoders import EncoderReading
 
 # kind: (payload type, frame ID). Order sets priority at equal times.
 STREAMS: dict[str, tuple[type, str]] = {
@@ -61,6 +62,7 @@ STREAMS: dict[str, tuple[type, str]] = {
     "esc": (EscTelemetry, "drone/esc"),
     "lidar": (LidarPoints, "drone/body"),
     "camera": (CameraFrame, "drone/camera"),
+    "wheel_encoders": (EncoderReading, "vehicle/wheels"),
 }
 PRIORITY = {kind: index for index, kind in enumerate(STREAMS)}
 

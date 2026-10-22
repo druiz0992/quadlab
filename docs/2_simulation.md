@@ -178,7 +178,9 @@ one odometry period at a time (`simulation/gazebo/stepping.py`):
 4. Python processes the period in a fixed order
    (`simulation/gazebo/ingress.py`, `LockstepOrderer`): it waits until every
    scheduled sensor has delivered its last sample stamped ≤ T (Gazebo
-   samples a sensor of period P at the first step at or after k·P), then
+   samples a sensor of period P at the first step at or after k·P, starting
+   at k = 0; an OdometryPublisher, such as a wheeled opponent's, starts at
+   k = 1), then
    handles all messages stamped ≤ T by timestamp, measurements before the
    odometry at equal stamps. Messages Gazebo repeats while paused (joint
    states, poses, contacts) are dropped as duplicates.

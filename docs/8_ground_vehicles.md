@@ -144,6 +144,16 @@ visuals neither spin nor steer; Rerun draws the live wheels.
 Encoders count floor(θ · cpr / 2π) of the true wheel angle and report the
 count difference over the time since the previous reading (quantized,
 interval-averaged speed); steering-angle sensors add seeded white noise.
+Readings are taken from the ego's wheels on the first odometry period at
+or after each multiple of 1/`rate_hz`, so the rate holds even when it does
+not divide the odometry rate (the controller is scheduled the same way;
+before 2026-10-22 a 100 Hz encoder on 4 ms periods read every 12 ms). The controller gets
+the latest reading in `WheeledControlState`. When the sensor bus exists
+(an estimator is configured), every reading is also a `wheel_encoders`
+sample (`EncoderReading`, frame `vehicle/wheels`, timing
+`sensor_timing.wheel_encoders`), so an estimator can declare it as an
+input. Disabled encoders pass truth to the controller and never enter
+the bus.
 
 Scene keys for wheeled robots (ignored by multirotors):
 
@@ -234,16 +244,40 @@ next grid slots:
 | Key | Meaning |
 | --- | --- |
 | `count` | number of opponents (0: none) |
-| `controller` | their controller (`package.module:Class` or an alias); default `track_follower` |
+| `mode` | `kinematic` (default): cheap moving obstacles; `dynamic`: full wheel model |
+| `update_rate_hz` | kinematic: odometry and command rate (default 50; must divide `control.odometry_rate_hz`) |
+| `controller` | their controller (`package.module:Class` or an alias); default `track_follower` (the only one in kinematic mode) |
 | `controller_options` | options for every opponent |
 | `per_opponent_options` | list of option dicts merged per opponent (first opponent first) |
 
 `configs/scenarios/race_opponents.json` sets three followers with
-different grip fractions and lines. Opponents run their controller on their
-own truth; the batched wheel model steps all cars together, and each
-publishes its own wrench. The ego controller receives their ground-truth
-states in `state.opponents` (labelled truth: a stand-in for perception).
-Contact with an opponent is a `vehicle_contact` warning, not a failed run.
+different grip fractions and lines. The ego controller receives their
+ground-truth states in `state.opponents` (labelled truth: a stand-in for
+perception). Contact with an opponent is a `vehicle_contact` warning, not
+a failed run, unless it is a high-speed impact.
+
+**Kinematic opponents** (the default) are moving obstacles, not vehicle
+simulations. They have no wheel model or wrench. Gazebo moves each one
+with its VelocityControl system, with gravity off and the body box as the
+only collision. At `update_rate_hz` Python turns the track follower's
+guidance into a body twist: the speed follows the target speed at the
+follower's grip-limited acceleration, and the yaw rate is v κ. A vertical
+term holds the start-up height above the ground, and roll and pitch rates
+level the body after a knock. Gazebo still resolves collisions with the
+ego. A velocity-controlled body keeps its commanded velocity, so it acts
+as a very heavy obstacle. The ego sees their states up to one update
+period old (20 ms by default). Their speeds are not limited by tyre
+physics.
+
+**Dynamic opponents** (`mode: "dynamic"`) run any `WheeledController` on
+their own truth. The batched wheel model steps all cars together every
+period, and each car publishes its own wrench. This mode costs about
+0.3 ms of Python per car per period, plus Gazebo's work for the full
+vehicle model.
+
+Migration (2026-10-22): before this change all opponents were dynamic.
+Set `"mode": "dynamic"` to keep the old behaviour. `summary.json.opponents[]`
+gained a `mode` entry.
 
 **Track follower** (`control/track_follower.py`, alias `track_follower`)
 is the traffic driver: pure pursuit on the (optionally offset) centreline,
@@ -317,10 +351,12 @@ pins, verified on 2026-10-22: the car on the template controller at 10 m/s
 covers 48.59 m in 6 s and agrees with the same model on the Python
 reference integrator (`rigid_body.py`) within 0.1 m; parked ride heights
 0.219 m (rover), 0.358 m (car), 1.023 m (tractor); repeated rover runs are
-identical; a race with two opponents is deterministic (identical ego
-telemetry and opponent summaries); scripted keys through the keyboard path
-drive at real time (achieved factor 1.0 ± 0.08). On the reference desktop
-one car runs at real time with headroom (as fast as possible: 6 s in
-about 3 s after start-up); a car with three opponents reaches about 0.87×
-real time (the batched wheel model and Gazebo's per-burst work grow with
-the number of cars).
+identical; a race with two opponents is deterministic in both opponent
+modes (identical ego telemetry and opponent summaries); scripted keys
+through the keyboard path drive at real time (achieved factor 1.0 ± 0.08).
+Speed on the reference desktop, running as fast as possible
+(`real_time_factor: 0`) for 20 s on the circuit: one car alone reaches
+1.32× real time; with three opponents it reaches 1.06× (kinematic) versus
+0.85× (dynamic); with five kinematic opponents it reaches 0.98×. The
+remaining cost is mostly the ego's own Python loop, about 1.7 ms per 4 ms
+period, of which the wheel model takes 0.7 ms.

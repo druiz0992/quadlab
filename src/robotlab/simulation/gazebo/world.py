@@ -21,7 +21,12 @@ from .wheeled_vehicle import (
 from ...core.track import Track
 from ..wheeled.config import WHEELED_KINDS
 from ..wheeled.ground import GroundModel, surfaces_from_scene, validate_surfaces
-from ..wheeled.spawn import spawn_pose, spawn_xy_yaw, validate_spawn_points
+from ..wheeled.spawn import (
+    kinematic_spawn_pose,
+    spawn_pose,
+    spawn_xy_yaw,
+    validate_spawn_points,
+)
 from .config import WORLD_ELEVATION_M, load_drone_config, wind_effects_enabled
 
 # Physics engine, written explicitly so a Gazebo upgrade cannot change it
@@ -258,20 +263,24 @@ def _add_wheeled(world, scene, config, terrain, mesh_dir):
     pose = spawn_pose(config.wheeled, ground, x, y, yaw)
     build_wheeled_vehicle(world, config.wheeled, config.data, pose)
     names = {obstacle["name"] for obstacle in scene["obstacles"]}
-    for index in range(1, config.data["ground_vehicle"]["opponents"]["count"] + 1):
+    opponents = config.data["ground_vehicle"]["opponents"]
+    kinematic = opponents["mode"] == "kinematic"
+    for index in range(1, opponents["count"] + 1):
         name = opponent_name(config.wheeled, index)
         if name in names:
             raise ValueError(f"scene obstacle name {name!r} is used by an opponent")
         x, y, yaw = spawn_xy_yaw(config.data, scene, offset=index)
+        place = kinematic_spawn_pose if kinematic else spawn_pose
         build_wheeled_vehicle(
             world,
             config.wheeled,
             config.data,
-            spawn_pose(config.wheeled, ground, x, y, yaw),
+            place(config.wheeled, ground, x, y, yaw),
             name=name,
             sensors=False,
             odometry_topic=OPPONENT_ODOMETRY_TOPIC.format(name=name),
             color=OPPONENT_COLORS[(index - 1) % len(OPPONENT_COLORS)],
+            kinematic_rate_hz=opponents["update_rate_hz"] if kinematic else None,
         )
 
 
