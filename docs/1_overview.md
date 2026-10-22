@@ -147,8 +147,9 @@ src/robotlab/
 │   ├── wheeled_mission.py  # The running wheeled mission (lockstep loop)
 │   └── wheeled_summary.py  # Wheeled summary.json assembly
 ├── testing/
-│   └── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo),
+│   ├── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo),
 │                           #   including check_wheeled_controller
+│   └── scenarios.py        # Estimator scenario suite: truth trajectories, scores
 └── visualization/
     ├── gazebo_rerun.py     # Gazebo-message-to-Rerun recording adapter
     ├── wheeled_rerun.py    # Wheeled-robot Rerun layout (wheels, surfaces, plots)
@@ -208,7 +209,9 @@ plug-in contracts in
 [7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms); put it in
 `estimation/<name>.py` or `control/<name>.py` (or any importable package)
 with tests in `tests/unit/<package>/` that call
-`robotlab.testing.plugins.check_estimator`/`check_controller`, and select
+`robotlab.testing.plugins.check_estimator`/`check_controller` (and, for
+an estimator, add it to the
+[scenario suite](7_experiments.md#estimator-scenario-suite)), and select
 it with `algorithms.estimator`/`algorithms.controller` as
 `package.module:Class`. Develop estimators against recorded runs with
 `robotlab-replay` (several at once for a comparison table), then confirm

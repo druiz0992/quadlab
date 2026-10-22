@@ -187,6 +187,57 @@ exceptions from the plug-in itself propagate unchanged. Passing means the
 plug-in fits the harness, not that it is good; judge that with Gazebo runs,
 `robotlab-replay`, and batches.
 
+### Estimator scenario suite
+
+`robotlab.testing.scenarios` scores an estimator against known truth on
+seeded synthetic data (no Gazebo). Each scenario is a truth trajectory
+plus sensor settings; `scenario_samples` turns it into bus samples (IMU
+200 Hz from t = 0: specific force `Rᵀ(a − g)` and body rates in body
+axes, plus constant bias and per-sample white noise; GPS 10 Hz from
+0.1 s at the body origin, with per-axis white noise and consecutive
+sequence numbers; IMU first at equal timestamps). `run_scenario` delivers
+them through the contract checks and returns a `ScenarioReport`:
+
+| Scenario | Truth | What it exposes |
+| --- | --- | --- |
+| `hover` | level at (0, 0, 1) m, facing east | noise handling, NIS consistency |
+| `constant_velocity` | straight, level, (1.5, 0.5, 0) m/s | velocity tracking |
+| `circle` | 5 m radius at 2 m/s, nose along the path (30 s) | frame and sign errors: constant body-frame centripetal force and yaw rate |
+| `gps_dropout` | `constant_velocity`, no GPS 8–13 s | coasting and recovery |
+| `biased_imu` | hover, accel bias (0.15, −0.1, 0.2) m/s², gyro bias (3, −2, 4) mrad/s, no GPS 30–35 s (40 s) | bias learning, seen as drift in the outage |
+
+Report metrics (after `settle_s`, 2 s or 10 s for `biased_imu`): position,
+velocity, attitude and tilt RMSE, maximum and final position error, final
+bias-error norms, and mean NIS per dof (None without innovations).
+`report.violations({"position_rmse_m": 0.1})` lists metrics above their
+limits. The estimator never sees the truth; `initial_truth(scenario)` is
+the explicit start state a test may declare as priors.
+
+`tests/unit/estimation/test_estimator_scenarios.py` runs every scenario for
+every entry of `CANDIDATES` (each with an options builder, per-scenario
+limits, and optionally an NIS band of 0.7–1.3). To add your filter, add a
+`Candidate`; a new scenario fails until every candidate declares limits.
+Verified scores (seeded, so exact):
+
+| Scenario | `gps_imu_ekf` position RMSE / tilt RMSE / NIS | `template` position RMSE / max error |
+| --- | --- | --- |
+| hover | 3.2 cm / 0.37° / 0.95 | 8.5 cm / 0.24 m |
+| constant_velocity | 3.6 cm / 0.47° / 0.91 | 8.4 cm / 0.25 m |
+| circle | 3.4 cm / 0.55° / 0.97 (attitude 4.2°) | 8.9 cm / 0.24 m (attitude 91°: starts facing east) |
+| gps_dropout | 15 cm, max 0.57 m | 82 cm, max 2.6 m |
+| biased_imu | 5.3 cm, max 0.22 m, tilt 1.26° | 1.12 m, max 4.6 m |
+
+The EKF there uses the default `ekf` section with the start pose and the
+scenario's GPS noise (0.05 m) declared. Two effects are physical, not
+defects: in a hover, yaw is unobservable and horizontal accelerometer bias
+is indistinguishable from tilt (0.18 m/s² ≈ 1°); on the circle, yaw is
+only weakly observable from 0.8 m/s² centripetal acceleration, so the EKF
+yaw error (about 2σ of its own covariance at times) dominates attitude
+RMSE. A flipped yaw-rate sign or swapped accelerometer axes fail the
+`circle` limits; the straight-line scenarios cannot detect either. The
+data are idealized (no latency, vibration, or banking), so the suite
+catches frame, sign, timing, and bias-handling mistakes, not tuning.
+
 ## Sensor bus and delivery timing (`sensor_timing`)
 
 `sensors/bus.py` turns each processed measurement into an immutable

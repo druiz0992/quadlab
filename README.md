@@ -193,7 +193,8 @@ robotlab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:
 robotlab-replay outputs/rec --output outputs/rec-cmp --estimator gps_imu_ekf \
   --estimator mypkg.filters:MyFilter            # side by side: comparison.md
 # Start new algorithms from estimation/template.py or control/template.py and
-# test them with robotlab.testing.plugins.check_estimator / check_controller
+# test them with robotlab.testing.plugins.check_estimator / check_controller;
+# score estimators on shared scenarios: tests/unit/estimation/test_estimator_scenarios.py
 
 # Magnetometer calibration (compass dance + throttle sweep in Gazebo), then fly with it
 robotlab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal

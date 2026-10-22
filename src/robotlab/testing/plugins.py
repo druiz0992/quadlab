@@ -40,6 +40,9 @@ driven wheels, brakes >= 0 on braked wheels, angles only on steered
 wheels), repeats exactly on a second run, and ``summary()`` (optional) is
 a JSON-serializable dict.
 
+``run_estimator`` is the checked delivery loop on its own, for any sample
+list; ``testing/scenarios.py`` uses it to score estimators against truth.
+
 All three raise ``PluginContractError`` (an AssertionError) with the reason,
 and return a report for further assertions. The data are synthetic and
 noise-light: passing says the plug-in fits the harness, not that it is a
@@ -207,17 +210,50 @@ def check_estimator(
     duration_s: float = 10.0,
 ) -> EstimatorReport:
     """Run the estimator contract checks (see module docs)."""
-    first = _run_estimator(factory, options or {}, duration_s)
-    second = _run_estimator(factory, options or {}, duration_s)
+    samples = hover_samples(duration_s)
+    first = run_estimator(factory, options or {}, samples)
+    second = run_estimator(factory, options or {}, samples)
     _fail(
-        len(first["states"]) == len(second["states"])
-        and all(_same_state(a, b) for a, b in zip(first["states"], second["states"])),
+        len(first.states) == len(second.states)
+        and all(_same_state(a, b) for a, b in zip(first.states, second.states)),
         "estimates differ between two identical runs (hidden randomness or state)",
     )
-    return first["report"]
+    last = first.states[-1] if first.states else None
+    final = None if last is None else last.payload.position_m
+    error = None if final is None else float(np.linalg.norm(final - HOVER_POSITION_M))
+    return EstimatorReport(
+        first.samples_delivered,
+        len(first.states),
+        len(first.innovations),
+        first.debug_entries,
+        None if final is None else (float(final[0]), float(final[1]), float(final[2])),
+        error,
+        first.summary,
+    )
 
 
-def _run_estimator(factory, options, duration_s) -> dict[str, Any]:
+@dataclass(frozen=True)
+class EstimatorRun:
+    """Everything one contract-checked estimator run produced."""
+
+    samples_delivered: int
+    states: tuple[Sample[EstimatedState], ...]  # each new latest(), in order
+    innovations: tuple[Innovation, ...]
+    debug_entries: int
+    summary: dict[str, Any]
+
+
+def run_estimator(
+    factory: Callable[[AlgorithmContext, Mapping[str, Any]], Any],
+    options: Mapping[str, Any],
+    samples: list[tuple[str, Sample]],
+) -> EstimatorRun:
+    """Deliver ``samples`` (kind, sample) in order to a new estimator built
+    on ``synthetic_context``, checking the contract after every delivery.
+
+    Samples of kinds the estimator does not declare in ``inputs`` are
+    skipped. Raises ``PluginContractError`` on the first violation.
+    """
     debug_entries = [0]
 
     def log(name, sim_time_ns, values, labels=None):
@@ -237,9 +273,10 @@ def _run_estimator(factory, options, duration_s) -> dict[str, Any]:
         f"inputs must be a non-empty tuple of {sorted(STREAMS)}, got {declared!r}",
     )
     inputs = cast(tuple[str, ...], declared)  # validated just above
-    states, innovations, newest_ns, last = [], 0, -1, None
-    delivered = 0
-    for kind, sample in hover_samples(duration_s):
+    states: list[Sample[EstimatedState]] = []
+    innovations: list[Innovation] = []
+    newest_ns, last, delivered = -1, None, 0
+    for kind, sample in samples:
         if kind not in inputs:
             continue
         delivered += 1
@@ -253,18 +290,9 @@ def _run_estimator(factory, options, duration_s) -> dict[str, Any]:
         innovations += _check_innovations(estimator.drain_innovations())
     summary = estimator.summary()
     _json_dict(summary, "summary")
-    final = None if last is None else last.payload.position_m
-    error = None if final is None else float(np.linalg.norm(final - HOVER_POSITION_M))
-    report = EstimatorReport(
-        delivered,
-        len(states),
-        innovations,
-        debug_entries[0],
-        None if final is None else (float(final[0]), float(final[1]), float(final[2])),
-        error,
-        summary,
+    return EstimatorRun(
+        delivered, tuple(states), tuple(innovations), debug_entries[0], summary
     )
-    return dict(report=report, states=states)
 
 
 def _check_estimate(latest: Any, previous: Any, newest_ns: int) -> None:
@@ -309,7 +337,7 @@ def _check_estimate(latest: Any, previous: Any, newest_ns: int) -> None:
     )
 
 
-def _check_innovations(innovations: Any) -> int:
+def _check_innovations(innovations: Any) -> list[Innovation]:
     _fail(isinstance(innovations, list), "drain_innovations() must return a list")
     for item in innovations:
         _fail(isinstance(item, Innovation), "innovations must be Innovation objects")
@@ -317,7 +345,7 @@ def _check_innovations(innovations: Any) -> int:
             np.isfinite(item.nis) and item.nis >= 0 and item.dof > 0,
             f"innovation {item.name!r}: NIS must be finite and ≥ 0, dof > 0",
         )
-    return len(innovations)
+    return innovations
 
 
 def _same_state(a: Sample, b: Sample) -> bool:
