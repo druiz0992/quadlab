@@ -1,4 +1,4 @@
-"""Opt-in real Gazebo checks: DRONELAB_TEST_GAZEBO=1 pytest this_file."""
+"""Opt-in real Gazebo checks: ROBOTLAB_TEST_GAZEBO=1 pytest this_file."""
 
 import json
 import os
@@ -7,12 +7,12 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.control.manual import FlightCommand
-from dronelab.experiments.gazebo import GazeboConfig, run
+from robotlab.control.manual import FlightCommand
+from robotlab.experiments.gazebo import GazeboConfig, run
 
 
 @pytest.mark.skipif(
-    os.environ.get("DRONELAB_TEST_GAZEBO") != "1",
+    os.environ.get("ROBOTLAB_TEST_GAZEBO") != "1",
     reason="requires native Gazebo transport and physics",
 )
 def test_manual_thrust_flight(tmp_path):
@@ -81,12 +81,12 @@ def test_manual_thrust_flight(tmp_path):
 
 
 @pytest.mark.skipif(
-    os.environ.get("DRONELAB_TEST_GAZEBO") != "1",
+    os.environ.get("ROBOTLAB_TEST_GAZEBO") != "1",
     reason="requires native Gazebo transport and physics",
 )
 @pytest.mark.parametrize("roll_deg", [0, 180])
 def test_configured_mass_limits_and_imu_error(tmp_path, monkeypatch, roll_deg):
-    from dronelab.visualization.gazebo_rerun import GazeboRerunRecorder
+    from robotlab.visualization.gazebo_rerun import GazeboRerunRecorder
 
     config = tmp_path / "drone.json"
     config.write_text(

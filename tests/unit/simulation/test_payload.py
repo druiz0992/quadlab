@@ -6,9 +6,9 @@ import sys
 import numpy as np
 import pytest
 
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.gazebo.vehicle import spawn_position
-from dronelab.simulation.gazebo.world import build_world
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.vehicle import spawn_position
+from robotlab.simulation.gazebo.world import build_world
 
 
 class FakeNode:
@@ -36,7 +36,7 @@ def control(monkeypatch):
     empty = ModuleType("gz.msgs10.empty_pb2")
     empty.Empty = object
     monkeypatch.setitem(sys.modules, "gz.msgs10.empty_pb2", empty)
-    from dronelab.simulation.gazebo.payload import PayloadControl
+    from robotlab.simulation.gazebo.payload import PayloadControl
 
     settings = dict(load_drone_config().data["payload"], enabled=True, drop_s=2.0)
     node = FakeNode()
@@ -48,7 +48,7 @@ def test_scheduled_drop_once(control):
     assert payload.update(1_000_000_000) is None
     assert payload.update(2_000_000_000)["action"] == "drop"
     assert payload.update(3_000_000_000) is None
-    assert node.published == ["/dronelab/payload/detach"] and not payload.attached
+    assert node.published == ["/robotlab/payload/detach"] and not payload.attached
 
 
 def test_pickup_only_within_reach_of_hook(control):
@@ -60,7 +60,7 @@ def test_pickup_only_within_reach_of_hook(control):
     assert not far["done"] and far["reason"] == "out of reach"
     near = payload.pickup(2, [0.1, 0.0, 0.3], level)  # hook at (0.1, 0, 0.18)
     assert near["done"] and near["distance_m"] == pytest.approx(np.hypot(0.1, 0.14))
-    assert node.published[-1] == "/dronelab/payload/attach" and payload.attached
+    assert node.published[-1] == "/robotlab/payload/attach" and payload.attached
 
 
 def test_payload_sdf_joint_and_ground_start(tmp_path):
@@ -113,7 +113,7 @@ def winch(monkeypatch):
 
     double.Double = Double
     monkeypatch.setitem(sys.modules, "gz.msgs10.double_pb2", double)
-    from dronelab.simulation.gazebo.payload import Winch
+    from robotlab.simulation.gazebo.payload import Winch
 
     tether = dict(
         load_drone_config().data["payload"]["tether"],

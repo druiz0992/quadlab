@@ -3,9 +3,9 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from dronelab.sensors.gazebo import vibrate_imu_message
-from dronelab.sensors.vibration import AccelerometerVibration
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.gazebo import vibrate_imu_message
+from robotlab.sensors.vibration import AccelerometerVibration
+from robotlab.simulation.gazebo.config import load_drone_config
 
 
 def settings(**overrides):

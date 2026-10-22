@@ -6,21 +6,21 @@ from types import MappingProxyType
 import numpy as np
 import pytest
 
-from dronelab.cli.replay import parse_overrides
-from dronelab.core.algorithms import AlgorithmContext, SensorDescription
-from dronelab.core.measurements import (
+from robotlab.cli.replay import parse_overrides
+from robotlab.core.algorithms import AlgorithmContext, SensorDescription
+from robotlab.core.measurements import (
     CameraFrame,
     GpsReading,
     GpsStatus,
     ImuReading,
     Sample,
 )
-from dronelab.core.serialization import decode, encode
-from dronelab.core.vehicle import DroneProperties
-from dronelab.experiments.algorithm_debug import AlgorithmDebugLog
-from dronelab.experiments.replay import replay
-from dronelab.experiments.replay_log import ReplayRecorder
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.core.serialization import decode, encode
+from robotlab.core.vehicle import DroneProperties
+from robotlab.experiments.algorithm_debug import AlgorithmDebugLog
+from robotlab.experiments.replay import replay
+from robotlab.experiments.replay_log import ReplayRecorder
+from robotlab.simulation.gazebo.config import load_drone_config
 
 
 def roundtrip(value):
@@ -69,7 +69,7 @@ def test_codec_context_skips_log_and_refuses_foreign_types():
     assert isinstance(restored.sensors, MappingProxyType)
     assert restored.sensors["imu"].rate_hz == 200.0 and restored == context
     foreign = {"__dataclass__": "subprocess:Popen", "fields": {}}
-    with pytest.raises(ValueError, match="not a dronelab type"):
+    with pytest.raises(ValueError, match="not a robotlab type"):
         decode(foreign)
 
 
@@ -104,7 +104,7 @@ def test_debug_log_validates_and_opens_lazily(tmp_path):
 
 ESTIMATOR = '''
 import numpy as np
-from dronelab.core.measurements import EstimatedState, Sample
+from robotlab.core.measurements import EstimatedState, Sample
 
 class Echo:
     """Test estimator: position = configured offset; logs every sample."""
@@ -200,7 +200,7 @@ def test_replay_overrides_are_validated_and_applied(recorded, tmp_path):
 def test_replay_rejects_other_files(tmp_path):
     other = tmp_path / "telemetry.jsonl"
     other.write_text('{"time": 0}\n')
-    with pytest.raises(ValueError, match="not a dronelab-replay log"):
+    with pytest.raises(ValueError, match="not a robotlab-replay log"):
         replay(other, tmp_path / "out")
 
 
@@ -215,7 +215,7 @@ def test_cli_override_parsing():
 
 
 def test_compare_estimators_side_by_side(recorded, tmp_path):
-    from dronelab.experiments.replay import compare_estimators, estimator_label
+    from robotlab.experiments.replay import compare_estimators, estimator_label
 
     taken = set()
     assert estimator_label("a.b:Echo", taken) == "Echo"

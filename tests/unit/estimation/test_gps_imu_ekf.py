@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.estimation.gps_imu_ekf import GpsImuEkf
+from robotlab.estimation.gps_imu_ekf import GpsImuEkf
 
 
 def ekf(**kwargs):

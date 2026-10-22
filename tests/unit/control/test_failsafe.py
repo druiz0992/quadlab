@@ -2,9 +2,9 @@ import math
 
 import pytest
 
-from dronelab.control.manual import FlightCommand, ManualController
-from dronelab.experiments.failsafe import BatteryFailsafe
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.control.manual import FlightCommand, ManualController
+from robotlab.experiments.failsafe import BatteryFailsafe
+from robotlab.simulation.gazebo.config import load_drone_config
 
 
 def failsafe(**overrides):

@@ -1,15 +1,15 @@
-"""Opt-in desktop event check: DRONELAB_TEST_GUI=1 pytest this_file."""
+"""Opt-in desktop event check: ROBOTLAB_TEST_GUI=1 pytest this_file."""
 
 import os
 import time
 
 import pytest
 
-from dronelab.visualization.keyboard import KeyboardWindow
+from robotlab.visualization.keyboard import KeyboardWindow
 
 
 @pytest.mark.skipif(
-    os.environ.get("DRONELAB_TEST_GUI") != "1", reason="requires a desktop display"
+    os.environ.get("ROBOTLAB_TEST_GUI") != "1", reason="requires a desktop display"
 )
 def test_real_keyboard_window():
     window = KeyboardWindow()

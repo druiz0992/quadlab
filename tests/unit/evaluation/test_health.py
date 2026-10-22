@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.evaluation.health import (
+from robotlab.evaluation.health import (
     HealthThresholds,
     RunHealth,
     contact_model,
@@ -56,7 +56,7 @@ def test_quiet_flight_is_ok():
 
 def test_helpers():
     assert contact_model("drone::base_link::body") == "drone"
-    assert contact_model("dronelab::wall::link::box") == "wall"
+    assert contact_model("robotlab::wall::link::box") == "wall"
     assert contact_model("ground") == "ground"
     assert tilt_deg(LEVEL) == pytest.approx(0)
     assert tilt_deg(roll(120)) == pytest.approx(120)

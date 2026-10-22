@@ -141,8 +141,8 @@ Start from a template; both are short and commented, and pass the kit:
 
 | Template | Selects with | What it does |
 | --- | --- | --- |
-| `estimation/template.py` | `dronelab.estimation.template:TemplateEstimator` | Complementary filter: gyro-integrated attitude pulled towards the accelerometer's gravity direction, GPS-blended position and velocity; fixed reported covariance (NEES not meaningful); logs `template/gps_error` |
-| `control/template.py` | `dronelab.control.template:TemplateController` | Cascaded PD: position → tilt-limited acceleration → desired attitude (geometric attitude error, Lee et al. 2010) → torque → pseudo-inverse allocation over the lift rotors |
+| `estimation/template.py` | `robotlab.estimation.template:TemplateEstimator` | Complementary filter: gyro-integrated attitude pulled towards the accelerometer's gravity direction, GPS-blended position and velocity; fixed reported covariance (NEES not meaningful); logs `template/gps_error` |
+| `control/template.py` | `robotlab.control.template:TemplateController` | Cascaded PD: position → tilt-limited acceleration → desired attitude (geometric attitude error, Lee et al. 2010) → torque → pseudo-inverse allocation over the lift rotors |
 
 Both reject unknown option keys. Verified in lockstep on the training
 square (two laps, 45 s): the template controller tracked with 0.148 m
@@ -150,11 +150,11 @@ RMSE (built-in 0.101 m), peak tilt 8.7°, health `ok`; the template
 estimator, as observer on the same flight, had 1.4 cm position and 1.4°
 attitude RMSE.
 
-`dronelab.testing.plugins` checks a plug-in's contract without Gazebo, in
+`robotlab.testing.plugins` checks a plug-in's contract without Gazebo, in
 a unit test:
 
 ```python
-from dronelab.testing.plugins import check_controller, check_estimator
+from robotlab.testing.plugins import check_controller, check_estimator
 
 def test_my_filter():
     report = check_estimator(MyFilter, {"gain": 2.0})
@@ -181,7 +181,7 @@ def test_my_controller():
 Failures raise `PluginContractError` (an `AssertionError`) with the reason;
 exceptions from the plug-in itself propagate unchanged. Passing means the
 plug-in fits the harness, not that it is good; judge that with Gazebo runs,
-`dronelab-replay`, and batches.
+`robotlab-replay`, and batches.
 
 ## Sensor bus and delivery timing (`sensor_timing`)
 
@@ -384,11 +384,11 @@ logs small (about 190 kB per simulated second with IMU at 200 Hz and GPS at
 10 Hz); `all` adds camera frames and lidar points.
 
 ```bash
-dronelab ... --drone configs/algorithms/record_replay.json --output outputs/rec
-dronelab-replay outputs/rec --output outputs/rec-ekf                      # estimator as flown
-dronelab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:MyFilter \
+robotlab ... --drone configs/algorithms/record_replay.json --output outputs/rec
+robotlab-replay outputs/rec --output outputs/rec-ekf                      # estimator as flown
+robotlab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:MyFilter \
   --set 'algorithms.estimator_options={"gain": 2}'
-dronelab-replay outputs/rec --output outputs/rec-tuned --set 'ekf.gps_std_m=[1,1,2]'
+robotlab-replay outputs/rec --output outputs/rec-tuned --set 'ekf.gps_std_m=[1,1,2]'
 ```
 
 Repeat `--estimator` to compare several on the same recording: each
@@ -397,7 +397,7 @@ estimation errors (lowest marked) and NEES. `--set` applies to all of
 them, so give estimator-specific options only when comparing one at a
 time.
 
-`dronelab-replay` (`experiments/replay.py`) builds the estimator from the
+`robotlab-replay` (`experiments/replay.py`) builds the estimator from the
 recorded settings plus `--set` overrides (dotted keys, JSON values,
 validated like any config layer) and the recorded context, feeds it the
 samples in order, and scores it against the recorded truth with the same
@@ -417,9 +417,9 @@ square with sensor errors reproduced the live `estimates.jsonl`,
 ## Batch experiments and baselines
 
 ```bash
-dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --dry-run
-dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --save-baseline
-dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check   # exit 1 on regression or failed run
+robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --dry-run
+robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --save-baseline
+robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check   # exit 1 on regression or failed run
 ```
 
 An experiment file (`experiments/batch.py` documents every key) names:
@@ -437,12 +437,12 @@ How runs are built and executed:
 - A seed sets every `seed`/`random_seed` in the resolved configuration to
   seed + CRC32(key path), so the random streams stay independent and adding
   new seed keys never changes existing ones (stable baselines).
-- Runs are separate `dronelab` processes, `parallel` at a time, each with a
+- Runs are separate `robotlab` processes, `parallel` at a time, each with a
   fresh output directory (non-empty ones are refused) and a private Gazebo
   transport partition.
 - Ctrl-C or SIGTERM stops the batch: no further runs start, running ones are
   sent SIGTERM and save their results (marked `interrupted`), any still
-  running after 60 s are killed, and `dronelab-batch` exits with 130
+  running after 60 s are killed, and `robotlab-batch` exits with 130
   (Ctrl-C) or 143 (SIGTERM) without aggregating. Children also stop if the
   batch itself is killed (see [2 Simulation](2_simulation.md#stopping-and-cleanup)).
 

@@ -3,8 +3,8 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from dronelab.sensors.lidar_effects import LidarEffects, sensor_frame_scan
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.lidar_effects import LidarEffects, sensor_frame_scan
+from robotlab.simulation.gazebo.config import load_drone_config
 
 
 def lidar(**effects):

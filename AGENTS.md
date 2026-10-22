@@ -1,4 +1,4 @@
-# DroneLab agent and contributor rules
+# RobotLab agent and contributor rules
 
 These rules apply to every session, for both coding agents and human
 contributors. Read them before changing anything. How to run the project is
@@ -76,7 +76,7 @@ in [README.md](README.md); design, behavior, and reference material are in
 - Authored scenes and saved worlds live in `worlds/`; generated artifacts go
   in `outputs/` or a temporary directory. Never commit virtual environments,
   caches, recordings, or large flight data.
-- When editing reusable worlds keep the world name `dronelab`, vehicle name
+- When editing reusable worlds keep the world name `robotlab`, vehicle name
   `drone`, sensor topics, and plugins. Collision and visual sizes must match.
 - Gazebo is authoritative for collisions and rendered sensors; Rerun world
   sync is partial. Check the health verdict and missing/dropped message
@@ -90,8 +90,8 @@ in [README.md](README.md); design, behavior, and reference material are in
     validation, and edge cases, using fakes for transport, clocks, and RNGs.
   - **Integration tests** in `tests/integration/` for flows spanning
     components. Tests needing Gazebo or a display are opt-in through
-    `DRONELAB_TEST_GAZEBO=1` / `DRONELAB_TEST_GUI=1` and must skip otherwise;
-    missions of several minutes also need `DRONELAB_TEST_GAZEBO_SLOW=1`.
+    `ROBOTLAB_TEST_GAZEBO=1` / `ROBOTLAB_TEST_GUI=1` and must skip otherwise;
+    missions of several minutes also need `ROBOTLAB_TEST_GAZEBO_SLOW=1`.
   - **Gazebo regression tests** in `tests/integration/test_gazebo_regression.py`
     pin verified simulator numbers in lockstep. Add one when you verify a new
     Gazebo behavior, and run the suite after changing the mission loop,
@@ -102,7 +102,7 @@ in [README.md](README.md); design, behavior, and reference material are in
   source .venv/bin/activate
   black --check src tests && mypy
   PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q
-  python -m dronelab --generate-only --output /tmp/dronelab-world-check
+  python -m robotlab --generate-only --output /tmp/robotlab-world-check
   ```
 
 - CI (`.github/workflows/tests.yml`) repeats these checks on Python 3.12
@@ -142,7 +142,7 @@ a new numbered file if a topic truly needs one. Keep links relative and valid.
   from ROS Jazzy (`source /opt/ros/jazzy/setup.bash`).
 - RotorPy and Rerun are pinned in `pyproject.toml`; change pins deliberately.
 - `gazebo_plugins/` holds C++ gz-sim system plugins (currently the lockstep
-  barrier), built with `dronelab-build-plugins` into `build/` (never
+  barrier), built with `robotlab-build-plugins` into `build/` (never
   committed). Python must keep working without them (fallback and a clear
   error when one is required). Keep them small; numerical algorithms stay
   in Python.

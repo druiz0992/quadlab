@@ -1,6 +1,6 @@
 # 4. Flight control
 
-DroneLab has two control modes, chosen with `--control-mode` (or implied by
+RobotLab has two control modes, chosen with `--control-mode` (or implied by
 `--keyboard`). Both use **ground-truth odometry** explicitly as feedback,
 labelled as such in `summary.json`. No estimator feeds control yet.
 
@@ -81,7 +81,7 @@ alongside anything scheduled in the configuration.
 | [ / ] | Ambient temperature down / up one step (clamped to −40…60 °C); the battery pack and IMU die jump by the same amount, as if swapping to a pack soaked at the new temperature, then self-heating continues | `ambient_step_c` (10); requires `battery.thermal.enabled` or `sensors.imu.temperature.enabled` ([3 Configuration](3_configuration.md#temperature-effects)) |
 
 Key 7 spawns a gravity-free moving obstacle at run time through Gazebo's
-`/world/dronelab/create` service (removed with `/world/dronelab/remove`),
+`/world/robotlab/create` service (removed with `/world/robotlab/remove`),
 circling the drone's position at the key press, at that altitude, along an
 8-point loop. Each spawn has a new name (`flying_object_1`, `_2`, …). Service
 replies are not trusted (see lockstep notes); the object's pose stream is
@@ -109,7 +109,7 @@ presses: all nine toggles took effect at their times (a 2 s blackout dropped
 exactly 20 fixes; wind went to still air and back; rotor 0's available thrust
 fell from 1 to 0 at the motor-stop toggle). Tests also caught that removing
 the last motor override must restore full health. The interactive Tk window
-itself needs a desktop check (`DRONELAB_TEST_GUI=1`).
+itself needs a desktop check (`ROBOTLAB_TEST_GUI=1`).
 
 ### Rotors
 
@@ -353,6 +353,6 @@ values, conflicts, replacement, expiry, pause/resume, stop races, failure
 cleanup, publish-on-send, tick grids, latency buffers, warm-up, loop-rate
 division, and equivalence of default timing with the single-loop controller,
 using fake clocks and transport. The opt-in Gazebo test
-(`DRONELAB_TEST_GAZEBO=1`, `tests/integration/test_gazebo_manual.py`) exercises
+(`ROBOTLAB_TEST_GAZEBO=1`, `tests/integration/test_gazebo_manual.py`) exercises
 forward/backward, turning, climb/descent, and hover recovery. Per-rotor
 perturbation response, lag, and GUI flight still need runtime checks.

@@ -12,7 +12,7 @@ Files are small building blocks, organized by topic under `configs/`. Repeat
 `--drone` to layer them; later files override earlier ones:
 
 ```bash
-dronelab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --ekf --control-mode rotor-thrust \
   --drone configs/vehicles/10in_4s.json \
   --drone configs/sensors/sensor_errors.json \
   --drone configs/environment/turbulence.json \
@@ -297,7 +297,7 @@ which are unaffected by sensor noise.
 **GPS horizontal noise mapping.** Gazebo Sensors 8 applies horizontal
 position noise directly to latitude/longitude in degrees
 ([source](https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/NavSatSensor.cc)).
-DroneLab converts configured metres to degrees with Earth radius 6378137 m, a
+RobotLab converts configured metres to degrees with Earth radius 6378137 m, a
 north-equivalent scale; east noise is therefore smaller by about
 cos(latitude). This is not isotropic ENU noise. Vertical values keep metre
 units. Regenerate older worlds to use this mapping. The Python GPS error
@@ -395,10 +395,10 @@ follows the same pattern:
   because the turn-on bias changes each time.
 - **In flight:** the EKF estimates what is left.
 
-**1. Procedure: `dronelab-imucal`** (`experiments/imu_calibration.py`):
+**1. Procedure: `robotlab-imucal`** (`experiments/imu_calibration.py`):
 
 ```bash
-dronelab-imucal --drone configs/sensors/imu_consumer_mems.json --startup-gyro-s 2 --output outputs/imucal
+robotlab-imucal --drone configs/sensors/imu_consumer_mems.json --startup-gyro-s 2 --output outputs/imucal
 ```
 
 The configured vehicle is made static, as if held by a fixture, with
@@ -451,7 +451,7 @@ When enabled, the autopilot side applies it like a driver:
   and estimate-driven body rates use the calibrated values.
 - **EKF priors:** the EKF's bias states then track only the residual, so
   its initial bias uncertainty is taken from `filter_*_bias_std` instead of
-  the `ekf` section. `dronelab-imucal` writes these as
+  the `ekf` section. `robotlab-imucal` writes these as
   √(residual² + turn-on repeatability² + bias instability²) per instrument.
   The repeatability and instability are datasheet values, read from the
   error model by the tool, never by the filter. The gyro omits turn-on
@@ -995,7 +995,7 @@ Rotor-thrust mode only. `simulation/fixed_wing.py` computes wing, tail, and
 control-surface forces in Python and applies them, with body drag, as one
 persistent ApplyLinkWrench. That wrench acts at the link origin, which was
 verified with an offset centre of mass. The wing sees airspeed relative to
-DroneLab's wind.
+RobotLab's wind.
 
 The model is the coefficient model of Beard & McLain, *Small Unmanned
 Aircraft* (2012), ch. 4:
@@ -1230,7 +1230,7 @@ circular image), and multiple cameras (one camera per vehicle).
 A Gazebo magnetometer, off by default. Gazebo computes the Earth field from
 the world's latitude/longitude with an internal table, ignoring any world
 `<magnetic_field>`. Its defaults publish **gauss** in a **north-east-down**
-frame despite the `field_tesla` message name; DroneLab sets the plugin's
+frame despite the `field_tesla` message name; RobotLab sets the plugin's
 `use_units_gauss` and `use_earth_frame_ned` to false so messages carry tesla
 in the world's ENU frame, rotated into sensor axes. Verified in Gazebo: at
 the Madrid reference the field is 25.6 µT north and 37.2 µT down (45.1 µT,
@@ -1277,14 +1277,14 @@ Calibration removes the vehicle's own predictable distortions. It does not
 remove noise, drift after calibration, changes to the vehicle (payload,
 wiring), or anomalies in the environment, so filters should still treat the
 compass as imperfect. Real autopilots split the work three ways, and so does
-DroneLab:
+RobotLab:
 
-**1. Procedure: `dronelab-magcal`** (`experiments/magnetometer_calibration.py`),
+**1. Procedure: `robotlab-magcal`** (`experiments/magnetometer_calibration.py`),
 the simulated ground-station compass calibration:
 
 ```bash
-dronelab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal
-dronelab ... --drone configs/sensors/magnetometer.json --drone outputs/magcal/magnetometer-calibration.json
+robotlab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal
+robotlab ... --drone configs/sensors/magnetometer.json --drone outputs/magcal/magnetometer-calibration.json
 ```
 
 - **Orientation dance:** Gazebo runs the configured vehicle with gravity
@@ -1530,14 +1530,14 @@ reflectivity setting.
 ## Barometer (`sensors.baro`)
 
 A Gazebo air-pressure sensor on the body, off by default. It measures static
-pressure in Pa; DroneLab converts it with the International Standard
+pressure in Pa; RobotLab converts it with the International Standard
 Atmosphere (`sensors/barometer.py`) to **pressure altitude above sea level**,
 comparable with GPS altitude (both use the world's 650 m elevation datum).
 Near 650 m, pressure falls about 11 Pa per metre.
 
 | Key | Units | Default | Meaning |
 | --- | --- | --- | --- |
-| `enabled` | bool | false | Add the sensor and subscribe to `/dronelab/baro` |
+| `enabled` | bool | false | Add the sensor and subscribe to `/robotlab/baro` |
 | `rate_hz` | Hz | 50 | Sample rate (≤ physics rate) |
 | `mount` | m, deg | origin | Body-relative position/rotation, like other sensors |
 | `pressure_pa.bias`, `pressure_pa.noise_stddev` | Pa | 0 | Gazebo native Gaussian error (not seeded) |
@@ -1655,7 +1655,7 @@ centre of mass: linear drag, not calibrated aerodynamics
   not depend on odometry polling. Scheduled events replace the mean and do
   not reset the random sequence; periodic gusts act on the smoothed speed.
 - `simulation/gazebo/wind.py` publishes dynamic targets to
-  `/world/dronelab/wind` at the first odometry sample at or after each
+  `/world/robotlab/wind` at the first odometry sample at or after each
   tick/event; missed ticks consume their RNG draws. Gazebo smooths the change
   (`rise_time_s`) and may take the long way round when crossing ±180°.
 - `wind-commands.jsonl` records requested targets and dispatch times, not

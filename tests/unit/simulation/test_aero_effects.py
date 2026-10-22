@@ -4,14 +4,14 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.simulation.aerodynamics import (
+from robotlab.simulation.aerodynamics import (
     RotorAerodynamics,
     hover_induced_velocity,
     quadratic_body_drag_world,
     translational_lift_factor,
     vortex_ring_factor,
 )
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.config import load_drone_config
 
 LEVEL = [0, 0, 0, 1]
 

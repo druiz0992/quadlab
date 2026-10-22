@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from dronelab.core.measurements import GpsReading, ImuReading
-from dronelab.sensors.bus import SensorBus
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.core.measurements import GpsReading, ImuReading
+from robotlab.sensors.bus import SensorBus
+from robotlab.simulation.gazebo.config import load_drone_config
 
 MS = 1_000_000
 

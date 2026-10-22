@@ -12,7 +12,7 @@ def test_python_module_runs_gazebo_generation_without_gui(tmp_path):
         [
             sys.executable,
             "-m",
-            "dronelab",
+            "robotlab",
             "--generate-only",
             "--control-mode",
             "rotor-thrust",
@@ -31,7 +31,7 @@ def test_python_module_runs_gazebo_generation_without_gui(tmp_path):
 
 def test_retired_backend_option_is_rejected():
     result = subprocess.run(
-        [sys.executable, "-m", "dronelab", "--backend", "reference"],
+        [sys.executable, "-m", "robotlab", "--backend", "reference"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -41,10 +41,10 @@ def test_retired_backend_option_is_rejected():
 
 
 def test_live_ekf_option_is_forwarded(monkeypatch):
-    from dronelab.cli import gazebo
+    from robotlab.cli import gazebo
 
     configurations = []
-    monkeypatch.setattr(sys, "argv", ["dronelab", "--ekf", "--headless", "--rerun"])
+    monkeypatch.setattr(sys, "argv", ["robotlab", "--ekf", "--headless", "--rerun"])
     monkeypatch.setattr(gazebo, "run", configurations.append)
     gazebo.main()
     assert (
@@ -57,7 +57,7 @@ def test_repeated_drone_option_layers_files_and_records_sources(tmp_path):
         [
             sys.executable,
             "-m",
-            "dronelab",
+            "robotlab",
             "--generate-only",
             "--drone",
             "configs/vehicles/10in_4s.json",
@@ -84,12 +84,12 @@ def test_repeated_drone_option_layers_files_and_records_sources(tmp_path):
 
 
 def test_runtime_error_exits_without_usage(monkeypatch, capsys):
-    from dronelab.cli import gazebo
+    from robotlab.cli import gazebo
 
     def fail(config):
         raise RuntimeError("Stale odometry in rotor-control queue")
 
-    monkeypatch.setattr(sys, "argv", ["dronelab"])
+    monkeypatch.setattr(sys, "argv", ["robotlab"])
     monkeypatch.setattr(gazebo, "run", fail)
     with pytest.raises(SystemExit) as exit_info:
         gazebo.main()
@@ -99,12 +99,12 @@ def test_runtime_error_exits_without_usage(monkeypatch, capsys):
 
 
 def test_value_error_shows_usage(monkeypatch, capsys):
-    from dronelab.cli import gazebo
+    from robotlab.cli import gazebo
 
     def invalid(config):
         raise ValueError("bad option")
 
-    monkeypatch.setattr(sys, "argv", ["dronelab"])
+    monkeypatch.setattr(sys, "argv", ["robotlab"])
     monkeypatch.setattr(gazebo, "run", invalid)
     with pytest.raises(SystemExit) as exit_info:
         gazebo.main()
@@ -117,9 +117,9 @@ def test_interrupt_and_absorbed_sigterm_exit_statuses(capsys):
     import os
     import signal
 
-    from dronelab.cli.common import run_reporting_errors
+    from robotlab.cli.common import run_reporting_errors
 
-    parser = argparse.ArgumentParser(prog="dronelab")
+    parser = argparse.ArgumentParser(prog="robotlab")
 
     def interrupted():
         raise KeyboardInterrupt

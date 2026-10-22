@@ -5,8 +5,8 @@ from queue import Empty
 
 import pytest
 
-from dronelab.simulation.gazebo import ingress as ingress_module
-from dronelab.simulation.gazebo.ingress import (
+from robotlab.simulation.gazebo import ingress as ingress_module
+from robotlab.simulation.gazebo.ingress import (
     MessageIngress,
     gz_sim_command,
     subscriptions,
@@ -39,10 +39,10 @@ def test_subscribe_failure_is_an_error(monkeypatch):
 
     class Node:
         def subscribe(self, cls, topic, callback):
-            return topic != "/dronelab/imu"
+            return topic != "/robotlab/imu"
 
-    topics = [("x", "/dronelab/odometry", "odometry"), ("y", "/dronelab/imu", "imu")]
-    with pytest.raises(ValueError, match="/dronelab/imu"):
+    topics = [("x", "/robotlab/odometry", "odometry"), ("y", "/robotlab/imu", "imu")]
+    with pytest.raises(ValueError, match="/robotlab/imu"):
         MessageIngress().subscribe(Node(), topics)
 
 
@@ -66,7 +66,7 @@ def test_gz_sim_command():
 
 from types import SimpleNamespace
 
-from dronelab.simulation.gazebo.ingress import LockstepOrderer, scheduled_stamp_ns
+from robotlab.simulation.gazebo.ingress import LockstepOrderer, scheduled_stamp_ns
 
 STEP = 2_000_000
 
@@ -160,7 +160,7 @@ def test_missing_sample_times_out_and_is_counted():
 
 # Start-up subscriber barrier -----------------------------------------------------
 
-from dronelab.simulation.gazebo.stepping import TrackedNode, wait_for_subscribers
+from robotlab.simulation.gazebo.stepping import TrackedNode, wait_for_subscribers
 
 
 class FakePublisher:

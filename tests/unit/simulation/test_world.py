@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from dronelab.simulation.gazebo.world import build_world, load_scene
+from robotlab.simulation.gazebo.world import build_world, load_scene
 
 
 def test_world_geometry_and_sensors(tmp_path):
@@ -25,7 +25,7 @@ def test_world_geometry_and_sensors(tmp_path):
         "camera",
         "gpu_lidar",
     }
-    assert drone.findtext("./link/sensor/contact/topic") == "/dronelab/contacts"
+    assert drone.findtext("./link/sensor/contact/topic") == "/robotlab/contacts"
     assert len(drone.findall("./plugin/rotorConfiguration/rotor")) == 4
     assert not root.findall(".//uri")  # No remote assets needed.
 

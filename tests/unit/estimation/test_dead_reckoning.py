@@ -2,8 +2,8 @@ import numpy as np
 
 from scipy.spatial.transform import Rotation
 
-from dronelab.estimation.dead_reckoning import ImuDeadReckoning
-from dronelab.simulation.state import initial_state
+from robotlab.estimation.dead_reckoning import ImuDeadReckoning
+from robotlab.simulation.state import initial_state
 
 
 def test_ideal_hover_estimator():

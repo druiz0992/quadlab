@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.control.references import ReferencePoint
-from dronelab.core.measurements import EstimatedState
-from dronelab.evaluation.control import ControlMetrics, step_response
-from dronelab.evaluation.estimation import EstimationMetrics, chi2_consistency
-from dronelab.evaluation.truth import TruthHistory
+from robotlab.control.references import ReferencePoint
+from robotlab.core.measurements import EstimatedState
+from robotlab.evaluation.control import ControlMetrics, step_response
+from robotlab.evaluation.estimation import EstimationMetrics, chi2_consistency
+from robotlab.evaluation.truth import TruthHistory
 
 MS = 1_000_000
 

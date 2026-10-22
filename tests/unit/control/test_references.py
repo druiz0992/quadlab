@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from dronelab.control.references import (
+from robotlab.control.references import (
     Chirp,
     Circle,
     Doublet,
@@ -16,7 +16,7 @@ from dronelab.control.references import (
     minimum_jerk,
     validate_mission,
 )
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.config import load_drone_config
 
 
 def numeric_derivative(reference, t, h=1e-5):

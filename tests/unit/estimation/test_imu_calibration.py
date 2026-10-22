@@ -7,15 +7,15 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.estimation.imu_calibration import ImuCalibration, ImuCalibrationDriver
-from dronelab.evaluation.imu_bias import EffectiveImuBias
-from dronelab.experiments.sensor_pipeline import calibration_warnings
-from dronelab.experiments.imu_calibration import (
+from robotlab.estimation.imu_calibration import ImuCalibration, ImuCalibrationDriver
+from robotlab.evaluation.imu_bias import EffectiveImuBias
+from robotlab.experiments.sensor_pipeline import calibration_warnings
+from robotlab.experiments.imu_calibration import (
     AXIS_POSES,
     imu_calibration_config,
     write_static_world,
 )
-from dronelab.simulation.gazebo.config import load_drone_config, sensor_fingerprint
+from robotlab.simulation.gazebo.config import load_drone_config, sensor_fingerprint
 
 MS = 1_000_000
 A = (
@@ -144,7 +144,7 @@ def test_static_calibration_world_and_gravity(tmp_path):
 
 
 def test_calibration_priors_override_ekf_defaults_only_when_enabled():
-    from dronelab.estimation.gps_imu_ekf.plugin import with_calibrated_priors
+    from robotlab.estimation.gps_imu_ekf.plugin import with_calibrated_priors
 
     ekf = load_drone_config().data["ekf"]
     calibration = dict(filter_accel_bias_std_mps2=0.05, filter_gyro_bias_std_rad_s=4e-4)
@@ -162,8 +162,8 @@ def test_calibration_priors_override_ekf_defaults_only_when_enabled():
 def test_live_ekf_uses_calibrated_imu_values():
     from types import SimpleNamespace as NS
 
-    from dronelab.core.measurements import GpsReading
-    from dronelab.experiments.live_ekf import LiveEkf
+    from robotlab.core.measurements import GpsReading
+    from robotlab.experiments.live_ekf import LiveEkf
 
     settings = load_drone_config().data
     live = LiveEkf(settings, GpsReading(40.4168, -3.7038, 650.0), monotonic=lambda: 0.0)

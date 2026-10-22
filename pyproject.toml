@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dronelab"
+name = "robotlab"
 version = "0.1.0"
 description = "Drone simulation lab for testing estimation and control algorithms"
 requires-python = ">=3.12"
@@ -14,13 +14,13 @@ dev = ["pytest>=8", "black>=24", "mypy>=1.10"]
 gazebo = ["rerun-sdk==0.24.1", "protobuf>=4.25,<6"]
 
 [project.scripts]
-dronelab = "dronelab.cli.gazebo:main"
-dronelab-gazebo = "dronelab.cli.gazebo:main"
-dronelab-batch = "dronelab.cli.batch:main"
-dronelab-magcal = "dronelab.cli.magcal:main"
-dronelab-imucal = "dronelab.cli.imucal:main"
-dronelab-replay = "dronelab.cli.replay:main"
-dronelab-build-plugins = "dronelab.cli.build_plugins:main"
+robotlab = "robotlab.cli.gazebo:main"
+robotlab-gazebo = "robotlab.cli.gazebo:main"
+robotlab-batch = "robotlab.cli.batch:main"
+robotlab-magcal = "robotlab.cli.magcal:main"
+robotlab-imucal = "robotlab.cli.imucal:main"
+robotlab-replay = "robotlab.cli.replay:main"
+robotlab-build-plugins = "robotlab.cli.build_plugins:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -31,7 +31,7 @@ pythonpath = ["src"]
 
 [tool.mypy]
 python_version = "3.12"
-files = ["src/dronelab", "tests"]
+files = ["src/robotlab", "tests"]
 mypy_path = "src"
 warn_unused_ignores = true
 

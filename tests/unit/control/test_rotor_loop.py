@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from dronelab.control.drone import RotorThrustControl
-from dronelab.control.manual import FlightCommand, ManualController
-from dronelab.experiments.rotor_loop import RotorControlLoop, TruthState
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.control.drone import RotorThrustControl
+from robotlab.control.manual import FlightCommand, ManualController
+from robotlab.experiments.rotor_loop import RotorControlLoop, TruthState
+from robotlab.simulation.gazebo.config import load_drone_config
 
 MS = 1_000_000
 

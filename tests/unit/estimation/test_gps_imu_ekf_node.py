@@ -2,10 +2,10 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.core.measurements import EstimatedState, GpsReading, ImuReading
-from dronelab.estimation.gps_imu_ekf import GpsImuEkf, GpsImuEkfNode
-from dronelab.sensors.streams import Publisher
-from dronelab.sensors.geodesy import gps_to_enu
+from robotlab.core.measurements import EstimatedState, GpsReading, ImuReading
+from robotlab.estimation.gps_imu_ekf import GpsImuEkf, GpsImuEkfNode
+from robotlab.sensors.streams import Publisher
+from robotlab.sensors.geodesy import gps_to_enu
 
 
 def test_rotated_imu_output_fanout_and_explicit_gps_timing():
@@ -85,7 +85,7 @@ def _node(**flags):
 
 
 def test_first_fix_initializes_position_and_its_covariance():
-    from dronelab.core.measurements import GpsStatus
+    from robotlab.core.measurements import GpsStatus
 
     node, reference, imu, gps = _node(
         initialize_from_gps=True, use_receiver_accuracy=True
@@ -119,7 +119,7 @@ def test_first_fix_initializes_position_and_its_covariance():
 
 
 def test_receiver_accuracy_is_used_only_when_valid():
-    from dronelab.core.measurements import GpsStatus
+    from robotlab.core.measurements import GpsStatus
 
     node, reference, imu, gps = _node(use_receiver_accuracy=True)
     try:

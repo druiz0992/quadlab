@@ -9,8 +9,8 @@ import time
 
 import pytest
 
-from dronelab.experiments.batch import ChildRuns
-from dronelab.experiments.interrupts import shielded, sigterm_as_interrupt
+from robotlab.experiments.batch import ChildRuns
+from robotlab.experiments.interrupts import shielded, sigterm_as_interrupt
 
 
 def test_sigterm_becomes_keyboard_interrupt_and_handler_is_restored():

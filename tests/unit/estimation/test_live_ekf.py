@@ -3,10 +3,10 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from dronelab.core.measurements import GpsReading
-from dronelab.experiments.live_ekf import LiveEkf
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.sensors.streams import ReadTimeout
+from robotlab.core.measurements import GpsReading
+from robotlab.experiments.live_ekf import LiveEkf
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.streams import ReadTimeout
 
 
 def message(kind, stamp):
@@ -56,8 +56,8 @@ def test_reordering_and_intermediate_gps_without_truth():
 
 
 def test_vibrating_acceleration_reaches_ekf_without_modifying_gyro_or_timestamps():
-    from dronelab.sensors.gazebo import vibrate_imu_message
-    from dronelab.sensors.vibration import AccelerometerVibration
+    from robotlab.sensors.gazebo import vibrate_imu_message
+    from robotlab.sensors.vibration import AccelerometerVibration
 
     settings = load_drone_config().data
     config = settings["sensors"]["imu"]["vibration"]

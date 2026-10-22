@@ -1,4 +1,4 @@
-from dronelab.simulation.gazebo.environment import gazebo_environment
+from robotlab.simulation.gazebo.environment import gazebo_environment
 
 
 def test_snap_environment_cleanup_preserves_ros():

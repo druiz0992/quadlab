@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
-from dronelab.sensors.camera_effects import (
+from robotlab.sensors.camera_effects import (
     CameraEffects,
     distortion_map,
     focal_length_px,
@@ -13,8 +13,8 @@ from dronelab.sensors.camera_effects import (
     motion_blur,
     rolling_shutter,
 )
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.gazebo.world import build_world
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.world import build_world
 
 
 def vertical_line(h=40, w=60, col=30):

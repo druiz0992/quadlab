@@ -7,19 +7,19 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.core.measurements import GpsReading, MagnetometerReading
-from dronelab.estimation.magnetometer_calibration import (
+from robotlab.core.measurements import GpsReading, MagnetometerReading
+from robotlab.estimation.magnetometer_calibration import (
     MagnetometerCalibration,
     fit_ellipsoid,
     fit_interference,
     heading_error_deg,
 )
-from dronelab.experiments.algorithms import build_context
-from dronelab.experiments.magnetometer_calibration import (
+from robotlab.experiments.algorithms import build_context
+from robotlab.experiments.magnetometer_calibration import (
     calibration_config,
     write_world,
 )
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.config import load_drone_config
 
 EARTH = np.array([0.0, 25.6, -37.2])  # µT, ENU: north and down at the default site
 SOFT = np.array([[1.04, 0.02, -0.01], [0.02, 0.97, 0.015], [-0.01, 0.015, 1.02]])

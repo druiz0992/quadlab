@@ -10,7 +10,7 @@
   "duration_s": 45,
   "seeds": [1, 2, 3],
   "parameters": {
-    "algorithms.controller": ["", "dronelab.control.template:TemplateController"]
+    "algorithms.controller": ["", "robotlab.control.template:TemplateController"]
   },
   "metrics": [
     "control.tracking.position_m.rmse",

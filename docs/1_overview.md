@@ -1,11 +1,22 @@
 # 1. Overview and architecture
 
-DroneLab provides inspectable drone experiments (multirotors and a quadplane) for learning state
+RobotLab provides inspectable drone experiments (multirotors and a quadplane) for learning state
 estimation and control. This document covers purpose, current status, code
 organization, and shared conventions. Following documents:
 [2 Simulation](2_simulation.md) · [3 Configuration](3_configuration.md) ·
 [4 Control](4_control.md) · [5 Estimation](5_estimation.md) ·
 [6 Roadmap](6_roadmap.md) · [7 Experiments](7_experiments.md).
+
+*Migration (2026-10-22):* the project was renamed from DroneLab to RobotLab
+with no compatibility alias, in preparation for ground vehicles. The Python
+package is `robotlab`, the commands are `robotlab`, `robotlab-batch`,
+`robotlab-replay`, … , environment variables start with `ROBOTLAB_`, the
+Gazebo world is named `robotlab`, and the lockstep plugin is
+`RobotlabLockstep` (`librobotlab-lockstep.so`; rebuild with
+`robotlab-build-plugins`). Recordings now carry the replay format tag
+`robotlab-replay`; replace `dronelab-replay` in the first line of an older
+`replay.jsonl` to replay it. Reinstall with `pip uninstall dronelab && pip
+install -e .`.
 
 ## Status
 
@@ -34,10 +45,10 @@ truth; it is used only to synthesize measurements and to score runs.
 ## Code organization
 
 ```text
-src/dronelab/
-├── cli/                    # Argument parsing: `dronelab` (gazebo.py), `dronelab-batch`
-│                           #   (batch.py), `dronelab-replay` (replay.py), `dronelab-magcal`
-│                           #   (magcal.py), `dronelab-imucal` (imucal.py); shared exit
+src/robotlab/
+├── cli/                    # Argument parsing: `robotlab` (gazebo.py), `robotlab-batch`
+│                           #   (batch.py), `robotlab-replay` (replay.py), `robotlab-magcal`
+│                           #   (magcal.py), `robotlab-imucal` (imucal.py); shared exit
 │                           #   statuses and SIGTERM handling (common.py)
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
 │                           #   measurement samples, rotor commands, JSON codec
@@ -95,7 +106,7 @@ src/dronelab/
 │       ├── process.py      # Owned gz sim process: parent-death signal, complete stop
 │       ├── ingress.py      # Topic subscriptions into one bounded, counted queue; gz command
 │       ├── stepping.py     # Lockstep stepping, start-up subscriber barrier
-│       ├── plugins.py      # DroneLab Gazebo plugins: location, build, barrier choice
+│       ├── plugins.py      # RobotLab Gazebo plugins: location, build, barrier choice
 │       └── messages.py     # Gazebo timestamp/vector adapters
 ├── experiments/
 │   ├── gazebo.py           # Compose a Gazebo mission (run entry point, wiring)
@@ -108,7 +119,7 @@ src/dronelab/
 │   ├── run_summary.py      # summary.json assembly
 │   ├── loop_timing.py      # Mission-loop wall cost and queue age (loop_timing)
 │   ├── replay_log.py       # Record bus deliveries and truth (replay.jsonl)
-│   ├── replay.py           # Offline estimator replay and scoring (dronelab-replay)
+│   ├── replay.py           # Offline estimator replay and scoring (robotlab-replay)
 │   ├── algorithm_debug.py  # Plug-in debug channel (algorithm-debug.jsonl, Rerun)
 │   ├── comparison.py       # Side-by-side metric tables (comparison.md)
 │   ├── rotor_loop.py       # Fixed-rate rotor-thrust control loop with latency
@@ -117,8 +128,8 @@ src/dronelab/
 │   ├── run_evaluation.py   # Per-run metrics (metrics.json)
 │   ├── batch.py            # Seed/parameter sweeps, aggregation, baselines
 │   ├── interrupts.py       # SIGTERM as Ctrl-C; cleanup shielded from repeated signals
-│   ├── magnetometer_calibration.py  # Automated calibration run (dronelab-magcal)
-│   ├── imu_calibration.py  # Automated IMU calibration run (dronelab-imucal)
+│   ├── magnetometer_calibration.py  # Automated calibration run (robotlab-magcal)
+│   ├── imu_calibration.py  # Automated IMU calibration run (robotlab-imucal)
 │   ├── calibration_session.py  # Shared Gazebo pose/sensor session for calibrations
 │   └── live_ekf.py         # Bounded live IMU/GPS ordering and EKF composition
 ├── testing/
@@ -130,7 +141,7 @@ src/dronelab/
     └── plotting.py         # Static flight plots (retained)
 
 gazebo_plugins/             # C++ gz-sim system plugins (lockstep barrier); built into
-                            #   build/gazebo_plugins by dronelab-build-plugins
+                            #   build/gazebo_plugins by robotlab-build-plugins
 configs/                    # Layerable drone JSON configurations, by topic:
 ├── vehicles/               #   airframes: micro, racing_5in, 10in_4s, heavy_lift, battery_low
 │                           #   (quad_x.json lists every default)
@@ -141,7 +152,7 @@ configs/                    # Layerable drone JSON configurations, by topic:
 ├── scenarios/              #   named combinations using "extends"
 ├── missions/               #   reference missions (step, square, circuit lap, chirp, ...)
 ├── algorithms/             #   estimator/controller plug-in setups
-└── experiments/            #   batch experiment files (dronelab-batch)
+└── experiments/            #   batch experiment files (robotlab-batch)
 baselines/                  # Stored batch metric baselines for regression checks
 worlds/                     # Authored JSON scenes and saved SDF worlds
 docs/                       # These numbered documents
@@ -164,7 +175,7 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
 | visualization | Observe and record data; never decide commands or run algorithms |
 
 - Gazebo SDF includes native plugins (motors, velocity controller, sensors).
-  These are simulator features, not DroneLab Python algorithms.
+  These are simulator features, not RobotLab Python algorithms.
 - The `gazebo_rerun` adapter deliberately understands Gazebo messages but
   does not control, plan, or estimate.
 - There is no shared simulator interface for Gazebo and RotorPy: one is
@@ -180,10 +191,10 @@ plug-in contracts in
 [7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms); put it in
 `estimation/<name>.py` or `control/<name>.py` (or any importable package)
 with tests in `tests/unit/<package>/` that call
-`dronelab.testing.plugins.check_estimator`/`check_controller`, and select
+`robotlab.testing.plugins.check_estimator`/`check_controller`, and select
 it with `algorithms.estimator`/`algorithms.controller` as
 `package.module:Class`. Develop estimators against recorded runs with
-`dronelab-replay` (several at once for a comparison table), then confirm
+`robotlab-replay` (several at once for a comparison table), then confirm
 in Gazebo and with batches.
 At the algorithm boundary use the bus samples (decoded measurements with
 explicit timestamps and frames) and the `AlgorithmContext`; never simulator

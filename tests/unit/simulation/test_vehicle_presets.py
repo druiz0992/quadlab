@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.config import load_drone_config
 
 # preset: (mass range kg, thrust-to-weight range, attitude ωn and ζ used for roll/pitch)
 PRESETS = {
@@ -58,7 +58,7 @@ def test_racing_fpv_scenario_composes_airframe_camera_and_no_gps():
 
 
 def test_battery_presets_are_rejected_in_velocity_mode(tmp_path):
-    from dronelab.experiments.gazebo import GazeboConfig, run
+    from robotlab.experiments.gazebo import GazeboConfig, run
 
     with pytest.raises(ValueError, match="rotor-thrust"):
         run(

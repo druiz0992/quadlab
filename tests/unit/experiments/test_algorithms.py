@@ -6,12 +6,12 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.control.interface import ControlState, RotorController
-from dronelab.control.manual import FlightCommand
-from dronelab.control.references import ReferencePoint
-from dronelab.core.measurements import EstimatedState, GpsReading, ImuReading, Sample
-from dronelab.estimation.interface import StateEstimator
-from dronelab.experiments.algorithms import (
+from robotlab.control.interface import ControlState, RotorController
+from robotlab.control.manual import FlightCommand
+from robotlab.control.references import ReferencePoint
+from robotlab.core.measurements import EstimatedState, GpsReading, ImuReading, Sample
+from robotlab.estimation.interface import StateEstimator
+from robotlab.experiments.algorithms import (
     AlgorithmRunner,
     EstimateStateSource,
     StaleEstimate,
@@ -20,8 +20,8 @@ from dronelab.experiments.algorithms import (
     build_estimator,
     load_class,
 )
-from dronelab.sensors.bus import SensorBus
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.bus import SensorBus
+from robotlab.simulation.gazebo.config import load_drone_config
 
 MS = 1_000_000
 ORIGIN = GpsReading(40.4168, -3.7038, 650.0)
@@ -44,7 +44,7 @@ def test_load_class_errors_are_explicit():
     with pytest.raises(ValueError, match="Cannot import"):
         load_class("no_such_module_xyz:Thing", {})
     with pytest.raises(ValueError, match="no class"):
-        load_class("dronelab.control.manual:Missing", {})
+        load_class("robotlab.control.manual:Missing", {})
 
 
 def test_context_has_mounts_and_no_error_models():

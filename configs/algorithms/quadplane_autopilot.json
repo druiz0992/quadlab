@@ -1,6 +1,6 @@
 {
   "algorithms": {
-    "controller": "dronelab.control.quadplane:QuadplaneController",
+    "controller": "robotlab.control.quadplane:QuadplaneController",
     "controller_options": {
       "cruise_altitude_m": 40.0,
       "cruise_airspeed_mps": 22.0,

@@ -6,7 +6,7 @@ edited, and what each run records. Commands and options are in the
 
 ## Gazebo runtime
 
-DroneLab runs a self-contained quadrotor in Gazebo Harmonic (8.x) through
+RobotLab runs a self-contained quadrotor in Gazebo Harmonic (8.x) through
 native Gazebo transport, with Rerun 0.24.1. ROS nodes, PX4, and Fuel model
 downloads are not required. RotorPy is not part of this runtime.
 
@@ -87,11 +87,11 @@ Now:
 
 | Event | What happens |
 | --- | --- |
-| Ctrl-C or SIGTERM to `dronelab`, `dronelab-magcal`, `dronelab-imucal` | Treated alike (`experiments/interrupts.py`): the mission saves `summary.json` (`exit_reason: interrupted`, health warning), Gazebo is stopped; exit status 130 (Ctrl-C) or 143 (SIGTERM). A second signal during this cleanup is ignored, so it cannot leave Gazebo or half-written results behind. |
+| Ctrl-C or SIGTERM to `robotlab`, `robotlab-magcal`, `robotlab-imucal` | Treated alike (`experiments/interrupts.py`): the mission saves `summary.json` (`exit_reason: interrupted`, health warning), Gazebo is stopped; exit status 130 (Ctrl-C) or 143 (SIGTERM). A second signal during this cleanup is ignored, so it cannot leave Gazebo or half-written results behind. |
 | Python killed (SIGKILL, out of memory) | Gazebo is launched under `setpriv --pdeathsig TERM` (util-linux), so the kernel sends it SIGTERM and it exits. No summary is written. Without `setpriv` (non-Linux) Gazebo keeps running. |
 | Gazebo ignores SIGTERM for 10 s | The launcher and every descendant process are killed. |
 | Gazebo exits during start-up | Lockstep runs fail at once ("Gazebo exited during start-up") instead of after the 60 s subscriber timeout; real-time runs already checked liveness every loop iteration. |
-| Gazebo exits during a calibration | `dronelab-magcal`/`-imucal` fail at once, naming `gazebo.log`, instead of after a 10 s sensor timeout. |
+| Gazebo exits during a calibration | `robotlab-magcal`/`-imucal` fail at once, naming `gazebo.log`, instead of after a 10 s sensor timeout. |
 | Runtime error | The command prints the error, the output directory, and the health verdict, and exits 1 (invalid options or configuration still print usage and exit 2). |
 
 Verified on the reference desktop (gz sim 8, Jazzy): SIGTERM and SIGKILL
@@ -173,7 +173,7 @@ one odometry period at a time (`simulation/gazebo/stepping.py`):
    every command topic it publishes (motors, wind, wrench, payload, ...):
    messages published before transport discovery connects are lost
    silently, and once left a ground-start run with motors that never spun.
-2. Python requests a burst of physics steps through `/world/dronelab/control`.
+2. Python requests a burst of physics steps through `/world/robotlab/control`.
 3. The odometry message at the end of the burst (time T) is the barrier.
 4. Python processes the period in a fixed order
    (`simulation/gazebo/ingress.py`, `LockstepOrderer`): it waits until every
@@ -199,7 +199,7 @@ circle; static wind; Python body drag.
 as topic messages and step requests through the control service, a
 separate connection, so under heavy load Gazebo could start a burst before
 reading that period's commands, which then took effect one period late
-(seen with dynamic wind and with rendered sensors). The `DronelabLockstep`
+(seen with dynamic wind and with rendered sensors). The `RobotlabLockstep`
 system plugin (`gazebo_plugins/lockstep/`, C++) closes this: before each
 step request Python publishes a grant (the period's end time) on the
 commands' own ordered connection, and the plugin, first in the world,
@@ -216,10 +216,10 @@ error.
 | `plugin` | Plugin; error if not built |
 | `service` | Control service only; commands can apply one period late under load, and a stalled burst is re-sent after 2 s, which can double-step |
 
-Build the plugin once with `dronelab-build-plugins` (needs cmake, a C++17
+Build the plugin once with `robotlab-build-plugins` (needs cmake, a C++17
 compiler, and the Gazebo development files; output in
-`build/gazebo_plugins`, or set `DRONELAB_PLUGIN_DIR`).
-`DRONELAB_LOCKSTEP_DEBUG=1` makes the plugin report grants and holds in
+`build/gazebo_plugins`, or set `ROBOTLAB_PLUGIN_DIR`).
+`ROBOTLAB_LOCKSTEP_DEBUG=1` makes the plugin report grants and holds in
 `gazebo.log`. `summary.json.lockstep.barrier` records the mode used.
 
 Verified under full CPU load with the plugin: turbulence (6 of 6 runs
@@ -257,17 +257,17 @@ determinism is then not guaranteed, and the health verdict warns). Rendered sens
 
 | Data | Default rate | Topic | Rerun view |
 | --- | --- | --- | --- |
-| Ground-truth odometry | 50 Hz | `/dronelab/odometry` | Pose, path, tracking error |
-| IMU | 200 Hz | `/dronelab/imu` | Acceleration and angular-rate plots |
-| GPS/NavSat | 10 Hz | `/dronelab/gps` | Latitude, longitude, altitude plots |
-| Barometer (optional) | 50 Hz | `/dronelab/baro` | Pressure (Pa) and pressure altitude (m above sea level) |
-| Magnetometer (optional) | 50 Hz | `/dronelab/magnetometer` | Field (µT, sensor axes) and level-compass yaw |
-| Rangefinder (optional, rendered) | 20 Hz | `/dronelab/rangefinder` | Downward range (m) |
+| Ground-truth odometry | 50 Hz | `/robotlab/odometry` | Pose, path, tracking error |
+| IMU | 200 Hz | `/robotlab/imu` | Acceleration and angular-rate plots |
+| GPS/NavSat | 10 Hz | `/robotlab/gps` | Latitude, longitude, altitude plots |
+| Barometer (optional) | 50 Hz | `/robotlab/baro` | Pressure (Pa) and pressure altitude (m above sea level) |
+| Magnetometer (optional) | 50 Hz | `/robotlab/magnetometer` | Field (µT, sensor axes) and level-compass yaw |
+| Rangefinder (optional, rendered) | 20 Hz | `/robotlab/rangefinder` | Downward range (m) |
 | Optical flow (optional, synthetic) | 50 Hz | Python model, no topic | Raw flow (rad/s), distance, validity |
 | Battery monitor (optional, synthetic) | 10 Hz | Python model, no topic | Measured voltage, current, remaining % |
-| Camera (optional) | 10 Hz | `/dronelab/camera` | 320 × 240 RGB image; pinhole or fisheye, optional blur, rolling shutter, distortion, latency |
-| Lidar (optional, rendered) | 10 Hz | `/dronelab/lidar` | 360-ray scan, 0.15–50 m; 2D by default, multi-channel 3D when configured |
-| Body contact | Physics-driven | `/dronelab/contacts` | Contact event log |
+| Camera (optional) | 10 Hz | `/robotlab/camera` | 320 × 240 RGB image; pinhole or fisheye, optional blur, rolling shutter, distortion, latency |
+| Lidar (optional, rendered) | 10 Hz | `/robotlab/lidar` | 360-ray scan, 0.15–50 m; 2D by default, multi-channel 3D when configured |
+| Body contact | Physics-driven | `/robotlab/contacts` | Contact event log |
 
 - Default mounts: camera along body +X, 0.3 m forward and 0.1 m up; lidar
   0.2 m above the body; IMU and GPS at the body origin. Mounts, rates, and
@@ -275,7 +275,7 @@ determinism is then not guaranteed, and the health verdict warns). Rendered sens
   Defaults are ideal (no noise).
 - Camera, lidar, and rangefinder need the rendering system, including EGL in server-only
   mode. They are off by default so physics, IMU, GPS, and contacts work
-  without a GPU. `--render-sensors` enables camera and lidar (not the rangefinder); DroneLab
+  without a GPU. `--render-sensors` enables camera and lidar (not the rangefinder); RobotLab
   changes no GPU settings.
 - Lidar scans are drawn under the moving drone frame with the mount applied;
   no motion deskewing.
@@ -303,7 +303,7 @@ logged 100 m box, so the initial camera frames the drone and nearby
 obstacles instead of the whole ground. Scalar time series are buffered and sent in batches covering 0.1 s
 of simulation time (every sample and timestamp is kept), so a live viewer
 shows them up to that much later than 3D poses. Rerun loads box visuals from the world at startup and tracks the
-poses of non-static models (DroneLab subscribes to Gazebo's
+poses of non-static models (RobotLab subscribes to Gazebo's
 `dynamic_pose/info`, 6 entries per message on the training world instead
 of 26, so static models moved in the Gazebo GUI during flight are not
 followed); objects added or removed during flight, meshes, non-box shapes,
@@ -338,7 +338,7 @@ together. `worlds/training.json` is the default scene.
 ### Editing and saved worlds
 
 ```bash
-dronelab --edit --render-sensors --output outputs/editor
+robotlab --edit --render-sensors --output outputs/editor
 ```
 
 1. Insert shapes with Gazebo's toolbar and place them with the translate and
@@ -348,7 +348,7 @@ dronelab --edit --render-sensors --output outputs/editor
    e.g. `worlds/my-world.sdf` (not "Save GUI configuration").
 3. Fly it with `--world worlds/my-world.sdf`.
 
-Keep the world named `dronelab`, the drone named `drone`, and its plugins and
+Keep the world named `robotlab`, the drone named `drone`, and its plugins and
 topics intact. `--world` uses the SDF without regenerating; `--drone`,
 `--keyboard`, and `--ekf` are rejected with saved worlds. Without `--world`,
 each run regenerates `<output>/world.sdf`.
@@ -439,8 +439,8 @@ waypoint-sequence runner ([6 Roadmap](6_roadmap.md)). If you change the
 layout, update `circuit.svg` too.
 
 ```bash
-dronelab --scene worlds/circuit.json --target 11 0 1.8 --duration 20 --render-sensors --output outputs/circuit-g1
-dronelab --headless --target 8 0 1 --duration 10 --output outputs/collision   # deliberately hit the training wall
+robotlab --scene worlds/circuit.json --target 11 0 1.8 --duration 20 --render-sensors --output outputs/circuit-g1
+robotlab --headless --target 8 0 1 --duration 10 --output outputs/collision   # deliberately hit the training wall
 ```
 
 ## Run artifacts
@@ -455,7 +455,7 @@ dronelab --headless --target 8 0 1 --duration 10 --output outputs/collision   # 
 | `command-events.jsonl` | Command publication, supersession, expiry, stop, and failure events |
 | `estimates.jsonl` | EKF state, covariance, and provenance (`--ekf`) |
 | `wind-commands.jsonl` | Published dynamic wind targets (random/scheduled wind) |
-| `replay.jsonl` | Bus deliveries and truth for `dronelab-replay` (`algorithms.record_bus`) |
+| `replay.jsonl` | Bus deliveries and truth for `robotlab-replay` (`algorithms.record_bus`) |
 | `algorithm-debug.jsonl` | Plug-in debug series (`context.log`), only when a plug-in logs |
 | `camera-first.png` | First camera frame (rendered runs) |
 | `summary.json` | Lockstep `message_ordering`, health verdict and findings ([7 Experiments](7_experiments.md#run-health-verdict-health)), completion, exit reason, message counts, drops, contacts, final position, control mode and state source, config hash, timing, `control_timing` and `loop_timing` ([Real-time loop timing](#real-time-loop-timing)), `sample_timing_warnings` ([audit](#simulator-environment-audit)), EKF/dropout/vibration/sensor-error/fault diagnostics |

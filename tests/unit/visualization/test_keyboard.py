@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from dronelab.control.manual import FlightCommand
-from dronelab.visualization.keyboard import KeyboardWindow
+from robotlab.control.manual import FlightCommand
+from robotlab.visualization.keyboard import KeyboardWindow
 
 
 class FakeRoot:

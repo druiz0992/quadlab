@@ -55,7 +55,7 @@ document and update the status below.
 | Battery and IMU temperature effects (with [ / ] ambient keys) | Implemented ([3 Configuration](3_configuration.md#temperature-effects)) |
 | Fixed-wing VTOL (quadplane) inspired by the IMS Kite/Falziot (2.99 m span, 17 kg empty, <25 kg MTOW, 60 km/h stall, 65-80 km/h cruise): general rotor list (4 lift + pusher), wing/tail/control-surface aerodynamics, airspeed sensor, transition and fixed-wing baseline control, large world. Public specs omit rotor layout, motors, propellers, battery, wing area, and inertias, so it is a plausible model, not a calibrated one | Implemented 2026-10-21 (steps below) |
 | VTOL step 1: general N-rotor vehicle schema (per-rotor position, axis, direction); quad becomes one rotor list; enables hexa/octo | Implemented ([3 Configuration](3_configuration.md#vehicle-and-motors)) |
-| VTOL step 2: pitot airspeed sensor; wing/tail/control-surface aerodynamics and servos | Implemented in Python (Beard & McLain coefficient model via ApplyLinkWrench, which follows DroneLab's wind) instead of Gazebo LiftDrag ([3 Configuration](3_configuration.md#fixed-wing-and-quadplanes-fixed_wing)) |
+| VTOL step 2: pitot airspeed sensor; wing/tail/control-surface aerodynamics and servos | Implemented in Python (Beard & McLain coefficient model via ApplyLinkWrench, which follows RobotLab's wind) instead of Gazebo LiftDrag ([3 Configuration](3_configuration.md#fixed-wing-and-quadplanes-fixed_wing)) |
 | VTOL step 3: Kite-like quadplane preset (derived parameters) and a kilometre-scale world | Implemented (`kite_quadplane.json`, `worlds/airfield.json`) |
 | VTOL step 4: minimal baseline hover / transition / cruise control, replaceable through the algorithm plug-in API | Implemented ([4 Control](4_control.md#quadplane-baseline-autopilot)) |
 | VTOL step 5: Gazebo verification of stall speed, cruise power, and endurance against the published figures | Implemented ([3 Configuration](3_configuration.md#kite-like-quadplane-preset)): 62 vs 60 km/h minimum speed, 672 W cruise, ≈183 vs 180 min |
@@ -90,10 +90,10 @@ document and update the status below.
 | Opt-in Gazebo regression suite pinning verified numbers (lockstep) | Implemented (`tests/integration/test_gazebo_regression.py`, see the README) |
 | Split the Gazebo mission loop (`experiments/gazebo.py`) into pipeline stages under the regression suite | Implemented ([2 Simulation](2_simulation.md#mission-lifecycle)); verified byte-identical lockstep outputs |
 | Lockstep determinism: command-topic start-up barrier, deterministic message order with duplicate removal, simulation-time thrust republishing; `no_liftoff` and `tracking_lost` health findings | Implemented ([2 Simulation](2_simulation.md#lockstep-simulation), [7 Experiments](7_experiments.md#run-health-verdict-health)) |
-| Offline estimator replay of recorded runs (`dronelab-replay`); plug-in debug channel (`context.log`) | Implemented ([7 Experiments](7_experiments.md#offline-replay)) |
+| Offline estimator replay of recorded runs (`robotlab-replay`); plug-in debug channel (`context.log`) | Implemented ([7 Experiments](7_experiments.md#offline-replay)) |
 | Plug-in contract test kit and templates; comparison reports for batches and multi-estimator replay | Implemented ([7 Experiments](7_experiments.md#writing-a-plug-in-templates-and-the-contract-test-kit)) |
 | Typed, validated plug-in options declared by each plug-in (templates reject unknown keys today) | Proposed |
-| Gazebo-side lockstep barrier (`DronelabLockstep` gz-sim plugin) so commands are read before each step | Implemented ([2 Simulation](2_simulation.md#lockstep-simulation)) |
+| Gazebo-side lockstep barrier (`RobotlabLockstep` gz-sim plugin) so commands are read before each step | Implemented ([2 Simulation](2_simulation.md#lockstep-simulation)) |
 | Audit remaining Gazebo defaults (atmosphere, magnetic table, solver and contact settings) | Done ([2 Simulation](2_simulation.md#simulator-environment-audit)): site air density by default, sample-timing warnings, explicit physics engine settings |
 | Lockstep performance on large worlds (pose-message volume) | Future (simulation robustness) |
 | Gazebo process cleanup and hang detection | Implemented ([2 Simulation](2_simulation.md#stopping-and-cleanup)); a simulator-side command timeout (for attaching to a running Gazebo) remains future |

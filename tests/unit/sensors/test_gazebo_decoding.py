@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from dronelab.sensors.gazebo import lidar_points, rgb_image
+from robotlab.sensors.gazebo import lidar_points, rgb_image
 
 
 def test_rgb_rows_exclude_padding():

@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from dronelab.simulation.aerodynamics import DrydenTurbulence, ground_effect_factor
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.gazebo.wind import WindProfile
+from robotlab.simulation.aerodynamics import DrydenTurbulence, ground_effect_factor
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.wind import WindProfile
 
 MS = 1_000_000
 

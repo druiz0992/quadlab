@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.gazebo.wind import WindCommands, WindProfile, dynamic_wind
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.wind import WindCommands, WindProfile, dynamic_wind
 
 
 def settings(**overrides):
@@ -101,7 +101,7 @@ def test_wind_commands_publish_native_messages_and_report_failures(monkeypatch):
 
     class Node:
         def advertise(self, topic, message_type):
-            assert topic == "/world/dronelab/wind" and message_type is Wind
+            assert topic == "/world/robotlab/wind" and message_type is Wind
             return publisher
 
     commands = WindCommands(Node(), settings(velocity_enu_mps=[3, 0, 0]))

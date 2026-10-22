@@ -4,12 +4,12 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
-from dronelab.control.manual import FlightCommand, ManualController
-from dronelab.core.vehicle import DEFAULT_DRONE
-from dronelab.simulation.gazebo.actuators import thrust_to_motor_speeds
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.gazebo.world import build_world
-from dronelab.experiments.gazebo import GazeboConfig, run
+from robotlab.control.manual import FlightCommand, ManualController
+from robotlab.core.vehicle import DEFAULT_DRONE
+from robotlab.simulation.gazebo.actuators import thrust_to_motor_speeds
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.world import build_world
+from robotlab.experiments.gazebo import GazeboConfig, run
 
 
 def config_file(tmp_path, data):
@@ -335,7 +335,7 @@ def test_invalid_mount_rejected(tmp_path, mount):
 
 
 def test_omitted_mount_preserves_existing_camera_and_lidar_offsets():
-    from dronelab.simulation.gazebo.config import mount_pose
+    from robotlab.simulation.gazebo.config import mount_pose
 
     config = load_drone_config()
     assert mount_pose(config.data["sensors"]["camera"]) == [0.3, 0, 0.1, 0, 0, 0]
@@ -634,7 +634,7 @@ def test_invalid_barometer_configuration(tmp_path, baro):
 
 
 def test_barometer_sdf_only_when_enabled_and_example_loads(tmp_path):
-    from dronelab.simulation.gazebo.world import world_elevation_m
+    from robotlab.simulation.gazebo.world import world_elevation_m
 
     default = build_world({"obstacles": []}, tmp_path / "default.sdf")
     root = ET.parse(default).getroot()
@@ -646,7 +646,7 @@ def test_barometer_sdf_only_when_enabled_and_example_loads(tmp_path):
     root = ET.parse(path).getroot()
     sensor = root.find(".//sensor[@name='baro']")
     assert sensor.get("type") == "air_pressure"
-    assert sensor.findtext("topic") == "/dronelab/baro"
+    assert sensor.findtext("topic") == "/robotlab/baro"
     assert sensor.findtext("update_rate") == "50"
     # Datum is applied in Python; Gazebo 8 ignores reference_altitude.
     assert sensor.find(".//reference_altitude") is None
@@ -775,7 +775,7 @@ def test_new_sensors_generate_sdf_only_when_enabled(tmp_path):
     ranger = root.find(".//sensor[@name='rangefinder']")
     assert (
         ranger.get("type") == "gpu_lidar"
-        and ranger.findtext("topic") == "/dronelab/rangefinder"
+        and ranger.findtext("topic") == "/robotlab/rangefinder"
     )
     assert ranger.findtext(".//horizontal/samples") == "1"
     assert ranger.findtext("pose") == "0.0 0.0 -0.07 0.0 1.5707963267948966 0.0"
@@ -850,7 +850,7 @@ def test_health_thresholds_validate_in_config(tmp_path):
 
 
 def test_sample_timing_warnings_name_unaligned_gazebo_streams():
-    from dronelab.simulation.gazebo.config import sample_timing_warnings
+    from robotlab.simulation.gazebo.config import sample_timing_warnings
 
     data = load_drone_config().data
     # Default: 200 Hz IMU on 2 ms steps; everything else aligned.
@@ -866,7 +866,7 @@ def test_sample_timing_warnings_name_unaligned_gazebo_streams():
 
 
 def test_site_air_density_default_and_overrides(tmp_path):
-    from dronelab.simulation.aerodynamics import site_air_density_kg_m3
+    from robotlab.simulation.aerodynamics import site_air_density_kg_m3
 
     # Standard sea level gives the classic value; the 650 m site at 25 °C less.
     assert site_air_density_kg_m3(0.0, 15.0) == pytest.approx(1.225, abs=5e-4)

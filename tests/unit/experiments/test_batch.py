@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from dronelab.experiments.batch import (
+from robotlab.experiments.batch import (
     aggregate,
     baseline_from,
     check_baseline,
@@ -55,7 +55,7 @@ def test_expand_runs_products_and_distinct_seeds():
 
 def test_run_command_appends_override_layer(tmp_path):
     command = run_command(EXPERIMENT, tmp_path / "o.json", tmp_path)
-    assert command[1:3] == ["-m", "dronelab"]
+    assert command[1:3] == ["-m", "robotlab"]
     drones = [command[i + 1] for i, c in enumerate(command) if c == "--drone"]
     assert drones == ["configs/missions/step_x.json", str(tmp_path / "o.json")]
 
@@ -145,7 +145,7 @@ def test_failed_health_runs_are_excluded_from_aggregates(tmp_path):
 
 
 def test_comparison_markdown_marks_best_by_direction():
-    from dronelab.experiments.comparison import comparison_markdown, stats
+    from robotlab.experiments.comparison import comparison_markdown, stats
 
     columns = {
         "ekf": {"err": stats([0.1, 0.3]), "nees": stats([15.0])},
@@ -166,7 +166,7 @@ def test_comparison_markdown_marks_best_by_direction():
 
 
 def test_batch_comparison_uses_tolerance_directions(tmp_path):
-    from dronelab.experiments.batch import batch_comparison
+    from robotlab.experiments.batch import batch_comparison
 
     runs = expand_runs(EXPERIMENT, [])
     table = aggregate(

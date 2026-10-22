@@ -3,21 +3,21 @@
 import numpy as np
 import pytest
 
-from dronelab.control.manual import ManualRotorController
-from dronelab.control.template import TemplateController
-from dronelab.core.measurements import EstimatedState, Sample
-from dronelab.estimation.gps_imu_ekf.plugin import GpsImuEkfEstimator
-from dronelab.estimation.template import TemplateEstimator
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.testing.plugins import (
+from robotlab.control.manual import ManualRotorController
+from robotlab.control.template import TemplateController
+from robotlab.core.measurements import EstimatedState, Sample
+from robotlab.estimation.gps_imu_ekf.plugin import GpsImuEkfEstimator
+from robotlab.estimation.template import TemplateEstimator
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.testing.plugins import (
     HOVER_POSITION_M,
     PluginContractError,
     check_controller,
     check_estimator,
     enu_to_gps,
 )
-from dronelab.sensors.geodesy import gps_to_enu
-from dronelab.testing.plugins import REFERENCE
+from robotlab.sensors.geodesy import gps_to_enu
+from robotlab.testing.plugins import REFERENCE
 
 
 def test_templates_and_builtins_pass():
@@ -172,7 +172,7 @@ class RouteController(TemplateController):
         return super().update_attitude(state) + self._offset
 
     def tracking_reference(self, position_m, velocity_world_mps, quaternion_xyzw):
-        from dronelab.control.references import ReferencePoint
+        from robotlab.control.references import ReferencePoint
 
         if self.mode == "none":
             return None

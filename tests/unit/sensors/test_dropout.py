@@ -1,6 +1,6 @@
 import numpy as np
 
-from dronelab.sensors.dropout import GpsDropout
+from robotlab.sensors.dropout import GpsDropout
 
 
 def test_disabled_and_total_random_loss():

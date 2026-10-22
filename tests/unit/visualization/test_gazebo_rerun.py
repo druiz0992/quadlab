@@ -1,7 +1,7 @@
 import pytest
 
-from dronelab.visualization.gazebo_rerun import GazeboRerunRecorder, ScalarBatch
-from dronelab.visualization.gazebo_rerun import _display_path
+from robotlab.visualization.gazebo_rerun import GazeboRerunRecorder, ScalarBatch
+from robotlab.visualization.gazebo_rerun import _display_path
 
 
 def test_display_paths_bound_long_run_work_and_preserve_endpoints():

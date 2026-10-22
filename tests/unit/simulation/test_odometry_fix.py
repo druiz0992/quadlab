@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from dronelab.simulation.gazebo.odometry import OdometryVelocityFix
+from robotlab.simulation.gazebo.odometry import OdometryVelocityFix
 
 MS = 1_000_000
 LEVEL = [0, 0, 0, 1]

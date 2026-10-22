@@ -4,12 +4,12 @@ import os
 import numpy as np
 import pytest
 
-from dronelab.control.manual import FlightCommand
-from dronelab.experiments.gazebo import GazeboConfig, run
+from robotlab.control.manual import FlightCommand
+from robotlab.experiments.gazebo import GazeboConfig, run
 
 
 @pytest.mark.skipif(
-    os.environ.get("DRONELAB_TEST_GAZEBO") != "1",
+    os.environ.get("ROBOTLAB_TEST_GAZEBO") != "1",
     reason="requires native Gazebo physics/transport",
 )
 @pytest.mark.parametrize("noisy", [False, True])
@@ -66,7 +66,7 @@ def test_live_ekf_tracks_moving_drone_with_unaligned_sensor_rates(tmp_path, nois
 
 
 @pytest.mark.skipif(
-    os.environ.get("DRONELAB_TEST_GAZEBO") != "1",
+    os.environ.get("ROBOTLAB_TEST_GAZEBO") != "1",
     reason="requires native Gazebo physics/transport",
 )
 def test_native_wind_and_modeled_gps_outage_recovery(tmp_path):

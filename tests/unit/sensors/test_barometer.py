@@ -3,13 +3,13 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from dronelab.sensors.barometer import (
+from robotlab.sensors.barometer import (
     BaroErrorModel,
     altitude_to_pressure,
     pressure_to_altitude,
 )
-from dronelab.sensors.gazebo import baro_datum_message, baro_errors_message
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.gazebo import baro_datum_message, baro_errors_message
+from robotlab.simulation.gazebo.config import load_drone_config
 
 PERIOD_NS = 20_000_000  # 50 Hz
 

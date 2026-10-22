@@ -1,8 +1,8 @@
 import numpy as np
 
-from dronelab.core.frames import GRAVITY
-from dronelab.simulation.state import initial_state
-from dronelab.sensors.models import SensorConfig, Sensors
+from robotlab.core.frames import GRAVITY
+from robotlab.simulation.state import initial_state
+from robotlab.sensors.models import SensorConfig, Sensors
 
 
 def test_imu_specific_force():

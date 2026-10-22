@@ -1,6 +1,6 @@
 import pytest
 
-from dronelab.control.timing import DelayLine, FixedRateTicker, StateBuffer
+from robotlab.control.timing import DelayLine, FixedRateTicker, StateBuffer
 
 MS = 1_000_000
 

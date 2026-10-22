@@ -3,14 +3,14 @@
 import numpy as np
 import pytest
 
-from dronelab.core.measurements import GpsReading
-from dronelab.experiments.effect_toggles import EffectToggles
-from dronelab.sensors.dropout import GpsDropout
-from dronelab.sensors.imu_faults import ImuFaults
-from dronelab.sensors.multipath import GpsMultipath
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.gazebo.wind import WindProfile
-from dronelab.simulation.powertrain import Powertrain
+from robotlab.core.measurements import GpsReading
+from robotlab.experiments.effect_toggles import EffectToggles
+from robotlab.sensors.dropout import GpsDropout
+from robotlab.sensors.imu_faults import ImuFaults
+from robotlab.sensors.multipath import GpsMultipath
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.wind import WindProfile
+from robotlab.simulation.powertrain import Powertrain
 
 HOVER_N = 1.54 * 9.81 / 4
 FIX = GpsReading(40.4168, -3.7038, 650.0)
@@ -101,7 +101,7 @@ def test_wind_switch_needs_configured_wind_and_events_are_logged():
 
 
 def test_wind_profile_off_publishes_still_air_once_then_resumes():
-    from dronelab.simulation.gazebo.wind import WindCommands
+    from robotlab.simulation.gazebo.wind import WindCommands
 
     commands = WindCommands.__new__(WindCommands)
     settings = load_drone_config().data["wind"]
@@ -125,7 +125,7 @@ def test_wind_profile_off_publishes_still_air_once_then_resumes():
 
 
 def test_flying_object_spawns_circle_and_removes_with_fresh_names():
-    from dronelab.experiments.flying_object import FlyingObjectSpawner, circle_entry
+    from robotlab.experiments.flying_object import FlyingObjectSpawner, circle_entry
 
     calls = []
 
@@ -150,7 +150,7 @@ def test_flying_object_spawns_circle_and_removes_with_fresh_names():
         def remove(self, name):
             calls.append(("delete", name))
 
-    from dronelab.simulation.gazebo.world import moving_obstacle_sdf
+    from robotlab.simulation.gazebo.world import moving_obstacle_sdf
 
     settings = load_drone_config().data["keyboard_effects"]
     spawner = FlyingObjectSpawner(
@@ -201,7 +201,7 @@ def test_battery_actions_need_a_battery_and_log_charge():
 
 
 def test_ambient_keys_need_a_temperature_model_and_move_pack_and_imu():
-    from dronelab.sensors.imu_temperature import ImuTemperatureModel
+    from robotlab.sensors.imu_temperature import ImuTemperatureModel
 
     toggles, models = setup()
     assert not toggles.action_available("colder")

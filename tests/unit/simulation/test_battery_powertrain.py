@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from dronelab.simulation.aerodynamics import ground_effect_factor
-from dronelab.simulation.battery import Battery
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.powertrain import Powertrain
+from robotlab.simulation.aerodynamics import ground_effect_factor
+from robotlab.simulation.battery import Battery
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.powertrain import Powertrain
 
 MS = 1_000_000
 HOVER_N = 1.54 * 9.81 / 4

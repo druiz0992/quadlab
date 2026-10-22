@@ -1,6 +1,6 @@
 """Opt-in real-time Gazebo check: the mission loop keeps up at 250 Hz.
 
-Run with ``DRONELAB_TEST_GAZEBO=1``. Unlike the lockstep regression suite
+Run with ``ROBOTLAB_TEST_GAZEBO=1``. Unlike the lockstep regression suite
 this runs in real time, so it measures this machine: it flies the
 ``racing_5in`` quad (250 Hz odometry and control, battery, Rerun file
 recording) and checks the loop-timing summary. The bounds leave headroom
@@ -13,11 +13,11 @@ import os
 
 import pytest
 
-from dronelab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.gazebo import GazeboConfig, run
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("DRONELAB_TEST_GAZEBO") != "1",
-    reason="requires native Gazebo transport and physics (DRONELAB_TEST_GAZEBO=1)",
+    os.environ.get("ROBOTLAB_TEST_GAZEBO") != "1",
+    reason="requires native Gazebo transport and physics (ROBOTLAB_TEST_GAZEBO=1)",
 )
 
 # Busy wall seconds per simulated second; measured 0.49 on the reference

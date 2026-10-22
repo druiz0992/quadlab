@@ -5,15 +5,15 @@ import math
 import numpy as np
 import pytest
 
-from dronelab.core.measurements import GpsReading
-from dronelab.sensors.geodesy import gps_to_enu
-from dronelab.sensors.gps_receiver import (
+from robotlab.core.measurements import GpsReading
+from robotlab.sensors.geodesy import gps_to_enu
+from robotlab.sensors.gps_receiver import (
     GpsHeading,
     GpsStatusModel,
     GpsVelocityErrors,
     RtkErrorModel,
 )
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.config import load_drone_config
 
 MS = 1_000_000
 ORIGIN = GpsReading(40.4168, -3.7038, 650.0)
@@ -114,7 +114,7 @@ def test_rtk_and_standard_error_model_are_exclusive(tmp_path):
 
 
 def test_auto_accuracy_follows_configured_error():
-    from dronelab.sensors.gps_receiver import configured_position_sigma_m
+    from robotlab.sensors.gps_receiver import configured_position_sigma_m
 
     section = load_drone_config().data["sensors"]["gps"]
     # Error-free default GPS: the receiver reports its floor, not 1.35 m.

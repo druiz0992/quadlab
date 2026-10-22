@@ -3,9 +3,9 @@ import json
 import numpy as np
 import pytest
 
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.motor_faults import MotorFaults
-from dronelab.simulation.powertrain import Powertrain
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.motor_faults import MotorFaults
+from robotlab.simulation.powertrain import Powertrain
 
 MS = 1_000_000
 HOVER_N = 1.54 * 9.81 / 4

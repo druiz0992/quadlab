@@ -1,6 +1,6 @@
 import numpy as np
 
-from dronelab.control.waypoint import waypoint_velocity
+from robotlab.control.waypoint import waypoint_velocity
 
 
 def test_velocity_body_frame_and_speed_limit():

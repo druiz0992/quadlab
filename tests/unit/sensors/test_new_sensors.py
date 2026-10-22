@@ -6,14 +6,14 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.sensors.gazebo import (
+from robotlab.sensors.gazebo import (
     lidar_points,
     magnetometer_errors_message,
     rangefinder_distance,
 )
-from dronelab.sensors.magnetometer import MagnetometerErrorModel
-from dronelab.sensors.optical_flow import OpticalFlowModel
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.magnetometer import MagnetometerErrorModel
+from robotlab.sensors.optical_flow import OpticalFlowModel
+from robotlab.simulation.gazebo.config import load_drone_config
 
 FIELD_T = np.array([0.0, 25.6e-6, -37.2e-6])
 LEVEL = [0.0, 0.0, 0.0, 1.0]

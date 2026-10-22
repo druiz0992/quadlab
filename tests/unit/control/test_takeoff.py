@@ -1,7 +1,7 @@
-from dronelab.control.manual import FlightCommand
-from dronelab.experiments.takeoff import TakeoffSequence
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.gazebo.vehicle import spawn_position
+from robotlab.control.manual import FlightCommand
+from robotlab.experiments.takeoff import TakeoffSequence
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.vehicle import spawn_position
 
 
 def test_climbs_until_setpoint_reaches_altitude_then_passes_commands():

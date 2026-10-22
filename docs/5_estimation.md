@@ -1,6 +1,6 @@
 # 5. State estimation
 
-DroneLab's estimator is a GPS/IMU error-state EKF. It runs live from Gazebo
+RobotLab's estimator is a GPS/IMU error-state EKF. It runs live from Gazebo
 sensor messages with `--ekf`, as an **observer only**: flight control keeps
 using truth. The estimator is initialized from declared priors and never
 receives simulator truth, true biases, wind, or fault-model information.
@@ -214,6 +214,6 @@ Unit tests cover hover, yaw integration, GPS drift reduction, lever arms,
 outlier gates, covariance, prediction Jacobians, GPS conversion, rotated IMU
 input, timing rejection, reordering, intermediate GPS corrections, watchdogs,
 bounds, mount restrictions, output fanout, and closure. Opt-in native tests
-(`DRONELAB_TEST_GAZEBO=1`, `tests/integration/test_live_gazebo_ekf.py`) fly a
+(`ROBOTLAB_TEST_GAZEBO=1`, `tests/integration/test_live_gazebo_ekf.py`) fly a
 moving drone with unaligned IMU/GPS rates, plus noisy/rotated sensors.
 Rerun appearance needs a separate visual check.

@@ -3,9 +3,9 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from dronelab.sensors.gazebo import imu_errors_message
-from dronelab.sensors.imu_errors import ImuErrorModel
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.gazebo import imu_errors_message
+from robotlab.sensors.imu_errors import ImuErrorModel
+from robotlab.simulation.gazebo.config import load_drone_config
 
 RATE_HZ = 200.0
 PERIOD_NS = 5_000_000

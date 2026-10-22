@@ -2,13 +2,13 @@ import math
 
 import pytest
 
-from dronelab.control.drone import (
+from robotlab.control.drone import (
     ControlBusy,
     ControlModeError,
     RotorThrustControl,
     SimulationPaused,
 )
-from dronelab.core.commands import RotorThrusts
+from robotlab.core.commands import RotorThrusts
 
 
 def setup_control(**kwargs):

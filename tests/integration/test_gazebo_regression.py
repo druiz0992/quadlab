@@ -1,7 +1,7 @@
 """Opt-in Gazebo regression suite: short lockstep runs pinning verified numbers.
 
-Run with ``DRONELAB_TEST_GAZEBO=1`` (about 2 minutes wall time); the
-quadplane mission (about 17 minutes) also needs ``DRONELAB_TEST_GAZEBO_SLOW=1``.
+Run with ``ROBOTLAB_TEST_GAZEBO=1`` (about 2 minutes wall time); the
+quadplane mission (about 17 minutes) also needs ``ROBOTLAB_TEST_GAZEBO_SLOW=1``.
 Each run uses lockstep (``configs/control/lockstep.json``) so results are
 repeatable, and a fresh pytest temporary directory. The EKF comparison
 flies its two missions at once in separate processes (``fly_concurrently``);
@@ -21,15 +21,15 @@ import sys
 import numpy as np
 import pytest
 
-from dronelab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.gazebo import GazeboConfig, run
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("DRONELAB_TEST_GAZEBO") != "1",
-    reason="requires native Gazebo transport and physics (DRONELAB_TEST_GAZEBO=1)",
+    os.environ.get("ROBOTLAB_TEST_GAZEBO") != "1",
+    reason="requires native Gazebo transport and physics (ROBOTLAB_TEST_GAZEBO=1)",
 )
 slow = pytest.mark.skipif(
-    os.environ.get("DRONELAB_TEST_GAZEBO_SLOW") != "1",
-    reason="long Gazebo mission (DRONELAB_TEST_GAZEBO_SLOW=1)",
+    os.environ.get("ROBOTLAB_TEST_GAZEBO_SLOW") != "1",
+    reason="long Gazebo mission (ROBOTLAB_TEST_GAZEBO_SLOW=1)",
 )
 
 LOCKSTEP = "configs/control/lockstep.json"
@@ -78,8 +78,8 @@ def fly(
 def fly_concurrently(
     flights: list[tuple[Path, list[str | dict], float]],
 ) -> list[dict]:
-    """Run several ``fly`` missions at once, each a separate ``dronelab``
-    process with its own transport partition, like ``dronelab-batch``.
+    """Run several ``fly`` missions at once, each a separate ``robotlab``
+    process with its own transport partition, like ``robotlab-batch``.
 
     Lockstep results do not depend on machine load, so this only saves
     wall time. Returns the summaries in order; fails with the run's output
@@ -88,12 +88,12 @@ def fly_concurrently(
     """
     processes = []
     for directory, layers, duration_s in flights:
-        command = [sys.executable, "-m", "dronelab", "--headless"]
+        command = [sys.executable, "-m", "robotlab", "--headless"]
         command += ["--control-mode", "rotor-thrust", "--duration", str(duration_s)]
         for path in layer_paths(directory, layers):
             command += ["--drone", path]
         command += ["--output", str(directory / "run")]
-        log = (directory / "dronelab.log").open("w")
+        log = (directory / "robotlab.log").open("w")
         processes.append(
             (
                 directory,
@@ -107,7 +107,7 @@ def fly_concurrently(
             failures.append(directory)
         log.close()
     assert not failures, "\n".join(
-        (directory / "dronelab.log").read_text() for directory in failures
+        (directory / "robotlab.log").read_text() for directory in failures
     )
     return [
         json.loads((directory / "run" / "summary.json").read_text())
@@ -121,7 +121,7 @@ def jsonl(path: Path) -> list[dict]:
 
 def capture(monkeypatch, method: str, key: str, convert) -> list:
     """Collect ``convert(...)`` for recorder calls whose first argument is ``key``."""
-    from dronelab.visualization.gazebo_rerun import GazeboRerunRecorder
+    from robotlab.visualization.gazebo_rerun import GazeboRerunRecorder
 
     values = []
     original = getattr(GazeboRerunRecorder, method)
@@ -195,7 +195,7 @@ def test_dipole_beside_hover_changes_vertical_field(tmp_path, monkeypatch):
 
 
 def test_magnetometer_calibration_recovers_injected_errors(tmp_path):
-    from dronelab.experiments.magnetometer_calibration import run_calibration
+    from robotlab.experiments.magnetometer_calibration import run_calibration
 
     report = run_calibration(["configs/sensors/magnetometer.json"], tmp_path)
     layer = json.loads((tmp_path / "magnetometer-calibration.json").read_text())
@@ -211,7 +211,7 @@ def test_magnetometer_calibration_recovers_injected_errors(tmp_path):
 
 
 def test_imu_calibration_recovers_scale_and_writes_priors(tmp_path):
-    from dronelab.experiments.imu_calibration import run_imu_calibration
+    from robotlab.experiments.imu_calibration import run_imu_calibration
 
     report = run_imu_calibration(
         ["configs/sensors/imu_consumer_mems.json"], tmp_path, startup_gyro_s=2
@@ -285,16 +285,16 @@ def test_esc_telemetry_matches_commanded_speeds(tmp_path, monkeypatch):
             "configs/missions/square.json",
             "configs/algorithms/ekf_observer.json",
         ],
-        # Python-published wind needs the DronelabLockstep plugin barrier.
+        # Python-published wind needs the RobotlabLockstep plugin barrier.
         ["configs/environment/turbulence.json", "configs/missions/step_x.json"],
     ],
     ids=["ekf-step", "ground-battery-esc-errors", "turbulence-plugin"],
 )
 def test_lockstep_runs_are_deterministic(tmp_path, layers):
-    from dronelab.simulation.gazebo.plugins import lockstep_plugin_available
+    from robotlab.simulation.gazebo.plugins import lockstep_plugin_available
 
     if "turbulence" in layers[0] and not lockstep_plugin_available():
-        pytest.skip("needs the lockstep plugin (dronelab-build-plugins)")
+        pytest.skip("needs the lockstep plugin (robotlab-build-plugins)")
     # One after the other, not concurrently: the extra load of a second
     # Gazebo once delayed a GPS sample past the orderer's 5 s wait, which
     # releases periods non-deterministically (reported, but not this test).
@@ -386,7 +386,7 @@ def test_quadplane_full_mission(tmp_path):
 
 def test_replay_reproduces_live_estimates(tmp_path):
     """Recorded bus deliveries replayed offline give the live EKF output."""
-    from dronelab.experiments.replay import replay
+    from robotlab.experiments.replay import replay
 
     live = fly(
         tmp_path,
@@ -414,7 +414,7 @@ def test_gazebo_environment_matches_python_models(tmp_path, monkeypatch):
     # agree with the Python atmosphere and geodesy models; the magnetic
     # table gives 45.1 µT, inclination 55.4°, zero declination at Madrid;
     # a 200 Hz IMU on 2 ms physics steps alternates 4 and 6 ms intervals.
-    from dronelab.sensors.barometer import pressure_to_altitude
+    from robotlab.sensors.barometer import pressure_to_altitude
 
     stamp = lambda message: message.header.stamp  # noqa: E731
     ns = lambda s: s.sec * 1_000_000_000 + s.nsec  # noqa: E731

@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from dronelab.sensors.esc_telemetry import EscTelemetryModel
-from dronelab.simulation.esc import EscModel
+from robotlab.sensors.esc_telemetry import EscTelemetryModel
+from robotlab.simulation.esc import EscModel
 
 MS = 1_000_000
 

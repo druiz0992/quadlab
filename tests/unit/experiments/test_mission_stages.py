@@ -12,16 +12,16 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from dronelab.control.manual import FlightCommand
-from dronelab.experiments.algorithms import StaleEstimate
-from dronelab.experiments.gazebo import GazeboConfig
-from dronelab.experiments.keyboard_flight import apply_keyboard_effects
-from dronelab.experiments.rotor_mission import RotorMission, control_state
-from dronelab.experiments.run_setup import validate_run
-from dronelab.experiments.run_summary import final_exit_reason
-from dronelab.experiments.vehicle_forces import ExternalForces
-from dronelab.simulation.aerodynamics import quadratic_body_drag_world
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.control.manual import FlightCommand
+from robotlab.experiments.algorithms import StaleEstimate
+from robotlab.experiments.gazebo import GazeboConfig
+from robotlab.experiments.keyboard_flight import apply_keyboard_effects
+from robotlab.experiments.rotor_mission import RotorMission, control_state
+from robotlab.experiments.run_setup import validate_run
+from robotlab.experiments.run_summary import final_exit_reason
+from robotlab.experiments.vehicle_forces import ExternalForces
+from robotlab.simulation.aerodynamics import quadratic_body_drag_world
+from robotlab.simulation.gazebo.config import load_drone_config
 
 ROTOR = GazeboConfig(control_mode="rotor-thrust", headless=True)
 
@@ -246,8 +246,8 @@ def test_final_exit_reason():
 
 
 def test_keyboard_polled_at_most_every_period(monkeypatch):
-    from dronelab.experiments import mission_loop
-    from dronelab.experiments.mission_loop import (
+    from robotlab.experiments import mission_loop
+    from robotlab.experiments.mission_loop import (
         KEYBOARD_POLL_PERIOD_WALL_S,
         MissionLoop,
     )
@@ -281,7 +281,7 @@ def test_keyboard_polled_at_most_every_period(monkeypatch):
 def test_calibration_session_fails_fast_when_gazebo_exits(tmp_path):
     from queue import Queue
 
-    from dronelab.experiments.calibration_session import CalibrationSession
+    from robotlab.experiments.calibration_session import CalibrationSession
 
     session = CalibrationSession.__new__(CalibrationSession)
     session.messages = Queue()
@@ -295,9 +295,9 @@ def test_calibration_session_fails_fast_when_gazebo_exits(tmp_path):
 
 
 def test_controller_tracking_reference_replaces_the_mission():
-    from dronelab.control.references import ReferencePoint
-    from dronelab.experiments.mission import MissionRunner
-    from dronelab.experiments.run_evaluation import RunEvaluation
+    from robotlab.control.references import ReferencePoint
+    from robotlab.experiments.mission import MissionRunner
+    from robotlab.experiments.run_evaluation import RunEvaluation
 
     data = settings()
     calls = []

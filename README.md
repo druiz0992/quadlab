@@ -1,6 +1,6 @@
-# DroneLab
+# RobotLab
 
-DroneLab is a local drone simulation lab for developing and testing state
+RobotLab is a local drone simulation lab for developing and testing state
 estimation and flight-control algorithms. It covers quadrotors, general
 multirotors, and a quadplane VTOL. Gazebo Harmonic simulates the vehicle and
 sensors, Python adds realistic sensor errors, faults, and timing, Rerun shows
@@ -40,172 +40,172 @@ source .venv/bin/activate
 
 ## Running
 
-`dronelab`, `dronelab-gazebo`, and `python -m dronelab` are the same command.
+`robotlab`, `robotlab-gazebo`, and `python -m robotlab` are the same command.
 Run from the repository root (scene paths are relative to it) and use a fresh
 `--output` directory per run; reusing one overwrites files.
 
 ```bash
 # Fly with the keyboard in the obstacle circuit (Gazebo headless, Rerun + key window)
-dronelab --keyboard --headless --scene worlds/circuit.json --output outputs/keyboard
+robotlab --keyboard --headless --scene worlds/circuit.json --output outputs/keyboard
 
 # Same, with the live EKF estimate shown next to truth
-dronelab --keyboard --headless --ekf --scene worlds/circuit.json --output outputs/live-ekf
+robotlab --keyboard --headless --ekf --scene worlds/circuit.json --output outputs/live-ekf
 
 # Automatic flight to a waypoint with Gazebo GUI, Rerun, camera and lidar
-dronelab --render-sensors --duration 20 --output outputs/waypoint
+robotlab --render-sensors --duration 20 --output outputs/waypoint
 
 # Window-free recording runs
-dronelab --headless --duration 10 --output outputs/headless
-dronelab --headless --control-mode rotor-thrust --duration 10 --output outputs/thrust-hover
-dronelab --headless --rerun --ekf --control-mode rotor-thrust --duration 15 --output outputs/ekf-hover
+robotlab --headless --duration 10 --output outputs/headless
+robotlab --headless --control-mode rotor-thrust --duration 10 --output outputs/thrust-hover
+robotlab --headless --rerun --ekf --control-mode rotor-thrust --duration 15 --output outputs/ekf-hover
 
 # Start on the ground and take off automatically (rotor-thrust/keyboard)
-dronelab --keyboard --headless --drone configs/scenarios/ground_start.json --output outputs/ground-start
+robotlab --keyboard --headless --drone configs/scenarios/ground_start.json --output outputs/ground-start
 
 # Aerodynamics: quadratic body drag, translational lift, vortex ring state
-dronelab --headless --rerun --control-mode rotor-thrust --drone configs/vehicles/racing_5in.json \
+robotlab --headless --rerun --control-mode rotor-thrust --drone configs/vehicles/racing_5in.json \
   --drone configs/environment/aerodynamics.json --drone configs/control/lockstep.json \
   --duration 20 --output outputs/aero
 
 # Tethered payload: W/S lower/raise the hook, 8 releases or hooks the payload
-dronelab --keyboard --headless --drone configs/scenarios/tethered_delivery.json --output outputs/delivery
+robotlab --keyboard --headless --drone configs/scenarios/tethered_delivery.json --output outputs/delivery
 
 # Terrain and moving (ground and flying) obstacles
-dronelab --keyboard --headless --scene worlds/hills.json --drone configs/scenarios/ground_start.json --output outputs/hills
-dronelab --headless --rerun --scene worlds/moving.json --control-mode rotor-thrust \
+robotlab --keyboard --headless --scene worlds/hills.json --drone configs/scenarios/ground_start.json --output outputs/hills
+robotlab --headless --rerun --scene worlds/moving.json --control-mode rotor-thrust \
   --drone configs/control/lockstep.json --duration 20 --output outputs/moving
 
 # Vehicle presets: micro, racing 5-inch (with FPV camera scenario), heavy-lift
-dronelab --keyboard --headless --drone configs/vehicles/micro.json --output outputs/micro
-dronelab --keyboard --headless --scene worlds/circuit.json \
+robotlab --keyboard --headless --drone configs/vehicles/micro.json --output outputs/micro
+robotlab --keyboard --headless --scene worlds/circuit.json \
   --drone configs/scenarios/racing_fpv.json --output outputs/racing
-dronelab --headless --rerun --control-mode rotor-thrust \
+robotlab --headless --rerun --control-mode rotor-thrust \
   --drone configs/vehicles/heavy_lift.json --duration 20 --output outputs/heavy
-dronelab --keyboard --headless --scene worlds/circuit.json \
+robotlab --keyboard --headless --scene worlds/circuit.json \
   --drone configs/scenarios/freestyle_fpv.json --output outputs/freestyle
 
 # Custom vehicle / sensors / disturbances. Configs are building blocks under
 # configs/{vehicles,sensors,faults,environment,control,scenarios}; repeat --drone to layer them.
-dronelab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --ekf --control-mode rotor-thrust \
   --drone configs/vehicles/10in_4s.json --drone configs/sensors/sensor_errors.json \
   --drone configs/environment/turbulence.json --duration 30 --output outputs/combined
-dronelab --keyboard --headless --drone configs/vehicles/quad_x.json --output outputs/configured
-dronelab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --keyboard --headless --drone configs/vehicles/quad_x.json --output outputs/configured
+robotlab --headless --rerun --ekf --control-mode rotor-thrust \
   --drone configs/scenarios/disturbances.json --duration 25 --output outputs/disturbances
-dronelab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --ekf --control-mode rotor-thrust \
   --drone configs/sensors/imu_vibration.json --duration 20 --output outputs/imu-vibration
-dronelab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --ekf --control-mode rotor-thrust \
   --drone configs/sensors/sensor_errors.json --duration 30 --output outputs/sensor-errors
 
 # Vehicle physics: battery running out, turbulence, ground effect, 10-inch/4S preset
-dronelab --headless --rerun --control-mode rotor-thrust \
+robotlab --headless --rerun --control-mode rotor-thrust \
   --drone configs/vehicles/battery_low.json --duration 60 --output outputs/battery
-dronelab --headless --rerun --control-mode rotor-thrust \
+robotlab --headless --rerun --control-mode rotor-thrust \
   --drone configs/environment/turbulence.json --duration 20 --output outputs/turbulence
-dronelab --headless --rerun --control-mode rotor-thrust \
+robotlab --headless --rerun --control-mode rotor-thrust \
   --drone configs/scenarios/ground_effect_hover.json --duration 10 --output outputs/ground-effect
-dronelab --keyboard --headless --scene worlds/circuit.json \
+robotlab --keyboard --headless --scene worlds/circuit.json \
   --drone configs/vehicles/10in_4s.json --output outputs/preset
 
 # Livox Mid-360-like 3D lidar with noise, dropouts, and motion distortion (rendering needed)
-dronelab --headless --rerun --scene worlds/circuit.json --drone configs/sensors/lidar_livox_mid360.json \
+robotlab --headless --rerun --scene worlds/circuit.json --drone configs/sensors/lidar_livox_mid360.json \
   --drone configs/control/lockstep.json --duration 20 --output outputs/livox
 
 # Lidar in fog: attenuation and near-range clutter (also rain.json, dust.json)
-dronelab --headless --rerun --scene worlds/circuit.json --drone configs/sensors/lidar_livox_mid360.json \
+robotlab --headless --rerun --scene worlds/circuit.json --drone configs/sensors/lidar_livox_mid360.json \
   --drone configs/environment/fog.json --drone configs/control/lockstep.json --duration 20 --output outputs/fog
 
 # New sensors: magnetometer, downward rangefinder + optical flow, 3D lidar (rendering needed)
-dronelab --headless --rerun --control-mode rotor-thrust \
+robotlab --headless --rerun --control-mode rotor-thrust \
   --drone configs/sensors/magnetometer.json --drone configs/sensors/downward.json \
   --drone configs/sensors/lidar_3d.json --duration 20 --output outputs/new-sensors
 
 # Low-battery failsafe: return home and land at 15 % (here starting at 15 %)
-dronelab --headless --rerun --control-mode rotor-thrust --drone configs/vehicles/battery_low.json \
+robotlab --headless --rerun --control-mode rotor-thrust --drone configs/vehicles/battery_low.json \
   --drone configs/control/failsafe_rth.json --drone configs/control/lockstep.json \
   --duration 40 --output outputs/failsafe
 
 # Cold weather (0 °C): cold pack sags more and runs flat sooner; IMU biases drift as it warms
-dronelab --headless --rerun --control-mode rotor-thrust --drone configs/vehicles/battery_low.json \
+robotlab --headless --rerun --control-mode rotor-thrust --drone configs/vehicles/battery_low.json \
   --drone configs/environment/cold_weather.json --drone configs/control/lockstep.json \
   --duration 60 --output outputs/cold
 
 # Battery monitor on the racing preset; Rerun Battery and Sensor status tabs
-dronelab --headless --rerun --control-mode rotor-thrust --drone configs/vehicles/racing_5in.json \
+robotlab --headless --rerun --control-mode rotor-thrust --drone configs/vehicles/racing_5in.json \
   --drone configs/sensors/battery_monitor.json --duration 20 --output outputs/battery-monitor
 
 # Barometer with offset, drift, and noise (see the Barometer tab in Rerun)
-dronelab --headless --rerun --control-mode rotor-thrust \
+robotlab --headless --rerun --control-mode rotor-thrust \
   --drone configs/sensors/baro.json --duration 20 --output outputs/baro
 
 # Lockstep: Gazebo waits for Python; deterministic, repeatable runs (no --keyboard)
-dronelab --headless --control-mode rotor-thrust --drone configs/vehicles/racing_5in.json \
+robotlab --headless --control-mode rotor-thrust --drone configs/vehicles/racing_5in.json \
   --drone configs/control/lockstep.json --duration 20 --output outputs/lockstep
 
 # Realistic controller timing: 250 Hz attitude / 50 Hz position loop with latency
-dronelab --headless --rerun --control-mode rotor-thrust \
+robotlab --headless --rerun --control-mode rotor-thrust \
   --drone configs/control/control_timing.json --duration 20 --output outputs/control-timing
 
 # Motor faults (rotor-thrust mode): damaged propeller or a stopped motor, in lockstep
-dronelab --headless --rerun --control-mode rotor-thrust --drone configs/faults/motor_degraded.json \
+robotlab --headless --rerun --control-mode rotor-thrust --drone configs/faults/motor_degraded.json \
   --drone configs/control/lockstep.json --duration 15 --output outputs/motor-degraded
 
 # Fault injection: fly through circuit gate G1 with GPS blockout/multipath, or IMU faults
-dronelab --headless --rerun --ekf --scene worlds/circuit.json --target 11 0 1.8 \
+robotlab --headless --rerun --ekf --scene worlds/circuit.json --target 11 0 1.8 \
   --drone configs/faults/gps_faults.json --duration 28 --output outputs/gps-faults
-dronelab --headless --rerun --ekf --scene worlds/circuit.json --target 11 0 1.8 \
+robotlab --headless --rerun --ekf --scene worlds/circuit.json --target 11 0 1.8 \
   --drone configs/faults/imu_faults.json --duration 28 --output outputs/imu-faults
 
 # Reference missions scored against truth (metrics.json): step, square laps, circuit lap
-dronelab --headless --control-mode rotor-thrust --drone configs/missions/square.json \
+robotlab --headless --control-mode rotor-thrust --drone configs/missions/square.json \
   --drone configs/algorithms/ekf_observer.json --drone configs/control/lockstep.json \
   --duration 45 --output outputs/square
-dronelab --headless --control-mode rotor-thrust --scene worlds/circuit.json \
+robotlab --headless --control-mode rotor-thrust --scene worlds/circuit.json \
   --drone configs/missions/circuit_lap.json --drone configs/control/lockstep.json \
   --duration 120 --output outputs/circuit-lap
 
 # Fly on the EKF estimate instead of truth (estimator in the loop)
-dronelab --headless --control-mode rotor-thrust --drone configs/missions/square.json \
+robotlab --headless --control-mode rotor-thrust --drone configs/missions/square.json \
   --drone configs/algorithms/ekf_in_the_loop.json --drone configs/control/lockstep.json \
   --duration 45 --output outputs/ekf-in-the-loop
 
 # Batch sweep (seeds × parameters, parallel) with a regression baseline;
 # runs whose health verdict failed are excluded from aggregates and fail --check
-dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --save-baseline
-dronelab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check
+robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --save-baseline
+robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check
 
 # Kite-like quadplane: hover, transition, fixed-wing square at 40 m, return and land
-dronelab --headless --rerun --control-mode rotor-thrust --scene worlds/airfield.json \
+robotlab --headless --rerun --control-mode rotor-thrust --scene worlds/airfield.json \
   --drone configs/vehicles/kite_quadplane.json --drone configs/algorithms/quadplane_autopilot.json \
   --drone configs/control/lockstep.json --duration 160 --output outputs/quadplane
 
 # Record a flight once, then run estimators on it offline (no Gazebo; deterministic)
-dronelab --headless --control-mode rotor-thrust --drone configs/control/lockstep.json \
+robotlab --headless --control-mode rotor-thrust --drone configs/control/lockstep.json \
   --drone configs/missions/square.json --drone configs/algorithms/ekf_observer.json \
   --drone configs/algorithms/record_replay.json --duration 30 --output outputs/rec
-dronelab-replay outputs/rec --output outputs/rec-ekf
-dronelab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:MyFilter
-dronelab-replay outputs/rec --output outputs/rec-cmp --estimator gps_imu_ekf \
+robotlab-replay outputs/rec --output outputs/rec-ekf
+robotlab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:MyFilter
+robotlab-replay outputs/rec --output outputs/rec-cmp --estimator gps_imu_ekf \
   --estimator mypkg.filters:MyFilter            # side by side: comparison.md
 # Start new algorithms from estimation/template.py or control/template.py and
-# test them with dronelab.testing.plugins.check_estimator / check_controller
+# test them with robotlab.testing.plugins.check_estimator / check_controller
 
 # Magnetometer calibration (compass dance + throttle sweep in Gazebo), then fly with it
-dronelab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal
-dronelab --headless --control-mode rotor-thrust --drone configs/sensors/magnetometer.json \
+robotlab-magcal --drone configs/sensors/magnetometer.json --output outputs/magcal
+robotlab --headless --control-mode rotor-thrust --drone configs/sensors/magnetometer.json \
   --drone outputs/magcal/magnetometer-calibration.json --duration 20 --output outputs/calibrated
 
 # IMU calibration once (static poses at 5/25/45 °C, startup gyro bias), then reuse the layer;
 # configs/sensors/no_calibration.json (last) bypasses all calibrations
-dronelab-imucal --drone configs/sensors/imu_consumer_mems.json --startup-gyro-s 2 --output outputs/imucal
-dronelab --headless --control-mode rotor-thrust --drone configs/sensors/imu_consumer_mems.json \
+robotlab-imucal --drone configs/sensors/imu_consumer_mems.json --startup-gyro-s 2 --output outputs/imucal
+robotlab --headless --control-mode rotor-thrust --drone configs/sensors/imu_consumer_mems.json \
   --drone configs/scenarios/ground_start.json --drone outputs/imucal/imu-calibration.json \
   --duration 20 --output outputs/imu-calibrated
 
 # Worlds: generate only, edit paused in Gazebo, fly a saved world
-dronelab --generate-only --output outputs/world-preview
-dronelab --edit --scene worlds/circuit.json --output outputs/circuit-editor
-dronelab --world worlds/my-world.sdf --render-sensors --duration 20 --output outputs/saved
+robotlab --generate-only --output outputs/world-preview
+robotlab --edit --scene worlds/circuit.json --output outputs/circuit-editor
+robotlab --world worlds/my-world.sdf --render-sensors --duration 20 --output outputs/saved
 
 # Replay a recording
 rerun outputs/headless/flight.rrd
@@ -213,7 +213,7 @@ rerun outputs/headless/flight.rrd
 
 ### Keyboard controls
 
-Click the **DroneLab — keyboard flight** window and keep it focused.
+Click the **RobotLab — keyboard flight** window and keep it focused.
 
 | Key | Action |
 | --- | --- |
@@ -261,7 +261,7 @@ Each mission writes `flight.rrd`, `telemetry.jsonl`, `commands.jsonl`,
 (estimation and control scores, [7 Experiments](docs/7_experiments.md#metrics-metricsjson));
 `--ekf` or an estimator plug-in adds `estimates.jsonl`; dynamic
 wind adds `wind-commands.jsonl`; camera runs save `camera-first.png`;
-`algorithms.record_bus` adds `replay.jsonl` for `dronelab-replay`; plug-ins
+`algorithms.record_bus` adds `replay.jsonl` for `robotlab-replay`; plug-ins
 that log debug series add `algorithm-debug.jsonl`. Check
 the health verdict (`ok`/`warning`/`failed`, printed after the run),
 completion, message counts, and dropped counters in `summary.json` before
@@ -275,12 +275,12 @@ exits 1. Gazebo also stops if the Python process is killed outright
 ## Gazebo plugin (lockstep barrier)
 
 Lockstep runs are deterministic only if Gazebo reads each period's commands
-before stepping. The small `DronelabLockstep` system plugin guarantees it;
+before stepping. The small `RobotlabLockstep` system plugin guarantees it;
 build it once (cmake, g++, and the Gazebo development files from ROS Jazzy):
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-dronelab-build-plugins          # → build/gazebo_plugins/libdronelab-lockstep.so
+robotlab-build-plugins          # → build/gazebo_plugins/librobotlab-lockstep.so
 ```
 
 Lockstep runs use it automatically when built (`simulation.lockstep_barrier:
@@ -294,7 +294,7 @@ let dynamic wind or rendered-sensor runs diverge under load. See
 source .venv/bin/activate
 black --check src tests && mypy                               # formatting and static types
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q          # unit + transport-free tests
-python -m dronelab --generate-only --output /tmp/dronelab-world-check   # world generation check
+python -m robotlab --generate-only --output /tmp/robotlab-world-check   # world generation check
 ```
 
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` avoids third-party ROS pytest plugins.
@@ -306,20 +306,20 @@ Tests needing real Gazebo or a desktop are skipped unless enabled:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_manual.py
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_live_gazebo_ekf.py
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GUI=1 python -m pytest -q tests/integration/test_keyboard_window.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ROBOTLAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_manual.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ROBOTLAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_live_gazebo_ekf.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ROBOTLAB_TEST_GUI=1 python -m pytest -q tests/integration/test_keyboard_window.py
 # Real-time check: a 250 Hz flight keeps up with Gazebo on this machine
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_realtime.py
-# Gazebo regression suite (lockstep, about 2 min); add DRONELAB_TEST_GAZEBO_SLOW=1
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ROBOTLAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_realtime.py
+# Gazebo regression suite (lockstep, about 2 min); add ROBOTLAB_TEST_GAZEBO_SLOW=1
 # for the full quadplane mission (about 17 min)
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 DRONELAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_regression.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ROBOTLAB_TEST_GAZEBO=1 python -m pytest -q tests/integration/test_gazebo_regression.py
 ```
 
 The regression suite flies short lockstep runs and asserts the numbers
 verified when each feature was built: the 1 cm centre-of-mass offset
-steady state, a magnetic dipole's −25 µT field change, `dronelab-magcal`
-and `dronelab-imucal` recovering injected errors, EKF-in-the-loop tracking
+steady state, a magnetic dipole's −25 µT field change, `robotlab-magcal`
+and `robotlab-imucal` recovering injected errors, EKF-in-the-loop tracking
 matching truth-fed tracking on the square, ESC telemetry against commanded
 speeds, identical repeated lockstep runs, and a battery-depletion crash
 reported as `failed` by the health verdict. Run it after changing the

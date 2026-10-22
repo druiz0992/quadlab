@@ -9,7 +9,7 @@ import time
 
 import pytest
 
-from dronelab.simulation.gazebo.process import (
+from robotlab.simulation.gazebo.process import (
     GazeboProcess,
     descendants,
     parent_death_prefix,
@@ -109,7 +109,7 @@ def test_child_stops_when_its_parent_is_killed(tmp_path):
     # code runs, yet the parent-death signal ends the child.
     parent_code = (
         "import sys, time\n"
-        "from dronelab.simulation.gazebo.process import GazeboProcess\n"
+        "from robotlab.simulation.gazebo.process import GazeboProcess\n"
         "p = GazeboProcess([sys.executable, '-c', 'import time; time.sleep(60)'], None)\n"
         "print(p.pid, flush=True)\n"
         "time.sleep(60)\n"

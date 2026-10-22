@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from dronelab.sensors.battery_monitor import BatteryMonitor
-from dronelab.simulation.battery import BatteryState
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.battery_monitor import BatteryMonitor
+from robotlab.simulation.battery import BatteryState
+from robotlab.simulation.gazebo.config import load_drone_config
 
 MS = 1_000_000
 

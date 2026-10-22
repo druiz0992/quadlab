@@ -6,12 +6,12 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.control.interface import ControlState
-from dronelab.control.quadplane import QuadplaneController
-from dronelab.control.references import ReferencePoint
-from dronelab.core.algorithms import AlgorithmContext
-from dronelab.core.measurements import GpsReading
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.control.interface import ControlState
+from robotlab.control.quadplane import QuadplaneController
+from robotlab.control.references import ReferencePoint
+from robotlab.core.algorithms import AlgorithmContext
+from robotlab.core.measurements import GpsReading
+from robotlab.simulation.gazebo.config import load_drone_config
 
 HOME = ReferencePoint(np.zeros(3), np.zeros(3), np.zeros(3), 0.0)
 

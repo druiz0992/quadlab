@@ -4,7 +4,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-from dronelab.simulation.gazebo.stepping import (
+from robotlab.simulation.gazebo.stepping import (
     WORLD_CONTROL_SERVICE,
     LockstepStepper,
     steps_per_period,
@@ -93,7 +93,7 @@ def test_resend_only_after_barrier_timeout():
 
 # Plugin barrier ------------------------------------------------------------------
 
-from dronelab.simulation.gazebo.stepping import RELEASE_NS
+from robotlab.simulation.gazebo.stepping import RELEASE_NS
 
 
 class Recorder:
@@ -156,8 +156,8 @@ def test_release_lifts_the_barrier_only_in_plugin_mode():
 
 # Barrier selection, world, environment ----------------------------------------------
 
-from dronelab.simulation.gazebo import plugins
-from dronelab.simulation.gazebo.environment import gazebo_environment
+from robotlab.simulation.gazebo import plugins
+from robotlab.simulation.gazebo.environment import gazebo_environment
 
 
 def lockstep_settings(barrier, lockstep=True):
@@ -165,10 +165,10 @@ def lockstep_settings(barrier, lockstep=True):
 
 
 def test_barrier_selection(monkeypatch, tmp_path):
-    monkeypatch.setenv("DRONELAB_PLUGIN_DIR", str(tmp_path))
+    monkeypatch.setenv("ROBOTLAB_PLUGIN_DIR", str(tmp_path))
     assert plugins.lockstep_barrier(lockstep_settings("auto", lockstep=False)) is None
     assert plugins.lockstep_barrier(lockstep_settings("auto")) == "service"
-    with pytest.raises(ValueError, match="dronelab-build-plugins"):
+    with pytest.raises(ValueError, match="robotlab-build-plugins"):
         plugins.lockstep_barrier(lockstep_settings("plugin"))
     (tmp_path / plugins.LOCKSTEP_LIBRARY).write_bytes(b"")
     assert plugins.lockstep_barrier(lockstep_settings("auto")) == "plugin"
@@ -178,7 +178,7 @@ def test_barrier_selection(monkeypatch, tmp_path):
 
 
 def test_environment_adds_plugin_dir(monkeypatch, tmp_path):
-    monkeypatch.setenv("DRONELAB_PLUGIN_DIR", str(tmp_path))
+    monkeypatch.setenv("ROBOTLAB_PLUGIN_DIR", str(tmp_path))
     env = gazebo_environment({"GZ_SIM_SYSTEM_PLUGIN_PATH": "/other"})
     assert env["GZ_SIM_SYSTEM_PLUGIN_PATH"] == f"/other:{tmp_path}"
 
@@ -186,10 +186,10 @@ def test_environment_adds_plugin_dir(monkeypatch, tmp_path):
 def test_world_lists_plugin_first_only_with_plugin_barrier(monkeypatch, tmp_path):
     import xml.etree.ElementTree as ET
 
-    from dronelab.simulation.gazebo.config import load_drone_config
-    from dronelab.simulation.gazebo.world import build_world, load_scene
+    from robotlab.simulation.gazebo.config import load_drone_config
+    from robotlab.simulation.gazebo.world import build_world, load_scene
 
-    monkeypatch.setenv("DRONELAB_PLUGIN_DIR", str(tmp_path))
+    monkeypatch.setenv("ROBOTLAB_PLUGIN_DIR", str(tmp_path))
     (tmp_path / plugins.LOCKSTEP_LIBRARY).write_bytes(b"")
     layer = tmp_path / "lockstep.json"
     layer.write_text('{"simulation": {"lockstep": true}}')

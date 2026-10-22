@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from dronelab.core.measurements import GpsReading
-from dronelab.sensors.geodesy import gps_to_enu
-from dronelab.sensors.multipath import GpsMultipath
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.core.measurements import GpsReading
+from robotlab.sensors.geodesy import gps_to_enu
+from robotlab.sensors.multipath import GpsMultipath
+from robotlab.simulation.gazebo.config import load_drone_config
 
 REFERENCE = GpsReading(40.4168, -3.7038, 650.0)
 PERIOD_NS = 100_000_000  # 10 Hz fixes

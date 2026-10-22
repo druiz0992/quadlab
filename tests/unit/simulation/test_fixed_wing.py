@@ -5,14 +5,14 @@ import math
 import numpy as np
 import pytest
 
-from dronelab.sensors.airspeed import AirspeedSensor
-from dronelab.simulation.fixed_wing import (
+from robotlab.sensors.airspeed import AirspeedSensor
+from robotlab.simulation.fixed_wing import (
     FixedWingAero,
     ServoBank,
     lift_coefficient,
     DEFAULT_COEFFICIENTS,
 )
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.config import load_drone_config
 
 RHO = 1.225
 

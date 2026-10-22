@@ -3,8 +3,8 @@ import json
 import numpy as np
 import pytest
 
-from dronelab.simulation.gazebo.world import build_world, load_scene
-from dronelab.simulation.moving_obstacles import PatrolPath
+from robotlab.simulation.gazebo.world import build_world, load_scene
+from robotlab.simulation.moving_obstacles import PatrolPath
 
 
 def test_pingpong_goes_back_and_forth_at_constant_speed():
@@ -84,9 +84,9 @@ def test_invalid_moving_obstacles_rejected(tmp_path, entry):
 
 
 def test_terrain_scene_spawn_and_mesh(tmp_path):
-    from dronelab.simulation.gazebo.config import load_drone_config
-    from dronelab.simulation.gazebo.vehicle import spawn_position
-    from dronelab.simulation.gazebo.world import scene_terrain
+    from robotlab.simulation.gazebo.config import load_drone_config
+    from robotlab.simulation.gazebo.vehicle import spawn_position
+    from robotlab.simulation.gazebo.world import scene_terrain
 
     scene = load_scene("worlds/hills.json")
     terrain = scene_terrain(scene)

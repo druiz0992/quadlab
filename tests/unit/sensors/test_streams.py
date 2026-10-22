@@ -3,8 +3,8 @@ import threading
 import numpy as np
 import pytest
 
-from dronelab.core.measurements import ImuReading
-from dronelab.sensors.streams import (
+from robotlab.core.measurements import ImuReading
+from robotlab.sensors.streams import (
     Publisher,
     ReadTimeout,
     SessionClosed,

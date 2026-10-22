@@ -6,9 +6,9 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
-from dronelab.simulation.gazebo.config import load_drone_config
-from dronelab.simulation.gazebo.world import build_world
-from dronelab.simulation.randomization import randomize_config
+from robotlab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.world import build_world
+from robotlab.simulation.randomization import randomize_config
 
 
 def config_with(**randomization):

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.config import load_drone_config
 
 
 def write(path, data):
@@ -115,7 +115,7 @@ def test_disturbance_scenario_matches_its_building_blocks():
 def test_all_example_configs_load_and_combine():
     from pathlib import Path
 
-    # Experiment files (dronelab-batch) are not drone layers; tested separately.
+    # Experiment files (robotlab-batch) are not drone layers; tested separately.
     paths = sorted(
         str(p)
         for p in Path("configs").rglob("*.json")
@@ -149,7 +149,7 @@ def test_all_example_configs_load_and_combine():
 def test_example_experiments_expand():
     from pathlib import Path
 
-    from dronelab.experiments.batch import (
+    from robotlab.experiments.batch import (
         expand_runs,
         load_experiment,
         resolved_seed_paths,

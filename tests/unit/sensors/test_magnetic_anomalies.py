@@ -5,9 +5,9 @@ import math
 import numpy as np
 import pytest
 
-from dronelab.sensors.magnetic_anomalies import MagneticAnomalies, scene_dipoles
-from dronelab.sensors.magnetometer import MagnetometerErrorModel
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.magnetic_anomalies import MagneticAnomalies, scene_dipoles
+from robotlab.sensors.magnetometer import MagnetometerErrorModel
+from robotlab.simulation.gazebo.config import load_drone_config
 
 MS = 1_000_000
 

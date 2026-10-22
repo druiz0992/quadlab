@@ -2,7 +2,7 @@
 # and pull request.
 #
 # Runs without Gazebo, ROS, or a display: the opt-in Gazebo and GUI suites
-# (DRONELAB_TEST_GAZEBO=1, DRONELAB_TEST_GUI=1) skip themselves here and
+# (ROBOTLAB_TEST_GAZEBO=1, ROBOTLAB_TEST_GUI=1) skip themselves here and
 # stay local (see AGENTS.md section 6). Python 3.12 matches the ROS Jazzy
 # interpreter the Gazebo bindings need.
 name: tests
@@ -42,4 +42,4 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: python -m pytest -q
       - name: World generation
-        run: python -m dronelab --generate-only --output "$RUNNER_TEMP/dronelab-world-check"
+        run: python -m robotlab --generate-only --output "$RUNNER_TEMP/robotlab-world-check"

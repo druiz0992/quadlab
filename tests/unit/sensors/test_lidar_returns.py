@@ -6,15 +6,15 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from dronelab.sensors.lidar_effects import LidarEffects
-from dronelab.sensors.lidar_returns import (
+from robotlab.sensors.lidar_effects import LidarEffects
+from robotlab.sensors.lidar_returns import (
     decode_scan,
     detected,
     extinction_per_m,
     mix_edge_returns,
     weather_clutter,
 )
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.simulation.gazebo.config import load_drone_config
 
 DETECTION = dict(
     enabled=True,

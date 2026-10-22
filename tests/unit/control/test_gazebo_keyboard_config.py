@@ -1,6 +1,6 @@
-from dronelab.cli import gazebo as cli
-from dronelab.experiments import gazebo
-from dronelab.visualization import keyboard
+from robotlab.cli import gazebo as cli
+from robotlab.experiments import gazebo
+from robotlab.visualization import keyboard
 
 
 def test_headless_keyboard_allowed(monkeypatch):
@@ -25,7 +25,7 @@ def test_headless_keyboard_allowed(monkeypatch):
 
 def test_cli_accepts_rerun_with_headless_keyboard(monkeypatch):
     monkeypatch.setattr(
-        "sys.argv", ["dronelab-gazebo", "--headless", "--keyboard", "--rerun"]
+        "sys.argv", ["robotlab-gazebo", "--headless", "--keyboard", "--rerun"]
     )
     configs = []
     monkeypatch.setattr(cli, "run", configs.append)

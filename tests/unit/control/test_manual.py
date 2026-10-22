@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from dronelab.control.manual import FlightCommand, ManualController
-from dronelab.simulation.gazebo.actuators import thrust_to_motor_speeds
-from dronelab.simulation.gazebo.properties import DEFAULT_DRONE
+from robotlab.control.manual import FlightCommand, ManualController
+from robotlab.simulation.gazebo.actuators import thrust_to_motor_speeds
+from robotlab.simulation.gazebo.properties import DEFAULT_DRONE
 
 
 def update(
@@ -77,7 +77,7 @@ def test_invalid_actuator_commands(forces):
 
 
 def test_split_loops_match_combined_update_and_hold_setpoint():
-    from dronelab.control.manual import FlightCommand, ManualController
+    from robotlab.control.manual import FlightCommand, ManualController
 
     combined, split = ManualController(), ManualController()
     args = ([0, 0, 1.0], [0.2, 0, 0], [0, 0.05, 0, 0.99875], [0.1, 0, 0])
@@ -89,7 +89,7 @@ def test_split_loops_match_combined_update_and_hold_setpoint():
 
 
 def test_attitude_loop_requires_position_setpoint():
-    from dronelab.control.manual import ManualController
+    from robotlab.control.manual import ManualController
 
     with pytest.raises(RuntimeError, match="update_position"):
         ManualController().update_attitude([0, 0, 0, 1], [0, 0, 0])

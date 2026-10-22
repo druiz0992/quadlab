@@ -3,8 +3,8 @@ import math
 import numpy as np
 import pytest
 
-from dronelab.sensors.imu_temperature import ImuTemperatureModel
-from dronelab.simulation.gazebo.config import load_drone_config
+from robotlab.sensors.imu_temperature import ImuTemperatureModel
+from robotlab.simulation.gazebo.config import load_drone_config
 
 HOVER = np.array([0.0, 0.0, 9.81])
 RATE = np.array([0.1, 0.2, 0.3])
