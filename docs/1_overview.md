@@ -1,11 +1,13 @@
 # 1. Overview and architecture
 
-RobotLab provides inspectable drone experiments (multirotors and a quadplane) for learning state
-estimation and control. This document covers purpose, current status, code
+RobotLab provides inspectable robot experiments for learning state
+estimation and control: multirotors and a quadplane, and wheeled robots
+(rover, race car, tractor; [8 Ground vehicles](8_ground_vehicles.md)). This document covers purpose, current status, code
 organization, and shared conventions. Following documents:
 [2 Simulation](2_simulation.md) · [3 Configuration](3_configuration.md) ·
 [4 Control](4_control.md) · [5 Estimation](5_estimation.md) ·
-[6 Roadmap](6_roadmap.md) · [7 Experiments](7_experiments.md).
+[6 Roadmap](6_roadmap.md) · [7 Experiments](7_experiments.md) ·
+[8 Ground vehicles](8_ground_vehicles.md).
 
 *Migration (2026-10-22):* the project was renamed from DroneLab to RobotLab
 with no compatibility alias, in preparation for ground vehicles. The Python
@@ -31,7 +33,8 @@ install -e .`.
 | Estimation | GPS/IMU error-state EKF, as a live observer (`--ekf`) or an estimator plug-in |
 | Algorithm harness | Estimator/controller plug-ins on a typed sensor bus with modelled delivery delay and clock offsets; control on truth or on the estimate; reference missions (step, waypoints/laps, circle, figure-eight, chirp, doublet); estimation and control metrics; truth-based run health verdict (crash, flip, impact, contact, no lift-off); offline estimator replay of recorded runs; plug-in debug channel; batch sweeps with regression baselines ([7 Experiments](7_experiments.md)) |
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
-| Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse |
+| Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse; surface friction zones and spawn points for wheeled robots |
+| Ground vehicles | `--robot rover/car/tractor`: ray-cast suspension, transient Magic Formula tyres, drive/brake/steering actuators, aerodynamics in Python; wheel encoders; keyboard driver; wheeled controller plug-ins ([8 Ground vehicles](8_ground_vehicles.md)) |
 
 **Not implemented:** the full Gazebo session API (algorithms run serially
 on the mission thread, not in worker threads), obstacle avoidance,
@@ -52,7 +55,8 @@ src/robotlab/
 │                           #   statuses and SIGTERM handling (common.py)
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
 │                           #   measurement samples, rotor commands, JSON codec
-│                           #   (serialization.py)
+│                           #   (serialization.py), wheel commands (wheeled.py),
+│                           #   wheeled vehicle properties (wheeled_vehicle.py)
 ├── sensors/                # Synthetic models, Gazebo decoding, geodesy, in-process
 │                           #   streams, GPS dropout, accelerometer vibration,
 │                           #   IMU/GPS error models (imu_errors.py, gps_errors.py),
@@ -61,7 +65,7 @@ src/robotlab/
 │                           #   magnetometer errors, synthetic optical flow,
 │                           #   sensor bus (bus.py), IMU imperfections, GPS receiver
 │                           #   (velocity, status, RTK, heading), ESC telemetry,
-│                           #   magnetic anomalies, lidar returns
+│                           #   magnetic anomalies, lidar returns, wheel encoders
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
 │   ├── template.py         # Copyable template estimator (complementary filter)
@@ -82,7 +86,10 @@ src/robotlab/
 │   ├── waypoint.py         # Waypoint → body-velocity feedback (native mode)
 │   ├── manual.py           # Position and attitude loops → four rotor thrusts
 │   ├── timing.py           # Fixed-rate ticks, state/command latency buffers
-│   └── drone.py            # Exclusive thrust handle, receipts, publication worker
+│   ├── drone.py            # Exclusive thrust handle, receipts, publication worker
+│   ├── wheeled.py          # WheeledController plug-in contract, state, DriverCommand
+│   ├── wheeled_keyboard.py # Keyboard driver and steering geometry
+│   └── wheeled_template.py # Copyable template wheeled controller
 ├── perception/             # Placeholder: images and point clouds
 ├── planning/               # Placeholder: global_planning, local_planning, behavior
 ├── rl/                     # Placeholder: environments, rewards, training, policies
@@ -94,11 +101,15 @@ src/robotlab/
 │   ├── esc.py              # ESC update rate and command resolution
 │   ├── randomization.py    # Per-run true vehicle vs nominal (model mismatch)
 │   ├── backends/           # Retained RotorPy/reference library adapters (no CLI)
+│   ├── wheeled/            # Wheeled robots: presets and validation (config.py), tyres,
+│                           #   ground ray casts and surfaces, actuators, the vehicle model,
+│                           #   spawn poses, reference rigid-body integrator
 │   └── gazebo/
 │       ├── config.py       # Drone JSON loading, defaults, validation
 │       ├── properties.py   # Resolved vehicle properties
 │       ├── world.py        # Scene loading and world composition
 │       ├── vehicle.py      # Drone, motor, controller, and sensor SDF
+│       ├── wheeled_vehicle.py  # Wheeled-robot chassis SDF
 │       ├── actuators.py    # Thrust → motor-speed transport adapter
 │       ├── wind.py         # Seeded wind targets and native wind commands
 │       ├── sdf.py          # XML-building helpers
@@ -131,11 +142,17 @@ src/robotlab/
 │   ├── magnetometer_calibration.py  # Automated calibration run (robotlab-magcal)
 │   ├── imu_calibration.py  # Automated IMU calibration run (robotlab-imucal)
 │   ├── calibration_session.py  # Shared Gazebo pose/sensor session for calibrations
-│   └── live_ekf.py         # Bounded live IMU/GPS ordering and EKF composition
+│   ├── live_ekf.py         # Bounded live IMU/GPS ordering and EKF composition
+│   ├── wheeled_run.py      # Compose a wheeled-robot mission
+│   ├── wheeled_mission.py  # The running wheeled mission (lockstep loop)
+│   └── wheeled_summary.py  # Wheeled summary.json assembly
 ├── testing/
-│   └── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo)
+│   └── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo),
+│                           #   including check_wheeled_controller
 └── visualization/
     ├── gazebo_rerun.py     # Gazebo-message-to-Rerun recording adapter
+    ├── wheeled_rerun.py    # Wheeled-robot Rerun layout (wheels, surfaces, plots)
+    ├── driving_keyboard.py # Tk driving window
     ├── keyboard.py         # Tk keyboard window (key/focus state only)
     ├── live.py             # Matplotlib live drone view (retained)
     └── plotting.py         # Static flight plots (retained)

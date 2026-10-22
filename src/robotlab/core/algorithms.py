@@ -16,6 +16,7 @@ from types import MappingProxyType
 
 from .measurements import GpsReading
 from .vehicle import DroneProperties
+from .wheeled_vehicle import WheeledProperties
 
 
 @dataclass(frozen=True)
@@ -60,11 +61,17 @@ class AlgorithmContext:
     """
 
     gps_reference: GpsReading
+    # Nominal multirotor (for wheeled robots the unused multirotor defaults;
+    # use ``wheeled`` there).
     vehicle: DroneProperties
     sensors: Mapping[str, SensorDescription] = field(default_factory=dict)
     gravity_mps2: float = 9.81
     log: DebugLog = field(
         default=ignore_debug, compare=False, repr=False, metadata={"serialize": False}
+    )
+    # Nominal wheeled vehicle (rover, car, tractor runs), else None.
+    wheeled: WheeledProperties | None = field(
+        default=None, metadata={"serialize": False}
     )
 
     def __post_init__(self) -> None:

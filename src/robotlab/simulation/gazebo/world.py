@@ -12,6 +12,10 @@ from ..moving_obstacles import validate_moving_obstacle
 from ..terrain import Terrain, validate_terrain
 from .plugins import LOCKSTEP_FILENAME, LOCKSTEP_NAME, lockstep_barrier
 from .vehicle import add_payload, build_drone
+from .wheeled_vehicle import build_wheeled_vehicle
+from ..wheeled.config import WHEELED_KINDS
+from ..wheeled.ground import GroundModel, surfaces_from_scene, validate_surfaces
+from ..wheeled.spawn import spawn_pose, spawn_xy_yaw, validate_spawn_points
 from .config import WORLD_ELEVATION_M, load_drone_config, wind_effects_enabled
 
 # Physics engine, written explicitly so a Gazebo upgrade cannot change it
@@ -23,12 +27,16 @@ DART_COLLISION_DETECTOR = "ode"
 DART_SOLVER = "dantzig"
 
 
+# Model names the generated world uses itself (vehicles, ground, terrain).
+RESERVED_NAMES = frozenset({"drone", "ground", "terrain", *WHEELED_KINDS})
+
+
 def load_scene(path):
     scene = json.loads(Path(path).read_text())
     names = set()
     for obstacle in scene["obstacles"]:
         name = obstacle["name"]
-        if not name.isidentifier() or name in names or name in {"drone", "ground"}:
+        if not name.isidentifier() or name in names or name in RESERVED_NAMES:
             raise ValueError(f"Invalid or duplicate obstacle name: {name}")
         names.add(name)
         for field in ["position", "size"]:
@@ -57,13 +65,13 @@ def load_scene(path):
     for entry in scene.get("moving_obstacles", []):
         validate_moving_obstacle(entry)
         name = entry["name"]
-        if (
-            not name.isidentifier()
-            or name in names
-            or name in {"drone", "ground", "terrain"}
-        ):
+        if not name.isidentifier() or name in names or name in RESERVED_NAMES:
             raise ValueError(f"Invalid or duplicate obstacle name: {name}")
         names.add(name)
+    # Wheeled-robot scene keys (ignored by multirotors): friction zones and
+    # start positions; see simulation/wheeled/.
+    validate_surfaces(scene)
+    validate_spawn_points(scene.get("spawn_points", []))
     return scene
 
 
@@ -136,6 +144,84 @@ def world_elevation_m(path):
     """Spherical-coordinates elevation of an SDF world in metres (0 if absent)."""
     text = ET.parse(path).findtext("./world/spherical_coordinates/elevation")
     return 0.0 if text is None else float(text)
+
+
+SURFACE_COLORS = {
+    "asphalt": ".22 .22 .24 1",
+    "tarmac": ".22 .22 .24 1",
+    "kerb": ".85 .2 .2 1",
+    "gravel": ".72 .66 .52 1",
+    "grass": ".35 .6 .3 1",
+    "mud": ".4 .3 .2 1",
+    "soil": ".5 .38 .25 1",
+    "sand": ".86 .78 .55 1",
+    "ice": ".85 .92 .98 1",
+    "snow": ".95 .95 .97 1",
+}
+SURFACE_DEFAULT_COLOR = ".55 .55 .5 1"
+# Surface visuals float this far above z = 0 (and above earlier zones).
+SURFACE_LAYER_M = 0.002
+
+
+def add_surface_visuals(world, scene):
+    """Visual-only patches for flat-ground surface zones (no collision).
+
+    Rectangles are thin boxes; strips are one box per segment plus a disc at
+    every joint. Zones on terrain are not drawn (the patch would not follow
+    the height field); their friction still applies.
+    """
+    if "terrain" in scene:
+        return
+    _, zones = surfaces_from_scene(scene)
+    if not zones:
+        return
+    model = element(world, "model", name="surfaces")
+    element(model, "static", "true")
+    link = element(model, "link", name="link")
+    for index, zone in enumerate(zones):
+        color = SURFACE_COLORS.get(zone.surface.name, SURFACE_DEFAULT_COLOR)
+        z = SURFACE_LAYER_M * (index + 1)
+        if zone.shape == "rectangle":
+            cx, cy = zone.center_m
+            box(
+                link,
+                f"zone_{index}",
+                [*zone.size_m, 0.001],
+                color,
+                f"{cx} {cy} {z} 0 0 {zone.yaw_rad}",
+                collision=False,
+            )
+            continue
+        points = list(zone.points_m) + ([zone.points_m[0]] if zone.closed else [])
+        for k, ((x0, y0), (x1, y1)) in enumerate(zip(points[:-1], points[1:])):
+            length = float(np.hypot(x1 - x0, y1 - y0))
+            yaw = float(np.arctan2(y1 - y0, x1 - x0))
+            box(
+                link,
+                f"zone_{index}_{k}",
+                [length, zone.width_m, 0.001],
+                color,
+                f"{(x0 + x1) / 2} {(y0 + y1) / 2} {z} 0 0 {yaw}",
+                collision=False,
+            )
+            disc = element(link, "visual", name=f"zone_{index}_{k}_joint")
+            element(disc, "pose", f"{x1} {y1} {z} 0 0 0")
+            cylinder = element(element(disc, "geometry"), "cylinder")
+            element(cylinder, "radius", zone.width_m / 2)
+            element(cylinder, "length", 0.001)
+            material = element(disc, "material")
+            element(material, "ambient", color)
+            element(material, "diffuse", color)
+
+
+def _add_wheeled(world, scene, config, terrain):
+    """The wheeled vehicle, its wrench system, and surface visuals."""
+    plugin(world, "apply-link-wrench", "ApplyLinkWrench")
+    add_surface_visuals(world, scene)
+    ground = GroundModel.from_scene(scene, terrain)
+    x, y, yaw = spawn_xy_yaw(config.data, scene)
+    pose = spawn_pose(config.wheeled, ground, x, y, yaw)
+    build_wheeled_vehicle(world, config.wheeled, config.data, pose)
 
 
 def build_world(
@@ -244,7 +330,10 @@ def build_world(
             Path(output).parent / "terrain.obj",
             scene.get("ground_reflectivity"),
         )
-    build_drone(world, render_sensors, control_mode, config, terrain=terrain)
+    if config.wheeled is not None:
+        _add_wheeled(world, scene, config, terrain)
+    else:
+        build_drone(world, render_sensors, control_mode, config, terrain=terrain)
     if config.data["payload"]["enabled"]:
         add_payload(world, config.data, terrain)
     ET.indent(root)

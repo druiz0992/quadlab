@@ -28,6 +28,10 @@ document and update the status below.
 | Battery monitor sensor; Rerun sensor markers and status indicators | Implemented ([3 Configuration](3_configuration.md#battery-monitor-sensorsbattery_monitor), [2 Simulation](2_simulation.md#viewing)) |
 | Acro (rate-mode) controller for racing and freestyle handling (flips, rolls) | Future |
 | Freestyle/acrobatic 5-inch preset | Implemented ([3 Configuration](3_configuration.md#vehicle-presets)) |
+| Ground vehicles: rover, race car, tractor (`--robot`), Python tyre/suspension model, wheel encoders, keyboard driver, wheeled controller contract | Implemented ([8 Ground vehicles](8_ground_vehicles.md)) |
+| Ground-vehicle worlds (off-road, race circuit with opponent cars, field), tractor implements (3-point hitch tool with draft force) and towed trailer | In progress (see [Ground vehicles](#ground-vehicles)) |
+| Wheel encoders on the sensor bus (estimator input), wheeled randomization, mission references for wheeled robots | Future |
+| ApplyLinkWrench persistent wrenches accumulate (multirotor body drag and fixed-wing aerodynamics publish a delta every period, so long runs slow down quadratically); wheeled robots use one-step impulses | Known issue; fix proposed below |
 | Reversible (3D) motors with negative thrust | Future (schema change) |
 | Hexa/octocopter layouts | Implemented: general `vehicle.rotors`, hexa preset |
 | Motor/propeller failure (stop, partial thrust, speed limit) | Implemented ([3 Configuration](3_configuration.md#motor-faults-motorsfaults)) |
@@ -268,3 +272,21 @@ avoidance using perception output. Intended flow: behavior selection →
 global route → local trajectory → controller, with perception supplying
 observations and estimation supplying state. Validate each step in Gazebo
 before claiming autonomous laps or realistic wind response.
+
+## Ground vehicles
+
+Next steps after the vehicle core ([8 Ground vehicles](8_ground_vehicles.md)):
+
+- **Worlds:** off-road rover terrain (rocks, slopes, ditches), a race
+  circuit (track strip with kerbs and track limits, lap timing), and a
+  farm field (boundary, headlands, crop rows, RTK scenario).
+- **Opponent cars:** several physics cars on the circuit, each driven by
+  its own controller slot (default: a simple centreline follower as
+  traffic), so racing algorithms can be developed against them.
+- **Tractor implements:** a three-point-hitch tool with soil draft force
+  (ASABE D497 form) lowered and raised by the keyboard, and a towed trailer
+  on a hitch joint with its own wheels.
+- **Persistent wrenches:** move multirotor body drag and fixed-wing
+  aerodynamics off accumulating ApplyLinkWrench deltas (one-step impulses
+  as for wheeled robots, or a small replace-semantics Gazebo plugin).
+

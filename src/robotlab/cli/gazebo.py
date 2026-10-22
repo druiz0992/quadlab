@@ -19,7 +19,13 @@ def main():
         "--config",
         dest="drone",
         action="append",
-        help="Drone JSON configuration; repeat to layer files (later ones override)",
+        help="JSON configuration; repeat to layer files (later ones override)",
+    )
+    parser.add_argument(
+        "--robot",
+        choices=["multirotor", "rover", "car", "tractor"],
+        help="Robot type (default: multirotor, or robot.kind from --config); "
+        "rover, car, and tractor load that vehicle's preset",
     )
     parser.add_argument("--output", default="outputs/gazebo")
     parser.add_argument(
@@ -30,7 +36,7 @@ def main():
     parser.add_argument(
         "--keyboard",
         action="store_true",
-        help="Fly with arrows and Q/A using per-rotor thrust control",
+        help="Fly (multirotor: arrows and Q/A) or drive (wheeled robots: arrows)",
     )
     parser.add_argument(
         "--control-mode",

@@ -243,9 +243,13 @@ Implementation notes, measured on gz-sim 8:
   therefore ignored (counted as `lost_replies`); a burst is re-sent only if
   its odometry barrier has not arrived after 2 s (`resends`).
 
-Requirements: the odometry period must be a whole number of physics steps;
-rotor-thrust mode needs `control.publish_on_send`. Not available with
-`--keyboard` (interactive flight needs real time), `--world`, or `--edit`.
+Requirements: the odometry period must be a whole number of physics steps,
+and at least two (measured with gz-sim 8: one-step bursts never deliver
+their odometry barrier, so the first burst stalls; rejected by the
+configuration); rotor-thrust mode needs `control.publish_on_send`. For
+multirotors not available with `--keyboard` (interactive flight needs real
+time), `--world`, or `--edit`. Wheeled robots always run in lockstep, also
+when driven by keyboard ([8 Ground vehicles](8_ground_vehicles.md)).
 Wall-clock watchdogs that guard against a stalled Python while Gazebo keeps
 flying are disabled, because Gazebo cannot advance while Python stalls.
 `summary.json` field `lockstep` reports bursts, steps per burst, lost

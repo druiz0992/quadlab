@@ -1,8 +1,10 @@
 # RobotLab
 
-RobotLab is a local drone simulation lab for developing and testing state
-estimation and flight-control algorithms. It covers quadrotors, general
-multirotors, and a quadplane VTOL. Gazebo Harmonic simulates the vehicle and
+RobotLab is a local robot simulation lab for developing and testing state
+estimation and control algorithms. It covers quadrotors, general
+multirotors, a quadplane VTOL, and wheeled robots: a skid-steer rover, a
+race car, and an electric four-wheel-steer tractor
+([8 Ground vehicles](docs/8_ground_vehicles.md)). Gazebo Harmonic simulates the vehicle and
 sensors, Python adds realistic sensor errors, faults, and timing, Rerun shows
 and records the flight, and your estimator and controller plug in through a
 typed sensor bus. Runs are scored against truth and can be swept in batches
@@ -15,7 +17,8 @@ hardware.
 Documentation (read in order): [1 Overview](docs/1_overview.md) ·
 [2 Simulation](docs/2_simulation.md) · [3 Configuration](docs/3_configuration.md) ·
 [4 Control](docs/4_control.md) · [5 Estimation](docs/5_estimation.md) ·
-[6 Roadmap](docs/6_roadmap.md) · [7 Experiments](docs/7_experiments.md).
+[6 Roadmap](docs/6_roadmap.md) · [7 Experiments](docs/7_experiments.md) ·
+[8 Ground vehicles](docs/8_ground_vehicles.md).
 Project rules: [AGENTS.md](AGENTS.md).
 
 ## Setup
@@ -202,6 +205,14 @@ robotlab --headless --control-mode rotor-thrust --drone configs/sensors/imu_cons
   --drone configs/scenarios/ground_start.json --drone outputs/imucal/imu-calibration.json \
   --duration 20 --output outputs/imu-calibrated
 
+# Ground vehicles: drive a rover, race car, or tractor with the keyboard
+# (always lockstep; arrows, Space brake, tractor 1/2/3 steering modes)
+robotlab --robot car --keyboard --headless --scene worlds/airfield.json --output outputs/car
+robotlab --robot rover --keyboard --headless --scene worlds/hills.json --output outputs/rover
+robotlab --robot tractor --keyboard --headless --output outputs/tractor
+# Your wheeled controller: algorithms.controller in a config layer; start from
+# control/wheeled_template.py and check it with check_wheeled_controller
+
 # Worlds: generate only, edit paused in Gazebo, fly a saved world
 robotlab --generate-only --output outputs/world-preview
 robotlab --edit --scene worlds/circuit.json --output outputs/circuit-editor
@@ -228,7 +239,8 @@ Click the **RobotLab — keyboard flight** window and keep it focused.
 | W / S | Winch: lower / raise a tethered payload's hook (held) |
 
 The drone starts airborne at (0, 0, 1) m. Closing Gazebo itself ends the run
-with an error; use Escape to finish cleanly.
+with an error; use Escape to finish cleanly. Wheeled robots open a driving
+window instead ([keys](docs/8_ground_vehicles.md#keyboard)).
 
 ### Command-line options
 
@@ -236,10 +248,11 @@ with an error; use Escape to finish cleanly.
 | --- | --- | --- |
 | `--scene PATH` | `worlds/training.json` | JSON scene used to generate the world SDF |
 | `--world PATH` | – | Use a world saved from Gazebo instead of generating one (no `--drone`, `--keyboard`, or `--ekf`) |
-| `--drone PATH`, `--config PATH` | built-in | Drone JSON configuration; repeat to layer files, later ones overriding earlier ([combining files](docs/3_configuration.md#combining-files)) |
+| `--drone PATH`, `--config PATH` | built-in | JSON configuration; repeat to layer files, later ones overriding earlier ([combining files](docs/3_configuration.md#combining-files)) |
+| `--robot {multirotor,rover,car,tractor}` | `multirotor` (or `robot.kind` from `--config`) | Robot type; wheeled kinds load their preset ([8 Ground vehicles](docs/8_ground_vehicles.md)) |
 | `--output DIR` | `outputs/gazebo` | Directory for the world and run artifacts |
 | `--duration S` | 20 (keyboard: 3600) | Mission length in simulation seconds |
-| `--keyboard` | off | Fly with arrows and Q/A using the per-rotor thrust controller; opens Rerun |
+| `--keyboard` | off | Fly with arrows and Q/A using the per-rotor thrust controller (wheeled robots: drive); opens Rerun |
 | `--control-mode {velocity,rotor-thrust}` | `velocity` | `velocity`: Gazebo native controller to `--target`. `rotor-thrust`: Python controller holds the initial pose |
 | `--target X Y Z` | `3 0 2` | Waypoint in metres (velocity mode only) |
 | `--ekf` | off | Run the live GPS/IMU EKF; records `estimates.jsonl` and shows it in Rerun |
@@ -266,6 +279,8 @@ that log debug series add `algorithm-debug.jsonl`. Check
 the health verdict (`ok`/`warning`/`failed`, printed after the run),
 completion, message counts, and dropped counters in `summary.json` before
 trusting a dataset. Details: [2 Simulation](docs/2_simulation.md#run-artifacts).
+Wheeled robots also write `wheels.jsonl` (per-wheel forces and slips) and
+per-tick wheel commands in `commands.jsonl` ([8 Ground vehicles](docs/8_ground_vehicles.md#outputs)).
 
 Ctrl-C or SIGTERM stops a run (or a whole batch) gracefully: results are
 saved, Gazebo is stopped, and the exit status is 130 or 143; a failed run

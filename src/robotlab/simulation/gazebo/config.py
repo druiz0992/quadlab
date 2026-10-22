@@ -17,6 +17,14 @@ from typing import Any
 import numpy as np
 
 from ...core.vehicle import DroneProperties
+from ..wheeled.config import (
+    GROUND_VEHICLE_DEFAULTS,
+    ROBOT_KINDS,
+    WHEELED_KINDS,
+    preset_layer,
+    validate_ground_vehicle,
+)
+from ...core.wheeled_vehicle import WheeledProperties
 
 # Height of the generated world's origin above sea level
 # (spherical_coordinates). GPS altitude, barometric altitude, and the "site"
@@ -81,6 +89,10 @@ def mount_pose(sensor):
 
 DEFAULTS: dict[str, Any] = {
     "schema_version": 1,
+    # Vehicle family: multirotor (the sections below) or a wheeled robot
+    # (rover, car, tractor: ``ground_vehicle``); see simulation/wheeled/.
+    "robot": {"kind": "multirotor"},
+    "ground_vehicle": GROUND_VEHICLE_DEFAULTS,
     "vehicle": {
         "body_mass_kg": 1.5,
         "rotor_mass_kg": 0.01,
@@ -450,6 +462,15 @@ DEFAULTS: dict[str, Any] = {
             "current_noise_std_a": 0.0,
             "current_offset_a": 0.0,
         },
+        # Wheeled robots: incremental wheel encoders and steering-angle
+        # sensors; see sensors/wheel_encoders.py (multirotors: unused).
+        "wheel_encoders": {
+            "enabled": False,
+            "rate_hz": 100.0,
+            "counts_per_revolution": 1024,
+            "steering_noise_std_rad": 0.0,
+            "seed": 0,
+        },
         # Synthetic flow over flat ground; see sensors/optical_flow.py.
         "optical_flow": {
             "mount": down_mount(),
@@ -811,6 +832,7 @@ SIGNED_SCALAR_KEYS = {
     "vertical_max_angle_deg",
 }
 NONNEGATIVE_SCALAR_KEYS = {
+    "steering_noise_std_rad",
     "flip_duration_s",
     "impact_window_s",
     "below_ground_margin_m",
@@ -1161,7 +1183,17 @@ def validate_lockstep(data):
     if simulation["lockstep"]:
         from .stepping import steps_per_period
 
-        steps_per_period(1 / data["control"]["odometry_rate_hz"], simulation["step_s"])
+        steps = steps_per_period(
+            1 / data["control"]["odometry_rate_hz"], simulation["step_s"]
+        )
+        if steps < 2:
+            # Measured with gz-sim 8: one-step bursts never deliver their
+            # odometry barrier, so the first burst stalls (multirotor and
+            # wheeled alike); two or more steps per period work.
+            raise ValueError(
+                "Lockstep needs at least two physics steps per odometry period; "
+                "lower control.odometry_rate_hz or simulation.step_s"
+            )
     elif simulation["real_time_factor"] == 0:
         raise ValueError("real_time_factor 0 (unlimited) requires simulation.lockstep")
 
@@ -1239,11 +1271,17 @@ def number(value, path, *, positive=False, nonnegative=False):
         raise ValueError(f"{path} must be {'positive' if positive else 'nonnegative'}")
 
 
+# Sections with their own validator (called from load_drone_config).
+SELF_VALIDATED_KEYS = {"ground_vehicle"}
+
+
 def validate_tree(value, template, path="config"):
     for key, default in template.items():
         item, name = value[key], f"{path}.{key}"
         if key in FREE_FORM_KEYS:
             continue  # validated by the plug-in that receives it
+        if key in SELF_VALIDATED_KEYS:
+            continue
         if key == "air_density_kg_m3":
             if item != "site":
                 number(item, name, positive=True)
@@ -1420,6 +1458,7 @@ def validate_tree(value, template, path="config"):
                     "satellites",
                     "satellite_variation",
                     "multipath_satellite_loss",
+                    "counts_per_revolution",
                 }
                 and type(item) is not int
             ):
@@ -1434,6 +1473,13 @@ class DroneConfig:
     # key, the file that last set it. Defaults are not listed.
     sources: tuple[str, ...] = ()
     provenance: dict = field(default_factory=dict)
+    # Nominal wheeled vehicle when robot.kind is rover, car, or tractor.
+    wheeled: WheeledProperties | None = None
+
+    @property
+    def kind(self) -> str:
+        """Robot family: ``multirotor``, ``rover``, ``car``, or ``tractor``."""
+        return str(self.data["robot"]["kind"])
 
     @property
     def render_sensors(self):
@@ -1514,11 +1560,30 @@ def _lookup(tree: dict, dotted: str):
     return tree
 
 
+def _robot_kind(robot: str | None, layers: list[tuple[str, dict]]) -> str:
+    """Robot kind from ``--robot`` and the layers' ``robot.kind`` (the last
+    layer that sets it); they must agree. Default: multirotor."""
+    kinds = [
+        (source, layer["robot"]["kind"])
+        for source, layer in layers
+        if isinstance(layer.get("robot"), dict) and "kind" in layer["robot"]
+    ]
+    kind = kinds[-1][1] if kinds else (robot or "multirotor")
+    if kind not in ROBOT_KINDS:
+        raise ValueError(f"robot.kind must be one of {', '.join(ROBOT_KINDS)}")
+    if robot is not None and kind != robot:
+        raise ValueError(
+            f"--robot {robot} conflicts with robot.kind {kind!r} in {kinds[-1][0]}"
+        )
+    return kind
+
+
 def load_drone_config(
     paths: ConfigPaths = None,
     *,
     render_sensors: bool = False,
     site_elevation_m: float = WORLD_ELEVATION_M,
+    robot: str | None = None,
 ):
     """Load built-in defaults overridden by zero or more layered JSON files.
 
@@ -1532,8 +1597,17 @@ def load_drone_config(
     generated world's elevation unless a saved world says otherwise) and
     ``environment.ambient_temperature_c``, so the returned settings always
     hold a number.
+
+    ``robot`` (the ``--robot`` option) or a layer's ``robot.kind`` selects
+    the robot family; a wheeled kind's preset (simulation/wheeled/config.py)
+    applies before every file layer.
     """
     layers = [layer for path in _as_paths(paths) for layer in _expand_layers(path)]
+    if robot is not None and robot not in ROBOT_KINDS:
+        raise ValueError(f"--robot must be one of {', '.join(ROBOT_KINDS)}")
+    kind = _robot_kind(robot, layers)
+    if kind != "multirotor":
+        layers.insert(0, (f"robot preset {kind}", preset_layer(kind)))
     # Copy: callers may modify the returned settings.
     data = deepcopy(DEFAULTS)
     provenance: dict[str, str] = {}  # dotted key -> layer file
@@ -1763,4 +1837,12 @@ def load_drone_config(
         raise ValueError(
             "Insufficient thrust for hover; increase limits or reduce mass"
         )
-    return DroneConfig(data, props, tuple(source for source, _ in layers), provenance)
+    wheeled = None
+    if kind in WHEELED_KINDS:
+        validate_ground_vehicle(data)
+        wheeled = WheeledProperties.from_settings(
+            kind, data["ground_vehicle"], aero["air_density_kg_m3"]
+        )
+    return DroneConfig(
+        data, props, tuple(source for source, _ in layers), provenance, wheeled
+    )

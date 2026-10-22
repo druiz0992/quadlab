@@ -124,6 +124,15 @@ also recorded in the summary. A configuration cannot be applied to a saved
 
 ## Sections
 
+`robot.kind` (or `--robot`) chooses the robot family: `multirotor` (the
+default; every section below) or a wheeled robot, `rover`, `car`, or
+`tractor`, whose preset is applied before all files and whose
+`ground_vehicle` section and `sensors.wheel_encoders` are described in
+[8 Ground vehicles](8_ground_vehicles.md#configuration). Wheeled robots
+reject the multirotor-only features (payload, wind, battery, fixed wing,
+rotor aerodynamics, optical flow, airspeed, battery monitor, ESC telemetry,
+motor faults).
+
 | Section | Properties |
 | --- | --- |
 | `vehicle` | Body and per-rotor mass (kg); diagonal body and rotor inertia (kg·m²); body box size (m); rotor arm x/y offset (m); centre-of-mass offset (m) |

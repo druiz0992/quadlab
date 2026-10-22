@@ -1,5 +1,10 @@
 # 4. Flight control
 
+This document covers multirotor and quadplane control. Wheeled robots
+(rover, car, tractor) take per-wheel drive, brake, and steering commands
+from a keyboard driver or a wheeled controller plug-in
+([8 Ground vehicles](8_ground_vehicles.md#controllers)).
+
 RobotLab has two control modes, chosen with `--control-mode` (or implied by
 `--keyboard`). Both use **ground-truth odometry** explicitly as feedback,
 labelled as such in `summary.json`. No estimator feeds control yet.

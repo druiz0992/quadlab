@@ -76,8 +76,11 @@ in [README.md](README.md); design, behavior, and reference material are in
 - Authored scenes and saved worlds live in `worlds/`; generated artifacts go
   in `outputs/` or a temporary directory. Never commit virtual environments,
   caches, recordings, or large flight data.
-- When editing reusable worlds keep the world name `robotlab`, vehicle name
-  `drone`, sensor topics, and plugins. Collision and visual sizes must match.
+- When editing reusable worlds keep the world name `robotlab`, vehicle names
+  (`drone`; wheeled robots `rover`, `car`, `tractor` or their configured
+  `ground_vehicle.model_name`), sensor topics, and plugins. Collision and
+  visual sizes must match (wheeled robots' wheel visuals are visual-only:
+  Python computes wheel forces).
 - Gazebo is authoritative for collisions and rendered sensors; Rerun world
   sync is partial. Check the health verdict and missing/dropped message
   counts in `summary.json`.
@@ -129,6 +132,7 @@ Documentation must match the code at the end of every change.
 | `docs/5_estimation.md` | EKF math and live estimation | Estimator behavior changes |
 | `docs/6_roadmap.md` | Proposed APIs and future work | Plans change or a proposal is implemented |
 | `docs/7_experiments.md` | Algorithm plug-ins, sensor bus, missions, metrics, batch runs | The harness or its contracts change |
+| `docs/8_ground_vehicles.md` | Wheeled robots: model, presets, settings, controllers, outputs | Wheeled-robot behavior or contracts change |
 
 When a proposal in the roadmap is implemented, move its description into the
 relevant numbered doc. Do not create new top-level docs; extend these, or add

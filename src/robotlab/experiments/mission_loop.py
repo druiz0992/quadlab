@@ -138,13 +138,16 @@ class RunFiles:
     wind: TextIO | None
 
 
-def lockstep_stepper(node: Any, settings: dict[str, Any], barrier: str) -> Any:
+def lockstep_stepper(
+    node: Any, settings: dict[str, Any], barrier: str, reply_timeout_ms: int = 10
+) -> Any:
     """Stepper advancing the paused world one odometry period per burst.
 
     Bursts are multi-step requests to the world control service. With the
     ``plugin`` barrier each request is preceded by a grant on the
     RobotlabLockstep topic (advertised here, so the start-up barrier also
-    waits for the plugin's subscription).
+    waits for the plugin's subscription). ``reply_timeout_ms`` bounds the
+    blocking wait for the (ignored) service reply.
     """
     from types import SimpleNamespace
 
@@ -176,6 +179,7 @@ def lockstep_stepper(node: Any, settings: dict[str, Any], barrier: str) -> Any:
         steps=steps_per_period(period_s, settings["simulation"]["step_s"]),
         period_ns=round(period_s * 1e9),
         grant=grant,
+        reply_timeout_ms=reply_timeout_ms,
     )
 
 

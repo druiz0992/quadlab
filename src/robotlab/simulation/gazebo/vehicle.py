@@ -93,109 +93,7 @@ def build_drone(
             f"{tail_x} 0 0.2 0 0 0",
             collision=False,
         )
-    contact = element(base, "sensor", name="contact", type="contact")
-    element(contact, "always_on", "true")
-    element(contact, "update_rate", sensors["contacts"]["rate_hz"])
-    contact_settings = element(contact, "contact")
-    element(contact_settings, "collision", "body")
-    element(contact_settings, "topic", "/robotlab/contacts")
-    imu = element(base, "sensor", name="imu", type="imu")
-    element(imu, "always_on", "true")
-    element(imu, "update_rate", sensors["imu"]["rate_hz"])
-    element(imu, "topic", "/robotlab/imu")
-    imu_settings = element(imu, "imu")
-    for section, field in (
-        ("linear_acceleration", "acceleration_mps2"),
-        ("angular_velocity", "angular_rate_rad_s"),
-    ):
-        component = element(imu_settings, section)
-        error = sensors["imu"][field]
-        for i, axis in enumerate("xyz"):
-            add_noise(
-                element(component, axis), error["bias"][i], error["noise_stddev"][i]
-            )
-    gps = element(base, "sensor", name="gps", type="navsat")
-    element(gps, "always_on", "true")
-    element(gps, "update_rate", sensors["gps"]["rate_hz"])
-    gps_settings = element(gps, "navsat")
-    for section, fields in (
-        ("position_sensing", ("horizontal_position_m", "vertical_position_m")),
-        ("velocity_sensing", ("horizontal_velocity_mps", "vertical_velocity_mps")),
-    ):
-        component = element(gps_settings, section)
-        for axis, field in zip(("horizontal", "vertical"), fields):
-            error = sensors["gps"][field]
-            # gz-sensors8 applies horizontal position noise directly to degrees,
-            # despite SDF documenting metres. Convert to angular units. A shared
-            # lat/lon model makes longitude metre errors scale by cos(latitude).
-            scale = (
-                math.degrees(1 / 6378137.0) if field == "horizontal_position_m" else 1.0
-            )
-            add_noise(
-                element(component, axis),
-                error["bias"] * scale,
-                error["noise_stddev"] * scale,
-            )
-    element(gps, "topic", "/robotlab/gps")
-    add_barometer(base, sensors["baro"])
-
-    if sensors["camera"]["enabled"]:
-        lens = sensors["camera"]["lens"]["type"]
-        kind = "camera" if lens == "pinhole" else "wideanglecamera"
-        camera = element(base, "sensor", name="camera", type=kind)
-        element(camera, "topic", "/robotlab/camera")
-        element(camera, "update_rate", sensors["camera"]["rate_hz"])
-        element(camera, "always_on", "true")
-        camera = element(camera, "camera")
-        element(camera, "horizontal_fov", sensors["camera"]["horizontal_fov_rad"])
-        image = element(camera, "image")
-        element(image, "width", sensors["camera"]["width"])
-        element(image, "height", sensors["camera"]["height"])
-        element(image, "format", "R8G8B8")
-        clip = element(camera, "clip")
-        element(clip, "near", sensors["camera"]["near_m"])
-        element(clip, "far", sensors["camera"]["far_m"])
-        error = sensors["camera"]["intensity"]
-        add_noise(camera, error["bias"], error["noise_stddev"])
-        if lens != "pinhole":
-            # Native Gazebo fisheye; verified to render headless with ogre2.
-            optics = element(camera, "lens")
-            element(optics, "type", lens)
-            element(optics, "scale_to_hfov", "true")
-            element(optics, "cutoff_angle", sensors["camera"]["horizontal_fov_rad"] / 2)
-            element(optics, "env_texture_size", 512)
-    if sensors["lidar"]["enabled"]:
-        lidar = sensors["lidar"]
-        vertical = None
-        if lidar["vertical_samples"] > 1:
-            vertical = (
-                lidar["vertical_samples"],
-                math.radians(lidar["vertical_min_angle_deg"]),
-                math.radians(lidar["vertical_max_angle_deg"]),
-            )
-        add_ray_sensor(
-            base,
-            "lidar",
-            lidar,
-            horizontal=(lidar["samples"], -3.14159265, 3.14159265),
-            vertical=vertical,
-        )
-    if sensors["rangefinder"]["enabled"]:
-        # One ray along the sensor's +x axis; the mount points it down.
-        add_ray_sensor(
-            base, "rangefinder", sensors["rangefinder"], horizontal=(1, 0, 0)
-        )
-    if sensors["magnetometer"]["enabled"]:
-        add_magnetometer(base, sensors["magnetometer"])
-
-    for sensor in list(base.findall("sensor")):
-        name = sensor.get("name")
-        if name in MOUNTED_SENSORS:
-            element(sensor, "pose", " ".join(map(str, mount_pose(sensors[name]))))
-        if not sensors[
-            "contacts" if sensor.get("name") == "contact" else sensor.get("name")
-        ]["enabled"]:
-            base.remove(sensor)
+    add_body_sensors(base, sensors)
 
     rotors = None
     if control_mode == "velocity":
@@ -312,6 +210,119 @@ MOUNTED_SENSORS = {
     "rangefinder",
     "magnetometer",
 }
+
+
+def add_body_sensors(base, sensors):
+    """Attach the configured sensors to ``base`` (a vehicle body link).
+
+    Contacts watch the link's collision named ``body``; every mounted sensor
+    gets its configured pose, and disabled sensors are removed again. Topics
+    are the shared ``/robotlab/<kind>`` names, so ingress is vehicle
+    independent.
+    """
+    contact = element(base, "sensor", name="contact", type="contact")
+    element(contact, "always_on", "true")
+    element(contact, "update_rate", sensors["contacts"]["rate_hz"])
+    contact_settings = element(contact, "contact")
+    element(contact_settings, "collision", "body")
+    element(contact_settings, "topic", "/robotlab/contacts")
+    imu = element(base, "sensor", name="imu", type="imu")
+    element(imu, "always_on", "true")
+    element(imu, "update_rate", sensors["imu"]["rate_hz"])
+    element(imu, "topic", "/robotlab/imu")
+    imu_settings = element(imu, "imu")
+    for section, field in (
+        ("linear_acceleration", "acceleration_mps2"),
+        ("angular_velocity", "angular_rate_rad_s"),
+    ):
+        component = element(imu_settings, section)
+        error = sensors["imu"][field]
+        for i, axis in enumerate("xyz"):
+            add_noise(
+                element(component, axis), error["bias"][i], error["noise_stddev"][i]
+            )
+    gps = element(base, "sensor", name="gps", type="navsat")
+    element(gps, "always_on", "true")
+    element(gps, "update_rate", sensors["gps"]["rate_hz"])
+    gps_settings = element(gps, "navsat")
+    for section, fields in (
+        ("position_sensing", ("horizontal_position_m", "vertical_position_m")),
+        ("velocity_sensing", ("horizontal_velocity_mps", "vertical_velocity_mps")),
+    ):
+        component = element(gps_settings, section)
+        for axis, field in zip(("horizontal", "vertical"), fields):
+            error = sensors["gps"][field]
+            # gz-sensors8 applies horizontal position noise directly to degrees,
+            # despite SDF documenting metres. Convert to angular units. A shared
+            # lat/lon model makes longitude metre errors scale by cos(latitude).
+            scale = (
+                math.degrees(1 / 6378137.0) if field == "horizontal_position_m" else 1.0
+            )
+            add_noise(
+                element(component, axis),
+                error["bias"] * scale,
+                error["noise_stddev"] * scale,
+            )
+    element(gps, "topic", "/robotlab/gps")
+    add_barometer(base, sensors["baro"])
+
+    if sensors["camera"]["enabled"]:
+        lens = sensors["camera"]["lens"]["type"]
+        kind = "camera" if lens == "pinhole" else "wideanglecamera"
+        camera = element(base, "sensor", name="camera", type=kind)
+        element(camera, "topic", "/robotlab/camera")
+        element(camera, "update_rate", sensors["camera"]["rate_hz"])
+        element(camera, "always_on", "true")
+        camera = element(camera, "camera")
+        element(camera, "horizontal_fov", sensors["camera"]["horizontal_fov_rad"])
+        image = element(camera, "image")
+        element(image, "width", sensors["camera"]["width"])
+        element(image, "height", sensors["camera"]["height"])
+        element(image, "format", "R8G8B8")
+        clip = element(camera, "clip")
+        element(clip, "near", sensors["camera"]["near_m"])
+        element(clip, "far", sensors["camera"]["far_m"])
+        error = sensors["camera"]["intensity"]
+        add_noise(camera, error["bias"], error["noise_stddev"])
+        if lens != "pinhole":
+            # Native Gazebo fisheye; verified to render headless with ogre2.
+            optics = element(camera, "lens")
+            element(optics, "type", lens)
+            element(optics, "scale_to_hfov", "true")
+            element(optics, "cutoff_angle", sensors["camera"]["horizontal_fov_rad"] / 2)
+            element(optics, "env_texture_size", 512)
+    if sensors["lidar"]["enabled"]:
+        lidar = sensors["lidar"]
+        vertical = None
+        if lidar["vertical_samples"] > 1:
+            vertical = (
+                lidar["vertical_samples"],
+                math.radians(lidar["vertical_min_angle_deg"]),
+                math.radians(lidar["vertical_max_angle_deg"]),
+            )
+        add_ray_sensor(
+            base,
+            "lidar",
+            lidar,
+            horizontal=(lidar["samples"], -3.14159265, 3.14159265),
+            vertical=vertical,
+        )
+    if sensors["rangefinder"]["enabled"]:
+        # One ray along the sensor's +x axis; the mount points it down.
+        add_ray_sensor(
+            base, "rangefinder", sensors["rangefinder"], horizontal=(1, 0, 0)
+        )
+    if sensors["magnetometer"]["enabled"]:
+        add_magnetometer(base, sensors["magnetometer"])
+
+    for sensor in list(base.findall("sensor")):
+        name = sensor.get("name")
+        if name in MOUNTED_SENSORS:
+            element(sensor, "pose", " ".join(map(str, mount_pose(sensors[name]))))
+        if not sensors[
+            "contacts" if sensor.get("name") == "contact" else sensor.get("name")
+        ]["enabled"]:
+            base.remove(sensor)
 
 
 def add_ray_sensor(base, name, settings, *, horizontal, vertical=None):

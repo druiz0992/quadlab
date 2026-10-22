@@ -31,7 +31,16 @@ numbers; an optional ``tracking_reference`` returns None or a finite
 ``ReferencePoint`` without changing the controller's output; ``allow_landing``
 can be called.
 
-Both raise ``PluginContractError`` (an AssertionError) with the reason,
+``check_wheeled_controller`` checks the ``WheeledController`` contract
+(control/wheeled.py) on a nominal rover, car, or tractor: from rest and
+while driving at a few speeds, with no request and with keyboard-like
+``DriverCommand`` requests, ``update`` returns ``WheelCommands`` that the
+vehicle's actuators accept (one finite value per wheel, torque only on
+driven wheels, brakes >= 0 on braked wheels, angles only on steered
+wheels), repeats exactly on a second run, and ``summary()`` (optional) is
+a JSON-serializable dict.
+
+All three raise ``PluginContractError`` (an AssertionError) with the reason,
 and return a report for further assertions. The data are synthetic and
 noise-light: passing says the plug-in fits the harness, not that it is a
 good algorithm; judge that with Gazebo runs and ``robotlab-replay``.
@@ -46,9 +55,11 @@ import numpy as np
 
 from ..control.interface import ControlState
 from ..control.references import ReferencePoint
-from ..core.algorithms import AlgorithmContext, SensorDescription
+from ..core.algorithms import AlgorithmContext, SensorDescription, ignore_debug
 from ..core.measurements import EstimatedState, GpsReading, ImuReading, Sample
 from ..core.vehicle import DroneProperties
+from ..core.wheeled import WheelCommands
+from ..core.wheeled_vehicle import WheeledProperties
 from ..estimation.interface import Innovation
 from ..experiments.algorithm_debug import validate_debug_entry
 from ..sensors.bus import STREAMS
@@ -91,16 +102,24 @@ def synthetic_context(
     kinds: tuple[str, ...] = ("imu", "gps"),
     vehicle: DroneProperties | None = None,
     log: Callable[..., None] | None = None,
+    wheeled: WheeledProperties | None = None,
 ) -> AlgorithmContext:
-    """Context like a Gazebo run's: body-origin mounts, nominal rates."""
+    """Context like a Gazebo run's: body-origin mounts, nominal rates.
+
+    ``wheeled`` makes it a wheeled-robot context (``context.wheeled``).
+    """
     rates = {"imu": 200.0, "gps": 10.0}
     sensors = {
         kind: SensorDescription(kind, STREAMS[kind][1], rates.get(kind))
         for kind in kinds
     }
-    extra = {} if log is None else {"log": log}
     return AlgorithmContext(
-        REFERENCE, vehicle or DroneProperties(), sensors, GRAVITY_MPS2, **extra
+        REFERENCE,
+        vehicle or DroneProperties(),
+        sensors,
+        GRAVITY_MPS2,
+        log=log or ignore_debug,
+        wheeled=wheeled,
     )
 
 
@@ -426,3 +445,93 @@ def _check_thrust(thrust: np.ndarray, properties: DroneProperties, controller) -
         or bool(np.all(thrust <= properties.max_rotor_thrust + 1e-9)),
         "thrust above the rotor limit without setting saturated",
     )
+
+
+@dataclass(frozen=True)
+class WheeledControllerReport:
+    """Commands ``check_wheeled_controller`` saw, in probe order."""
+
+    commands: tuple[WheelCommands, ...]
+    summary: dict[str, Any] = field(default_factory=dict)
+
+
+def nominal_wheeled(kind: str = "car") -> WheeledProperties:
+    """The built-in preset vehicle of ``kind`` (rover, car, tractor)."""
+    from ..simulation.gazebo.config import load_drone_config
+
+    properties = load_drone_config(robot=kind).wheeled
+    if properties is None:
+        raise ValueError(f"{kind!r} is not a wheeled robot kind")
+    return properties
+
+
+def _wheeled_probes(properties: WheeledProperties) -> list[tuple[Any, Any]]:
+    """(state, request) pairs: at rest and moving, with and without input."""
+    from ..control.wheeled import DriverCommand, WheeledControlState
+
+    n = properties.wheel_count
+    probes: list[tuple[Any, Any]] = []
+    for speed in (0.0, 1.0, 5.0):
+        for yaw_rate in (0.0, 0.3):
+            state = WheeledControlState(
+                sim_time_ns=len(probes) * 10_000_000,
+                position_m=np.zeros(3),
+                velocity_world_mps=np.array([speed, 0.0, 0.0]),
+                quaternion_xyzw=np.array([0.0, 0.0, 0.0, 1.0]),
+                body_rates_rad_s=np.array([0.0, 0.0, yaw_rate]),
+                wheel_speed_rad_s=np.full(n, speed / properties.tyre.radius_m),
+                steer_angle_rad=np.zeros(n),
+            )
+            for request in (
+                None,
+                DriverCommand(throttle=0.5, steer=0.3),
+                DriverCommand(throttle=-0.5, brake=0.0, steer=-1.0),
+                DriverCommand(brake=1.0),
+            ):
+                probes.append((state, request))
+    return probes
+
+
+def _run_wheeled(factory, options, properties) -> tuple[list[WheelCommands], Any]:
+    controller = factory(synthetic_context(wheeled=properties), dict(options))
+    commands = []
+    for index, (state, request) in enumerate(_wheeled_probes(properties)):
+        command = controller.update(state, request, 0.0 if index == 0 else 0.01)
+        _fail(
+            isinstance(command, WheelCommands),
+            f"update returned {type(command).__name__}, not WheelCommands",
+        )
+        try:
+            command.validate(
+                tuple(properties.mask("driven")),
+                tuple(properties.mask("braked")),
+                tuple(properties.mask("steered")),
+            )
+        except ValueError as error:
+            raise PluginContractError(f"invalid WheelCommands: {error}") from error
+        commands.append(command)
+    return commands, controller
+
+
+def check_wheeled_controller(
+    factory: Callable[[AlgorithmContext, Mapping[str, Any]], Any],
+    options: Mapping[str, Any] | None = None,
+    kind: str = "car",
+) -> WheeledControllerReport:
+    """Check a ``WheeledController`` class (see module docs)."""
+    from ..control.wheeled import WheeledController
+
+    properties = nominal_wheeled(kind)
+    options = options or {}
+    first, controller = _run_wheeled(factory, options, properties)
+    _fail(
+        isinstance(controller, WheeledController),
+        "controller does not implement WheeledController (update)",
+    )
+    second, _ = _run_wheeled(factory, options, properties)
+    _fail(first == second, "two runs gave different commands (hidden state or RNG)")
+    summary: dict[str, Any] = {}
+    if hasattr(controller, "summary"):
+        summary = controller.summary()
+        _json_dict(summary, "summary()")
+    return WheeledControllerReport(tuple(first), summary)

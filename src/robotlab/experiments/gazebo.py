@@ -59,6 +59,9 @@ class GazeboConfig:
     keyboard: bool = False
     control_mode: str = "velocity"
     ekf: bool = False
+    # Robot family (``--robot``); None: from the config layers (default
+    # multirotor). See simulation/wheeled/config.py.
+    robot: str | None = None
 
 
 def run(args: GazeboConfig, command_source=None):
@@ -79,7 +82,8 @@ def run(args: GazeboConfig, command_source=None):
 
     try:
         # _run opens the window only once the run is validated (never for
-        # generate-only), so option errors need no desktop.
+        # generate-only), so option errors need no desktop. Wheeled robots
+        # open their own driving window (experiments/wheeled_run.py).
         return _run(args, open_keyboard if args.keyboard else None, command_source)
     finally:
         for window in windows:
@@ -151,6 +155,11 @@ def _run(args, open_keyboard, command_source):
 
     if args.drone and args.world:
         raise ValueError("--drone/--config requires a generated world; omit --world")
+    if args.robot not in (None, "multirotor") and args.world:
+        raise ValueError(
+            f"{args.robot}: needs a generated world (the wheel model reads the "
+            "scene); omit --world"
+        )
     # A saved world keeps its own elevation (for the "site" air density).
     config = load_drone_config(
         args.drone,
@@ -158,7 +167,12 @@ def _run(args, open_keyboard, command_source):
         site_elevation_m=(
             world_elevation_m(args.world) if args.world else WORLD_ELEVATION_M
         ),
+        robot=args.robot,
     )
+    if config.wheeled is not None:
+        from .wheeled_run import run_wheeled
+
+        return run_wheeled(args, config, command_source is not None)
     settings = config.data
 
     sensors = settings["sensors"]

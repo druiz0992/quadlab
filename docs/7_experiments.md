@@ -144,6 +144,10 @@ Start from a template; both are short and commented, and pass the kit:
 | `estimation/template.py` | `robotlab.estimation.template:TemplateEstimator` | Complementary filter: gyro-integrated attitude pulled towards the accelerometer's gravity direction, GPS-blended position and velocity; fixed reported covariance (NEES not meaningful); logs `template/gps_error` |
 | `control/template.py` | `robotlab.control.template:TemplateController` | Cascaded PD: position → tilt-limited acceleration → desired attitude (geometric attitude error, Lee et al. 2010) → torque → pseudo-inverse allocation over the lift rotors |
 
+Wheeled robots have their own controller contract, template
+(`control/wheeled_template.py`), and kit check (`check_wheeled_controller`);
+estimator plug-ins are shared ([8 Ground vehicles](8_ground_vehicles.md#controllers)).
+
 Both reject unknown option keys. Verified in lockstep on the training
 square (two laps, 45 s): the template controller tracked with 0.148 m
 RMSE (built-in 0.101 m), peak tilt 8.7°, health `ok`; the template

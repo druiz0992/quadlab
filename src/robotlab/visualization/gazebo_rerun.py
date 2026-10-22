@@ -73,6 +73,24 @@ class ScalarBatch:
             self._send(path, times, values)
 
 
+# Time-series tabs of the multirotor layout: (entity origin, tab name).
+DRONE_TABS = (
+    ("estimation", "EKF vs truth"),
+    ("actuators/thrust_target_n", "Rotor thrust targets (N)"),
+    ("imu", "IMU"),
+    ("gps", "GPS"),
+    ("baro", "Barometer"),
+    ("magnetometer", "Magnetometer"),
+    ("downward", "Rangefinder and flow"),
+    ("battery", "Battery"),
+    ("status", "Sensor status"),
+    ("aero", "Aerodynamics"),
+    ("tracking", "Waypoint error"),
+)
+# Generated helper models that are not obstacles (drawn by subclasses).
+SKIPPED_MODELS = frozenset({"surfaces"})
+
+
 class GazeboRerunRecorder:
     def __init__(
         self,
@@ -84,10 +102,17 @@ class GazeboRerunRecorder:
         properties=DEFAULT_DRONE,
         body_size=(0.48, 0.48, 0.12),
         optical_flow_mount=None,
+        vehicle_model="drone",
+        body_color=(40, 100, 220),
+        time_series_tabs=DRONE_TABS,
+        title="World and drone",
     ):
         import rerun as rr
 
         self.rr = rr
+        # Gazebo model of the vehicle; Rerun draws it at world/<model>.
+        self.vehicle = vehicle_model
+        self.body_color = list(body_color)
         self.properties = properties
         self.output = output
         self.target = target
@@ -114,36 +139,18 @@ class GazeboRerunRecorder:
                 # 100 m ground box made it start zoomed far out.
                 blueprint.Spatial3DView(
                     origin="world",
-                    name="World and drone",
+                    name=title,
                     line_grid=blueprint.LineGrid3D(
                         visible=True, spacing=1.0, color=[100, 120, 100, 160]
                     ),
                 ),
                 blueprint.Vertical(
-                    blueprint.Spatial2DView(origin="camera", name="Drone camera"),
+                    blueprint.Spatial2DView(origin="camera", name="Vehicle camera"),
                     blueprint.Tabs(
-                        blueprint.TimeSeriesView(
-                            origin="estimation", name="EKF vs truth"
-                        ),
-                        blueprint.TimeSeriesView(
-                            origin="actuators/thrust_target_n",
-                            name="Rotor thrust targets (N)",
-                        ),
-                        blueprint.TimeSeriesView(origin="imu", name="IMU"),
-                        blueprint.TimeSeriesView(origin="gps", name="GPS"),
-                        blueprint.TimeSeriesView(origin="baro", name="Barometer"),
-                        blueprint.TimeSeriesView(
-                            origin="magnetometer", name="Magnetometer"
-                        ),
-                        blueprint.TimeSeriesView(
-                            origin="downward", name="Rangefinder and flow"
-                        ),
-                        blueprint.TimeSeriesView(origin="battery", name="Battery"),
-                        blueprint.TimeSeriesView(origin="status", name="Sensor status"),
-                        blueprint.TimeSeriesView(origin="aero", name="Aerodynamics"),
-                        blueprint.TimeSeriesView(
-                            origin="tracking", name="Waypoint error"
-                        ),
+                        *[
+                            blueprint.TimeSeriesView(origin=origin, name=name)
+                            for origin, name in time_series_tabs
+                        ],
                         blueprint.TextLogView(origin="events", name="Contacts"),
                     ),
                 ),
@@ -161,14 +168,14 @@ class GazeboRerunRecorder:
                 static=True,
             )
         rr.log(
-            "world/drone/body",
-            rr.Boxes3D(half_sizes=[np.asarray(body_size) / 2], colors=[40, 100, 220]),
+            f"world/{self.vehicle}/body",
+            rr.Boxes3D(half_sizes=[np.asarray(body_size) / 2], colors=list(body_color)),
             static=True,
         )
         # Child geometry inherits each vehicle's body-to-world pose, so +X
         # indicates its forward direction even while it pitches or rolls.
         for entity, color in (
-            ("drone", [40, 100, 220]),
+            (self.vehicle, list(body_color)),
             ("ekf", [230, 80, 180]),
         ):
             rr.log(
@@ -185,13 +192,12 @@ class GazeboRerunRecorder:
         # messages update these entities if they are moved while the run is live.
         sdf = ET.parse(world)
         self.lidar_pose = [0, 0, 0.2, 0, 0, 0]
-        anchor = sdf.findtext('./world/model[@name="drone"]/link[@name="tether"]/pose')
+        model_path = f'./world/model[@name="{self.vehicle}"]'
+        anchor = sdf.findtext(f'{model_path}/link[@name="tether"]/pose')
         self.tether_anchor = (
             None if anchor is None else list(map(float, anchor.split()[:3]))
         )
-        for sensor in sdf.findall(
-            './world/model[@name="drone"]/link[@name="base_link"]/sensor'
-        ):
+        for sensor in sdf.findall(f'{model_path}/link[@name="base_link"]/sensor'):
             name = sensor.get("name")
             if name not in {
                 "imu",
@@ -218,7 +224,7 @@ class GazeboRerunRecorder:
         obstacle_names = set()
         for model in sdf.findall("./world/model"):
             name = model.get("name")
-            if name in {"drone", "ground"}:
+            if name in {self.vehicle, "ground", *SKIPPED_MODELS}:
                 continue
             pose = list(map(float, model.findtext("pose", "0 0 0 0 0 0").split()))
             obstacle_names.add(name)
@@ -305,7 +311,7 @@ class GazeboRerunRecorder:
         """Marker at a sensor mount; an arrow shows the sensor +x axis."""
         rr = self.rr
         color, directional = self.SENSOR_STYLE[name]
-        path = f"world/drone/sensors/{name}"
+        path = f"world/{self.vehicle}/sensors/{name}"
         rr.log(
             path,
             rr.Transform3D(
@@ -357,7 +363,8 @@ class GazeboRerunRecorder:
             level = np.clip(np.asarray(reflectivity, float), 0.0, 1.0)[:, None]
             colors = (40 + level * np.array([215, 175, 15])).astype(np.uint8)
         rr.log(
-            "world/drone/lidar", rr.Points3D(points_body, radii=0.025, colors=colors)
+            f"world/{self.vehicle}/lidar",
+            rr.Points3D(points_body, radii=0.025, colors=colors),
         )
 
     def log_camera_image(self, image, t):
@@ -466,7 +473,7 @@ class GazeboRerunRecorder:
                 if pose.name == "hook" and self.tether_anchor is not None:
                     # Link poses are relative to the drone model: draw in its frame.
                     rr.log(
-                        "world/drone/tether",
+                        f"world/{self.vehicle}/tether",
                         rr.LineStrips3D(
                             [[self.tether_anchor, vector(pose.position).tolist()]],
                             colors=[60, 60, 60],
@@ -474,7 +481,7 @@ class GazeboRerunRecorder:
                         ),
                     )
                     rr.log(
-                        "world/drone/hook",
+                        f"world/{self.vehicle}/hook",
                         rr.Points3D(
                             [vector(pose.position)], radii=0.03, colors=[90, 90, 90]
                         ),
@@ -503,7 +510,7 @@ class GazeboRerunRecorder:
             p = vector(message.pose.position)
             q = message.pose.orientation
             rr.log(
-                "world/drone",
+                f"world/{self.vehicle}",
                 rr.Transform3D(translation=p, quaternion=[q.x, q.y, q.z, q.w]),
             )
             self.truth_positions[round(t * 1e9)] = p.copy()
@@ -514,7 +521,7 @@ class GazeboRerunRecorder:
                 rr.log(
                     "world/path",
                     rr.LineStrips3D(
-                        [_display_path(self.positions)], colors=[40, 100, 220]
+                        [_display_path(self.positions)], colors=self.body_color
                     ),
                 )
             if self.target is not None:
@@ -539,7 +546,7 @@ class GazeboRerunRecorder:
             self._scalar("magnetometer/level_yaw_deg", yaw)
         elif kind == "rangefinder":
             distance = rangefinder_distance(message)
-            ray = "world/drone/sensors/rangefinder/ray"
+            ray = f"world/{self.vehicle}/sensors/rangefinder/ray"
             if np.isfinite(distance):
                 self._scalar("downward/range_m", distance)
                 # Ray from the sensor along its +x axis to the measured hit.
@@ -576,7 +583,7 @@ class GazeboRerunRecorder:
                 position_m=self.lidar_pose[:3],
                 rotation_rad=self.lidar_pose[3:],
             )
-            rr.log("world/drone/lidar", rr.Points3D(points, radii=0.025))
+            rr.log(f"world/{self.vehicle}/lidar", rr.Points3D(points, radii=0.025))
 
     def log_algorithm_debug(self, name, sim_time_ns, values, labels):
         """A plug-in's debug series under ``algorithms/<name>`` at its own time."""

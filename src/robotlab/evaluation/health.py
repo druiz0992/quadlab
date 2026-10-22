@@ -18,6 +18,7 @@ worst value seen:
 | ``incomplete`` | failed | the run ended on an error before its duration |
 | ``interrupted`` | warning | the user interrupted the run |
 | ``ground_contact`` | warning | touchdown after ``touchdown_gap_s`` without contact |
+| ``chassis_ground_contact`` | warning | wheeled robots: the body box touched the ground (bottoming out, rollover) |
 | ``tracking_lost`` | warning | position error above ``tracking_lost_m`` for ``tracking_lost_s`` (kept in batch aggregates: it is a result, not a broken run) |
 | ``left_ground_area`` | warning | flew past the ground plane's edge (nothing below collides) |
 | ``saturated`` | warning | more than ``saturated_fraction`` of commands saturated |
@@ -147,8 +148,15 @@ class RunHealth:
         ground_height_m: Callable[[float, float], float] = lambda x, y: 0.0,
         ground_half_m: float | None = None,
         weight_n: float | None = None,
+        own_models: frozenset[str] = IGNORED_MODELS,
+        wheeled: bool = False,
     ) -> None:
         self.thresholds = thresholds
+        # Models whose collisions are the vehicle's own (never obstacles).
+        self._own_models = own_models
+        # Wheeled robots rest on wheels the contact sensor does not watch:
+        # any body-ground contact is a chassis contact, not a touchdown.
+        self._wheeled = wheeled
         self._ground_height_m = ground_height_m
         self._ground_half_m = ground_half_m
         self._origin_ns: int | None = None
@@ -258,7 +266,7 @@ class RunHealth:
     def on_contact(self, sim_time_ns: int, collision1: str, collision2: str) -> None:
         """One contact reported by the drone's contact sensor."""
         models = {contact_model(collision1), contact_model(collision2)}
-        others = sorted(models - IGNORED_MODELS)
+        others = sorted(models - self._own_models)
         if not others:
             return
         t = self._time_s(sim_time_ns)
@@ -272,7 +280,16 @@ class RunHealth:
                     subject=model,
                 )
         self._check_impact(sim_time_ns, t, others)
-        self._check_touchdown(sim_time_ns, t)
+        if self._wheeled:
+            if GROUND_MODELS & set(others):
+                self._report(
+                    "chassis_ground_contact",
+                    WARNING,
+                    t,
+                    "chassis touched the ground (bottoming out or rollover)",
+                )
+        else:
+            self._check_touchdown(sim_time_ns, t)
         self._last_contact_ns = sim_time_ns
 
     def _check_impact(self, sim_time_ns: int, t: float, models: list[str]) -> None:
