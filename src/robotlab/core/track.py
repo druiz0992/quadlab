@@ -80,25 +80,57 @@ class Track:
     def length_m(self) -> float:
         return float(np.sum(np.linalg.norm(np.diff(self.points, axis=0), axis=1)))
 
-    def project(self, xy: ArrayLike) -> TrackProjection:
+    def _segments(self) -> tuple[NDArray, NDArray, NDArray, NDArray]:
+        """Cached segment starts, vectors, lengths, and start arc lengths."""
+        cache = self.__dict__.get("_segment_cache")
+        if cache is None:
+            p = self.points
+            a, ab = p[:-1], np.diff(p, axis=0)
+            length = np.linalg.norm(ab, axis=1)
+            start_s = np.concatenate([[0.0], np.cumsum(length)[:-1]])
+            cache = (a, ab, length, start_s)
+            object.__setattr__(self, "_segment_cache", cache)
+        return cache
+
+    def project(
+        self, xy: ArrayLike, near: int | None = None, window: int = 30
+    ) -> TrackProjection:
         """Arc length and lateral offset of world points (…×2) on the nearest
-        segment (brute force over segments; fine for a few hundred)."""
+        segment. With ``near`` (a previous nearest segment) only segments
+        within ``window`` of it are searched, unless the result is farther
+        than the track width from the centreline (then all are searched)."""
         q = np.atleast_2d(np.asarray(xy, float))
-        p = self.points
-        a, ab = p[:-1], np.diff(p, axis=0)
-        length = np.linalg.norm(ab, axis=1)
-        start_s = np.concatenate([[0.0], np.cumsum(length)[:-1]])
+        a, ab, length, start_s = self._segments()
+        count = len(a)
+        if near is not None and 2 * window + 1 < count:
+            offsets = np.arange(-window, window + 1) + int(near)
+            candidates = (
+                offsets % count if self.closed else np.clip(offsets, 0, count - 1)
+            )
+            result = self._nearest(q, candidates, a, ab, length, start_s)
+            if np.all(np.abs(result.lateral_m) <= self.width_m):
+                return result
+        return self._nearest(q, np.arange(count), a, ab, length, start_s)
+
+    @staticmethod
+    def _nearest(q, candidates, a, ab, length, start_s) -> TrackProjection:
+        a, ab, length, start_s = (
+            a[candidates],
+            ab[candidates],
+            length[candidates],
+            start_s[candidates],
+        )
         rel = q[:, None, :] - a[None, :, :]
         t = np.clip(np.sum(rel * ab, axis=2) / length**2, 0.0, 1.0)
         nearest = a + t[..., None] * ab
         distance = np.linalg.norm(q[:, None, :] - nearest, axis=2)
-        segment = np.argmin(distance, axis=1)
+        best = np.argmin(distance, axis=1)
         rows = np.arange(len(q))
-        direction = ab[segment] / length[segment, None]
-        offset = q - nearest[rows, segment]
+        direction = ab[best] / length[best, None]
+        offset = q - nearest[rows, best]
         lateral = direction[:, 0] * offset[:, 1] - direction[:, 1] * offset[:, 0]
-        s = start_s[segment] + t[rows, segment] * length[segment]
-        return TrackProjection(s, lateral, segment)
+        s = start_s[best] + t[rows, best] * length[best]
+        return TrackProjection(s, lateral, np.asarray(candidates)[best])
 
     def heading_rad(self, segment: ArrayLike) -> NDArray[np.float64]:
         """Driving direction (rad, from +x) of centreline segments."""

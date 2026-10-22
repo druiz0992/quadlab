@@ -207,8 +207,9 @@ GROUND_VEHICLE_DEFAULTS: dict[str, Any] = {
         "controller_options": {},
         "per_opponent_options": [],
     },
-    # Tyre/wheel-spin integration substeps per odometry period.
-    "substeps": 2,
+    # Tyre/wheel-spin integration substeps per odometry period (1 ms each
+    # at the 250 Hz default).
+    "substeps": 4,
     # Keyboard driving (see control/wheeled_keyboard.py): fraction of the
     # torque limits and steering lock per second of key hold.
     "keyboard": {
@@ -220,17 +221,19 @@ GROUND_VEHICLE_DEFAULTS: dict[str, Any] = {
 
 # Settings every wheeled kind shares (layered under the kind's own preset).
 _WHEELED_COMMON: dict[str, Any] = {
-    # publish_on_send: satisfies the shared control-timing checks (wheel
-    # commands take effect at the next physics period anyway).
+    # 250 Hz wheel-force updates with two 2 ms physics steps per lockstep
+    # burst (lockstep needs two or more): verified against 500 Hz / 1 ms,
+    # a follower lap on the race circuit differed by 0.01 % (56.736 s vs
+    # 56.730 s) at about two thirds of the cost. publish_on_send satisfies
+    # the shared control-timing checks.
     "control": {
-        "odometry_rate_hz": 500.0,
-        "control_rate_hz": 100.0,
+        "odometry_rate_hz": 250.0,
+        "control_rate_hz": 125.0,
         "publish_on_send": True,
     },
-    # 1 ms physics: lockstep needs two steps per 500 Hz odometry period.
     "simulation": {
         "lockstep": True,
-        "step_s": 0.001,
+        "step_s": 0.002,
         "spawn_position_m": [0.0, 0.0, 0.0],
     },
     "sensors": {"wheel_encoders": {"enabled": True}},

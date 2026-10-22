@@ -63,9 +63,14 @@ def drive(directory: Path, robot: str, layer: dict, duration_s: float, scene: st
 
 def offline_cruise(layer_path: Path, periods: int) -> np.ndarray:
     """The same car, controller, and command timing on the Python reference
-    integrator (two 1 ms steps per 2 ms period, as Gazebo)."""
+    integrator (the configured odometry period and physics steps)."""
     config = load_drone_config(layer_path, robot="car")
-    vehicle = config.wheeled
+    vehicle, settings = config.wheeled, config.data
+    period_s = 1 / settings["control"]["odometry_rate_hz"]
+    step_s = settings["simulation"]["step_s"]
+    control_every = round(
+        settings["control"]["odometry_rate_hz"] / settings["control"]["control_rate_hz"]
+    )
     ground = GroundModel.from_scene(load_scene("worlds/airfield.json"), None)
     pose = spawn_pose(vehicle, ground, 0.0, 0.0, 0.0)
     body = RigidBody.at_rest(vehicle.mass_kg, vehicle.inertia_kg_m2, pose.position_m)
@@ -75,9 +80,9 @@ def offline_cruise(layer_path: Path, periods: int) -> np.ndarray:
     )
     for period in range(periods):
         state = body.state()
-        if period % 5 == 0:
+        if period % control_every == 0:
             control = WheeledControlState(
-                period * 2_000_000,
+                round(period * period_s * 1e9),
                 state.position_m,
                 state.velocity_world_mps,
                 state.quaternion_xyzw,
@@ -85,11 +90,11 @@ def offline_cruise(layer_path: Path, periods: int) -> np.ndarray:
                 model.wheel_speed_rad_s.copy(),
                 model.actuators.steer_rad.copy(),
             )
-            commands = controller.update(control, None, 0.01 if period else 0.0)
-            model.actuators.accept(commands, 0)
-        wrench = model.step(state, 0.002)
-        for _ in range(2):
-            body.step(wrench, 0.001)
+            dt = control_every * period_s if period else 0.0
+            model.actuators.accept(controller.update(control, None, dt), 0)
+        wrench = model.step(state, period_s)
+        for _ in range(round(period_s / step_s)):
+            body.step(wrench, step_s)
     return body.position_m
 
 
@@ -98,8 +103,9 @@ def test_car_cruise_matches_python_reference(tmp_path):
     assert summary["health"]["verdict"] == "ok"
     assert summary["lockstep"]["steps_per_burst"] == 2
     final = np.array(rows[-1]["position"])
-    # Verified 2026-10-22: 48.531 m after 6 s (template controller, 10 m/s).
-    assert final[0] == pytest.approx(48.531, abs=0.05)
+    # Verified 2026-10-22: 48.59 m at 6.004 s (template controller, 10 m/s;
+    # 48.531 m at 6.002 s with the earlier 500 Hz / 1 ms preset).
+    assert final[0] == pytest.approx(48.589, abs=0.05)
     assert abs(final[1]) < 1e-6 and final[2] == pytest.approx(0.358, abs=0.002)
     # Gazebo's first odometry is one period after the reference's start.
     reference = offline_cruise(tmp_path / "layer.json", len(rows))
@@ -210,3 +216,77 @@ def test_plough_draft_slows_the_tractor(tmp_path):
     assert last["tool_speed_mps"] == pytest.approx(2.153, abs=0.05)
     assert last["draft_n"] == pytest.approx(21466.0, rel=0.02)
     assert summary["implement"]["worked_area_m2"] > 20.0
+
+
+class ScriptedKeys:
+    """Stand-in for the Tk driving window: keys by wall time since start."""
+
+    def __init__(self, script):
+        import time as _time
+
+        self._time = _time
+        self._start = _time.monotonic()
+        self._script = script  # [(until_wall_s, keys, presses)]
+        self._pressed: set[int] = set()
+        self.closed = False
+
+    def _entry(self):
+        elapsed = self._time.monotonic() - self._start
+        for index, (until, keys, presses) in enumerate(self._script):
+            if elapsed < until:
+                return index, keys, presses
+        self.closed = True
+        return len(self._script), frozenset(), ()
+
+    def poll_keys(self):
+        return frozenset(self._entry()[1])
+
+    def drain_presses(self):
+        index, _, presses = self._entry()
+        if index in self._pressed:
+            return []
+        self._pressed.add(index)
+        return list(presses)
+
+    def close(self):
+        self.closed = True
+
+
+def test_keyboard_driving_path_in_real_time(tmp_path, monkeypatch):
+    """Scripted keys through the real keyboard path (DriverInput ramps,
+    KeyboardDriver, real-time pacing): accelerate, steer left, brake, and
+    end by closing the window."""
+    import robotlab.visualization.driving_keyboard as driving
+
+    script = [
+        (1.0, set(), ()),
+        (5.0, {"Up"}, ()),
+        (8.0, {"Up", "Left"}, ()),
+        (11.0, {"space"}, ()),
+    ]
+    monkeypatch.setattr(
+        driving, "DrivingKeyboardWindow", lambda title, layout: ScriptedKeys(script)
+    )
+    output = tmp_path / "run"
+    run(
+        GazeboConfig(
+            robot="car",
+            scene="worlds/airfield.json",
+            output=str(output),
+            headless=True,
+            keyboard=True,
+            duration=60.0,
+        )
+    )
+    summary = json.loads((output / "summary.json").read_text())
+    assert summary["exit_reason"] == "keyboard_closed"
+    assert summary["health"]["verdict"] == "ok"
+    assert summary["algorithms"]["controller"] == "keyboard"
+    commands = [json.loads(line) for line in (output / "commands.jsonl").open()]
+    driver = [c["driver"] for c in commands]
+    assert max(d["throttle"] for d in driver) == pytest.approx(1.0)
+    assert max(d["steer"] for d in driver) > 0.9
+    assert driver[-1]["brake"] == 1.0
+    assert summary["max_speed_mps"] > 10.0
+    # Python paces the unthrottled world to real time.
+    assert summary["real_time"]["achieved_factor"] == pytest.approx(1.0, abs=0.08)

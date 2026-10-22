@@ -96,7 +96,9 @@ def test_skid_layout_rejects_steered_wheels(tmp_path):
 
 
 def test_lockstep_needs_two_steps_per_period(tmp_path):
-    layer = write(tmp_path, {"simulation": {"step_s": 0.002}})
+    layer = write(
+        tmp_path, {"simulation": {"step_s": 0.004}}
+    )  # one step per 250 Hz period
     with pytest.raises(ValueError, match="two physics steps"):
         load_drone_config(layer, robot="car")
 

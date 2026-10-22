@@ -65,10 +65,12 @@ class TrackFollower:
         self._path, self._s = self._offset_path(self.options["lateral_offset_m"])
         self._length = float(self._s[-1])
         self._curvature = _curvature(self._path)
+        self._abs_curvature = np.abs(self._curvature)
         self._driven = self.vehicle.mask("driven")
         self._braked = self.vehicle.mask("braked")
         self._side = np.sign(self.vehicle.hub_positions_m()[:, 1])
         self.last_target_mps = 0.0
+        self._segment: int | None = None
 
     def _offset_path(self, offset_m: float) -> tuple[NDArray, NDArray]:
         """Path vertices (closing vertex included) and their arc lengths."""
@@ -107,7 +109,9 @@ class TrackFollower:
         yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
         heading = np.array([np.cos(yaw), np.sin(yaw)])
         forward = float(heading @ state.velocity_world_mps[:2])
-        s_here = float(self.track.project(state.position_m[:2]).s_m[0])
+        projection = self.track.project(state.position_m[:2], self._segment)
+        self._segment = int(projection.segment[0])
+        s_here = float(projection.s_m[0])
         lookahead = max(o["min_lookahead_m"], o["lookahead_s"] * abs(forward))
         target = self._point_at(s_here + lookahead) - state.position_m[:2]
         bearing = np.arctan2(target[1], target[0]) - yaw
@@ -117,12 +121,24 @@ class TrackFollower:
         return self._commands(forward, curvature, speed, state)
 
     def _target_speed(self, s_here: float) -> float:
+        """Speed limit from the largest curvature within ``preview_m`` ahead."""
         o = self.options
-        ahead = (
-            (self._s - s_here) % self._length if self.track.closed else self._s - s_here
-        )
-        window = (ahead >= 0) & (ahead <= o["preview_m"])
-        kappa = float(np.max(np.abs(self._curvature[window]), initial=1e-6))
+        s, curvature = self._s, self._abs_curvature
+        if self.track.closed:
+            begin = s_here % self._length
+            end = begin + o["preview_m"]
+            first = int(np.searchsorted(s, begin))
+            if end <= self._length:
+                values = curvature[first : int(np.searchsorted(s, end, "right"))]
+            else:
+                wrapped = int(np.searchsorted(s, end - self._length, "right"))
+                values = np.concatenate([curvature[first:], curvature[:wrapped]])
+        else:
+            first = int(np.searchsorted(s, s_here))
+            values = curvature[
+                first : int(np.searchsorted(s, s_here + o["preview_m"], "right"))
+            ]
+        kappa = float(np.max(values, initial=1e-6))
         lateral = o["grip_fraction"] * self.vehicle.tyre.friction_lateral * 9.81
         return float(min(o["max_speed_mps"], np.sqrt(lateral / max(kappa, 1e-6))))
 

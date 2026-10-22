@@ -42,10 +42,16 @@ class LapTimer:
         self._last_t: float | None = None
         self.max_lateral_m = 0.0
         self.progress_m = 0.0
+        # Previous nearest segment: a search hint (the car moves little
+        # between samples).
+        self._segment: int | None = None
 
     def on_truth(self, t: float, position_m: ArrayLike, contacts_xy: ArrayLike) -> None:
         """One truth sample: vehicle position (m) and wheel contact points (n×2)."""
-        projection = self.track.project(np.asarray(position_m, float)[:2])
+        projection = self.track.project(
+            np.asarray(position_m, float)[:2], self._segment
+        )
+        self._segment = int(projection.segment[0])
         s = float(projection.s_m[0])
         self.max_lateral_m = max(
             self.max_lateral_m, abs(float(projection.lateral_m[0]))
@@ -75,7 +81,7 @@ class LapTimer:
 
     def _limits(self, t: float, contacts_xy: ArrayLike) -> None:
         points = np.atleast_2d(np.asarray(contacts_xy, float))
-        lateral = self.track.project(points).lateral_m
+        lateral = self.track.project(points, self._segment).lateral_m
         off = bool(np.all(np.abs(lateral) > self.track.width_m / 2))
         if off and self._off_since is not None and self._last_t is not None:
             # Time between consecutive off-track samples.

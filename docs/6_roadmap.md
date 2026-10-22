@@ -282,8 +282,9 @@ Next steps after the vehicle core ([8 Ground vehicles](8_ground_vehicles.md)):
   only bumps), surface patches drawn on terrain, climbable steps.
 - **More implements:** chisel plough, harrows, seeders (ASABE D497
   coefficients per tool), vertical soil forces, PTO power.
-- **Faster ego loop:** the ego's per-period Python work (about 1.9 ms with
-  opponents) limits keyboard racing to about half real time.
+- **Faster races:** with three opponents a race runs at about 0.87× real
+  time; the batched wheel model (0.9 ms per period for four cars) and
+  Gazebo's per-burst work are the remaining costs.
 - **Persistent wrenches:** move multirotor body drag and fixed-wing
   aerodynamics off accumulating ApplyLinkWrench deltas (one-step impulses
   as for wheeled robots, or a small replace-semantics Gazebo plugin).

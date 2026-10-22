@@ -72,6 +72,10 @@ def build_wheeled_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
         sim_end=loop.last_time,
         collisions=loop.collisions,
         wall_seconds=time.monotonic() - loop.started,
+        real_time=dict(
+            target_factor=settings["simulation"]["real_time_factor"],
+            achieved_factor=loop.achieved_real_time_factor,
+        ),
         loop_timing=loop.timing.summary(),
         lockstep=loop.stepper.summary() if loop.stepper is not None else None,
         final_position=loop.positions[-1].tolist() if loop.positions else None,

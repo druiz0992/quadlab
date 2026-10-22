@@ -64,6 +64,8 @@ from .run_summary import final_exit_reason
 WHEEL_LOG_RATE_HZ = 50.0
 # Lap timing and track limits are evaluated at this rate (Hz).
 LAP_RATE_HZ = 100.0
+# Falling this far behind the real-time schedule (wall s) restarts it.
+PACE_RESET_S = 0.1
 # Blocking wait for the world-control reply per burst (ms). The reply is
 # ignored (stepping.py); at 500 bursts/s the default 10 ms cap cost ~1.5 ms
 # per burst on average.
@@ -137,6 +139,9 @@ class WheeledMissionLoop:
         self._next_wheel_log_ns = 0
         self._next_lap_ns = 0
         self._published_lift_m: float | None = None
+        self._pace_origin: tuple[float, float] | None = None
+        self._last_pace: tuple[float, float] | None = None
+        self._pace_first: tuple[float, float] | None = None
         self._encoder = None
         self._driver = DriverCommand()
         self._receipt: WheelCommandReceipt | None = None
@@ -361,9 +366,37 @@ class WheeledMissionLoop:
         if t - self.first_time >= parts.args.duration:
             self.completed = True
             return False
+        self._pace(t)
         if self.stepper is not None:
             self.stepper.on_odometry(stamp)
         return True
+
+    def _pace(self, t: float) -> None:
+        """Hold the next burst until wall time reaches the simulated time
+        divided by ``simulation.real_time_factor`` (0: unlimited). Never
+        catches up after falling behind (no bursts of speed)."""
+        now = time.monotonic()
+        if self._pace_origin is None:
+            self._pace_origin = self._pace_first = (now, t)
+        self._last_pace = (now, t)
+        factor = self.settings["simulation"]["real_time_factor"]
+        if factor <= 0:
+            return
+        wall0, sim0 = self._pace_origin
+        target = wall0 + (t - sim0) / factor
+        if target > now:
+            time.sleep(target - now)
+        elif now - target > PACE_RESET_S:
+            # Behind schedule: restart the schedule here instead of rushing.
+            self._pace_origin = (now, t)
+
+    @property
+    def achieved_real_time_factor(self) -> float | None:
+        """Simulated seconds per wall second since the first period."""
+        if self._pace_first is None or self._last_pace is None:
+            return None
+        wall = self._last_pace[0] - self._pace_first[0]
+        return (self._last_pace[1] - self._pace_first[1]) / wall if wall > 0 else None
 
     def _truth_state(self, message: Any, stamp: int) -> ChassisState:
         truth = self.parts.truth

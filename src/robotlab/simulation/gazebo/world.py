@@ -285,7 +285,18 @@ def build_world(
     element(world, "gravity", "0 0 -9.81")
     physics = element(world, "physics", name="fixed", type="dart")
     element(physics, "max_step_size", config.data["simulation"]["step_s"])
-    element(physics, "real_time_factor", config.data["simulation"]["real_time_factor"])
+    # Wheeled robots: Gazebo runs bursts unthrottled and Python paces the
+    # run to real_time_factor (its own processing would otherwise add to
+    # Gazebo's paced time; experiments/wheeled_mission.py).
+    element(
+        physics,
+        "real_time_factor",
+        (
+            0
+            if config.wheeled is not None
+            else config.data["simulation"]["real_time_factor"]
+        ),
+    )
     dart = element(physics, "dart")
     element(dart, "collision_detector", DART_COLLISION_DETECTOR)
     element(element(dart, "solver"), "solver_type", DART_SOLVER)

@@ -46,10 +46,14 @@ robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json -
 `--robot` loads the vehicle's preset (`simulation/wheeled/config.py`) under
 all `--config` layers; a layer may instead set `robot.kind`, and the two must
 agree. Without a controller and keyboard the vehicle stays parked. Wheeled
-robots always run in lockstep with a 1 ms physics step and 500 Hz odometry,
-because Python computes the wheel forces every period; `real_time_factor`
-1 (the default) paces keyboard driving in real time, 0 runs as fast as
-possible. Not supported yet: `--world` (saved worlds), `--ekf` (use
+robots always run in lockstep, because Python computes the wheel forces
+every period: 250 Hz odometry (wheel-force updates) with two 2 ms physics
+steps per period and four 1 ms tyre substeps, a 125 Hz controller. Against
+500 Hz / 1 ms steps a follower lap differed by 0.01 % (56.736 s vs
+56.730 s). Gazebo runs the bursts unthrottled and Python paces the run:
+`simulation.real_time_factor` 1 (the default) is real time (keyboard
+driving), 0 as fast as possible; `summary.json.real_time` reports the
+achieved factor (a slow period is not caught up). Not supported yet: `--world` (saved worlds), `--ekf` (use
 `algorithms.estimator: gps_imu_ekf`), mission references, randomization,
 and the multirotor-only features (payload, wind, battery, fixed wing, ground
 effect, optical flow, airspeed); the configuration rejects them.
@@ -310,11 +314,13 @@ own collisions as its own, and body-on-ground contact as
 
 `tests/integration/test_gazebo_wheeled.py` (opt-in, `ROBOTLAB_TEST_GAZEBO=1`)
 pins, verified on 2026-10-22: the car on the template controller at 10 m/s
-covers 48.53 m in 6 s and agrees with the same model on the Python
+covers 48.59 m in 6 s and agrees with the same model on the Python
 reference integrator (`rigid_body.py`) within 0.1 m; parked ride heights
 0.219 m (rover), 0.358 m (car), 1.023 m (tractor); repeated rover runs are
 identical; a race with two opponents is deterministic (identical ego
-telemetry and opponent summaries). On the reference desktop a 10 s car run
-takes about 13 s wall time (Python load 0.7 per simulated second); a car
-with three opponents runs at about half real time (20 s in 43 s, load 1.4:
-each opponent adds about 0.25 ms per 2 ms period).
+telemetry and opponent summaries); scripted keys through the keyboard path
+drive at real time (achieved factor 1.0 ± 0.08). On the reference desktop
+one car runs at real time with headroom (as fast as possible: 6 s in
+about 3 s after start-up); a car with three opponents reaches about 0.87×
+real time (the batched wheel model and Gazebo's per-burst work grow with
+the number of cars).
