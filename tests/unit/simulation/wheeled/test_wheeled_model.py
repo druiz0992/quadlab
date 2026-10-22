@@ -162,3 +162,32 @@ def test_airborne_wheels_carry_no_load():
     wrench = model.step(state, DT)
     assert not model.telemetry.in_contact.any()
     np.testing.assert_allclose(wrench.force_world_n, 0.0)
+
+
+def test_batched_vehicles_match_separate_models():
+    vehicle, single_a, body_a = make("car")
+    _, single_b, body_b = make("rover" if False else "car")
+    body_b.position_m = body_b.position_m + np.array([10.0, 3.0, 0.0])
+    ground = single_a.ground
+    batched = WheeledVehicleModel(vehicle, ground, vehicles=2)
+    a, b = drive(vehicle, 300.0, steer=0.1), drive(vehicle, 100.0)
+    single_a.actuators.accept(a, 0)
+    single_b.actuators.accept(b, 0)
+    batched.actuators.accept(a, 0, vehicle=0)
+    batched.actuators.accept(b, 0, vehicle=1)
+    pair = [body_a.state(), body_b.state()]
+    for _ in range(300):
+        wa = single_a.step(pair[0], DT)
+        wb = single_b.step(pair[1], DT)
+        both = batched.step_all(pair, DT)
+        np.testing.assert_allclose(
+            both[0].force_world_n, wa.force_world_n, rtol=1e-9, atol=1e-9
+        )
+        np.testing.assert_allclose(
+            both[1].torque_world_nm, wb.torque_world_nm, rtol=1e-9, atol=1e-9
+        )
+        body_a.step(wa, DT)
+        body_b.step(wb, DT)
+        pair = [body_a.state(), body_b.state()]
+    with pytest.raises(ValueError, match="step_all"):
+        batched.step(pair[0], DT)

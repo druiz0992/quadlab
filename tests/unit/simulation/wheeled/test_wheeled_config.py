@@ -67,6 +67,19 @@ def test_layer_overrides_preset(tmp_path):
         ({"ground_vehicle": {"wheels": []}}, "three wheels"),
         ({"ground_vehicle": {"model_name": "my car"}}, "identifier"),
         ({"ground_vehicle": {"spawn_index": -1}}, "integer"),
+        ({"ground_vehicle": {"opponents": {"count": 9}}}, "count"),
+        (
+            {
+                "ground_vehicle": {
+                    "opponents": {"count": 1, "per_opponent_options": [{}, {}]}
+                }
+            },
+            "more",
+        ),
+        (
+            {"ground_vehicle": {"opponents": {"count": 1, "controller": ""}}},
+            "name a controller",
+        ),
     ],
 )
 def test_invalid_wheeled_settings(tmp_path, layer, message):
@@ -86,3 +99,18 @@ def test_lockstep_needs_two_steps_per_period(tmp_path):
     layer = write(tmp_path, {"simulation": {"step_s": 0.002}})
     with pytest.raises(ValueError, match="two physics steps"):
         load_drone_config(layer, robot="car")
+
+
+def test_opponent_options_merge():
+    from robotlab.experiments.opponents import opponent_options
+
+    settings = {
+        "ground_vehicle": {
+            "opponents": {
+                "controller_options": {"a": 1, "b": 2},
+                "per_opponent_options": [{"b": 3}],
+            }
+        }
+    }
+    assert opponent_options(settings, 0) == {"a": 1, "b": 3}
+    assert opponent_options(settings, 1) == {"a": 1, "b": 2}

@@ -408,6 +408,12 @@ hovering drone at 4.97 s, was recorded as a collision, and pushed it 9 m.
 Rerun follows moving obstacles. During keyboard flight, key 7 spawns an
 extra flying object (see [4 Control](4_control.md#keyboard-effect-toggles)).
 
+### Race circuit
+
+`worlds/race_circuit.json` is a race track for wheeled robots (asphalt,
+kerbs, gravel, grass, start grid, `track` for lap timing); see
+[8 Ground vehicles](8_ground_vehicles.md#race-circuit-and-opponents).
+
 ### Obstacle circuit
 
 `worlds/circuit.json` is a 60 × 40 m arena with walls at x = −10/50 m and

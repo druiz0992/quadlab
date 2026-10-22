@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ET
 
+import numpy as np
+
 import pytest
 
 from robotlab.simulation.gazebo.config import load_drone_config
@@ -39,8 +41,9 @@ def test_wheeled_world(tmp_path, kind):
     x = float(model.findtext("pose").split()[0])
     assert x == 1.0
     surfaces = root.find('./world/model[@name="surfaces"]/link')
-    assert len(surfaces.findall("visual")) == 2 * 2 + 1  # 2 segments + discs, 1 box
+    assert len(surfaces.findall("visual")) == 2  # one mesh per zone
     assert not surfaces.findall("collision")
+    assert (tmp_path / "surface_0.obj").exists()
 
 
 def test_vehicle_names_are_reserved(tmp_path):
@@ -58,3 +61,46 @@ def test_scene_surface_validation(tmp_path):
     path.write_text('{"obstacles": [], "surfaces": [{"shape": "blob"}]}')
     with pytest.raises(ValueError, match="shape"):
         load_scene(path)
+
+
+def test_opponents_get_models_on_the_next_spawn_points(tmp_path):
+    layer = tmp_path / "layer.json"
+    layer.write_text('{"ground_vehicle": {"opponents": {"count": 2}}}')
+    config = load_drone_config(layer, robot="car")
+    scene = {
+        "obstacles": [],
+        "spawn_points": [
+            {"position_m": [0, 0]},
+            {"position_m": [-8, 3]},
+            {"position_m": [-16, -3]},
+        ],
+    }
+    root = ET.parse(build_world(scene, tmp_path / "world.sdf", config=config))
+    for name, x in (("car_1", -8.0), ("car_2", -16.0)):
+        model = root.find(f'./world/model[@name="{name}"]')
+        assert float(model.findtext("pose").split()[0]) == x
+        assert not model.findall("link/sensor")
+        topic = model.find("plugin/odom_topic").text
+        assert topic == f"/robotlab/opponents/{name}/odometry"
+    scene["spawn_points"].pop()
+    with pytest.raises(ValueError, match="spawn points"):
+        build_world(scene, tmp_path / "w2.sdf", config=config)
+    scene = {
+        "obstacles": [{"name": "car_1", "position": [50, 0, 1], "size": [1, 1, 1]}],
+        "spawn_points": scene["spawn_points"] + [{"position_m": [-16, -3]}],
+    }
+    with pytest.raises(ValueError, match="opponent"):
+        build_world(scene, tmp_path / "w3.sdf", config=config)
+
+
+def test_zone_mesh_ribbon():
+    from robotlab.simulation.gazebo.world import zone_mesh
+    from robotlab.simulation.wheeled.ground import parse_zone
+
+    zone = parse_zone(
+        {"shape": "strip", "points_m": [[0, 0], [10, 0], [10, 10]], "width_m": 2}, 0
+    )
+    vertices, faces = zone_mesh(zone)
+    assert vertices.shape == (6, 2) and faces.shape == (4, 3)
+    np.testing.assert_allclose(vertices[0], [0, 1])
+    np.testing.assert_allclose(vertices[1], [9, 1])  # mitred corner

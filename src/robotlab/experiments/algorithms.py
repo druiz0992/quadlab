@@ -35,6 +35,7 @@ from ..core.algorithms import (
 )
 from ..core.measurements import EstimatedState, GpsReading, Sample
 from ..core.vehicle import DroneProperties
+from ..core.track import Track
 from ..core.wheeled_vehicle import WheeledProperties
 from ..estimation.interface import Innovation, StateEstimator
 from ..sensors.bus import STREAMS, SensorBus
@@ -76,6 +77,7 @@ def build_context(
     kinds: tuple[str, ...],
     log: DebugLog = ignore_debug,
     wheeled: WheeledProperties | None = None,
+    track: Track | None = None,
 ) -> AlgorithmContext:
     """Context from configuration only: sensor frames, rates, and mounts.
 
@@ -105,7 +107,7 @@ def build_context(
             calibration if calibration and calibration.get("enabled") else None,
         )
     return AlgorithmContext(
-        gps_reference, vehicle, descriptions, log=log, wheeled=wheeled
+        gps_reference, vehicle, descriptions, log=log, wheeled=wheeled, track=track
     )
 
 
@@ -247,6 +249,7 @@ def build_algorithm_stack(
     log: DebugLog = ignore_debug,
     need_bus: bool = False,
     wheeled: WheeledProperties | None = None,
+    track: Track | None = None,
 ) -> AlgorithmStack:
     """Context, estimator, sensor bus, runner, state source, and controller.
 
@@ -254,7 +257,9 @@ def build_algorithm_stack(
     exists with an estimator, or when ``need_bus`` (recording for replay).
     """
     algorithms = settings["algorithms"]
-    context = build_context(settings, vehicle, reference, bus_kinds, log, wheeled)
+    context = build_context(
+        settings, vehicle, reference, bus_kinds, log, wheeled, track
+    )
     estimator = build_estimator(settings, context)
     bus = (
         SensorBus(settings["sensor_timing"], bus_kinds)

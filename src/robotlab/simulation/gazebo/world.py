@@ -12,7 +12,13 @@ from ..moving_obstacles import validate_moving_obstacle
 from ..terrain import Terrain, validate_terrain
 from .plugins import LOCKSTEP_FILENAME, LOCKSTEP_NAME, lockstep_barrier
 from .vehicle import add_payload, build_drone
-from .wheeled_vehicle import build_wheeled_vehicle
+from .wheeled_vehicle import (
+    OPPONENT_COLORS,
+    OPPONENT_ODOMETRY_TOPIC,
+    build_wheeled_vehicle,
+    opponent_name,
+)
+from ...core.track import Track
 from ..wheeled.config import WHEELED_KINDS
 from ..wheeled.ground import GroundModel, surfaces_from_scene, validate_surfaces
 from ..wheeled.spawn import spawn_pose, spawn_xy_yaw, validate_spawn_points
@@ -72,6 +78,7 @@ def load_scene(path):
     # start positions; see simulation/wheeled/.
     validate_surfaces(scene)
     validate_spawn_points(scene.get("spawn_points", []))
+    Track.from_scene(scene)
     return scene
 
 
@@ -163,12 +170,63 @@ SURFACE_DEFAULT_COLOR = ".55 .55 .5 1"
 SURFACE_LAYER_M = 0.002
 
 
-def add_surface_visuals(world, scene):
-    """Visual-only patches for flat-ground surface zones (no collision).
+def zone_mesh(zone):
+    """Flat triangle mesh of a surface zone: vertices (n×2) and faces (m×3).
 
-    Rectangles are thin boxes; strips are one box per segment plus a disc at
-    every joint. Zones on terrain are not drawn (the patch would not follow
-    the height field); their friction still applies.
+    Rectangles are two triangles; strips are a ribbon of quads whose edge
+    points are offset along the mitred normal at every vertex (miter length
+    capped at twice the half width for very sharp joints).
+    """
+    if zone.shape == "rectangle":
+        c, s = np.cos(zone.yaw_rad), np.sin(zone.yaw_rad)
+        hx, hy = zone.size_m[0] / 2, zone.size_m[1] / 2
+        corners = np.array([[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]])
+        rotated = corners @ np.array([[c, s], [-s, c]]) + np.asarray(zone.center_m)
+        return rotated, np.array([[0, 1, 2], [0, 2, 3]])
+    points = np.asarray(zone.points_m, float)
+    closed = zone.closed
+    count = len(points)
+    previous = (
+        np.roll(points, 1, axis=0) if closed else np.vstack([points[:1], points[:-1]])
+    )
+    following = (
+        np.roll(points, -1, axis=0) if closed else np.vstack([points[1:], points[-1:]])
+    )
+    tangent_in = points - previous
+    tangent_out = following - points
+    if not closed:
+        tangent_in[0] = tangent_out[0]
+        tangent_out[-1] = tangent_in[-1]
+    tangent_in /= np.maximum(np.linalg.norm(tangent_in, axis=1, keepdims=True), 1e-9)
+    tangent_out /= np.maximum(np.linalg.norm(tangent_out, axis=1, keepdims=True), 1e-9)
+    tangent = tangent_in + tangent_out
+    tangent /= np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1e-9)
+    normal = np.column_stack([-tangent[:, 1], tangent[:, 0]])
+    in_normal = np.column_stack([-tangent_in[:, 1], tangent_in[:, 0]])
+    miter = 1 / np.maximum(np.sum(normal * in_normal, axis=1), 0.5)
+    offset = (zone.width_m / 2) * miter[:, None] * normal
+    vertices = np.vstack([points + offset, points - offset])
+    faces = []
+    for i in range(count if closed else count - 1):
+        j = (i + 1) % count
+        faces += [(i, j, count + j), (i, count + j, count + i)]
+    return vertices, np.asarray(faces, np.int64)
+
+
+def write_zone_obj(path, vertices, faces):
+    """Wavefront OBJ of a flat mesh with upward normals (DART-safe format)."""
+    lines = [f"v {x:.3f} {y:.3f} 0" for x, y in vertices]
+    lines.append("vn 0 0 1")
+    lines += [f"f {a + 1}//1 {b + 1}//1 {c + 1}//1" for a, b, c in faces]
+    Path(path).write_text("\n".join(lines) + "\n")
+
+
+def add_surface_visuals(world, scene, mesh_dir):
+    """Visual-only meshes for flat-ground surface zones (no collision), one
+    per zone in ``mesh_dir`` (``surface_<k>.obj``), layered in zone order.
+
+    Zones on terrain are not drawn (a flat patch would not follow the height
+    field); their friction still applies.
     """
     if "terrain" in scene:
         return
@@ -180,48 +238,41 @@ def add_surface_visuals(world, scene):
     link = element(model, "link", name="link")
     for index, zone in enumerate(zones):
         color = SURFACE_COLORS.get(zone.surface.name, SURFACE_DEFAULT_COLOR)
-        z = SURFACE_LAYER_M * (index + 1)
-        if zone.shape == "rectangle":
-            cx, cy = zone.center_m
-            box(
-                link,
-                f"zone_{index}",
-                [*zone.size_m, 0.001],
-                color,
-                f"{cx} {cy} {z} 0 0 {zone.yaw_rad}",
-                collision=False,
-            )
-            continue
-        points = list(zone.points_m) + ([zone.points_m[0]] if zone.closed else [])
-        for k, ((x0, y0), (x1, y1)) in enumerate(zip(points[:-1], points[1:])):
-            length = float(np.hypot(x1 - x0, y1 - y0))
-            yaw = float(np.arctan2(y1 - y0, x1 - x0))
-            box(
-                link,
-                f"zone_{index}_{k}",
-                [length, zone.width_m, 0.001],
-                color,
-                f"{(x0 + x1) / 2} {(y0 + y1) / 2} {z} 0 0 {yaw}",
-                collision=False,
-            )
-            disc = element(link, "visual", name=f"zone_{index}_{k}_joint")
-            element(disc, "pose", f"{x1} {y1} {z} 0 0 0")
-            cylinder = element(element(disc, "geometry"), "cylinder")
-            element(cylinder, "radius", zone.width_m / 2)
-            element(cylinder, "length", 0.001)
-            material = element(disc, "material")
-            element(material, "ambient", color)
-            element(material, "diffuse", color)
+        path = Path(mesh_dir) / f"surface_{index}.obj"
+        write_zone_obj(path, *zone_mesh(zone))
+        visual = element(link, "visual", name=f"zone_{index}")
+        element(visual, "pose", f"0 0 {SURFACE_LAYER_M * (index + 1)} 0 0 0")
+        mesh = element(element(visual, "geometry"), "mesh")
+        element(mesh, "uri", path.resolve().as_uri())
+        material = element(visual, "material")
+        element(material, "ambient", color)
+        element(material, "diffuse", color)
 
 
-def _add_wheeled(world, scene, config, terrain):
+def _add_wheeled(world, scene, config, terrain, mesh_dir):
     """The wheeled vehicle, its wrench system, and surface visuals."""
     plugin(world, "apply-link-wrench", "ApplyLinkWrench")
-    add_surface_visuals(world, scene)
+    add_surface_visuals(world, scene, mesh_dir)
     ground = GroundModel.from_scene(scene, terrain)
     x, y, yaw = spawn_xy_yaw(config.data, scene)
     pose = spawn_pose(config.wheeled, ground, x, y, yaw)
     build_wheeled_vehicle(world, config.wheeled, config.data, pose)
+    names = {obstacle["name"] for obstacle in scene["obstacles"]}
+    for index in range(1, config.data["ground_vehicle"]["opponents"]["count"] + 1):
+        name = opponent_name(config.wheeled, index)
+        if name in names:
+            raise ValueError(f"scene obstacle name {name!r} is used by an opponent")
+        x, y, yaw = spawn_xy_yaw(config.data, scene, offset=index)
+        build_wheeled_vehicle(
+            world,
+            config.wheeled,
+            config.data,
+            spawn_pose(config.wheeled, ground, x, y, yaw),
+            name=name,
+            sensors=False,
+            odometry_topic=OPPONENT_ODOMETRY_TOPIC.format(name=name),
+            color=OPPONENT_COLORS[(index - 1) % len(OPPONENT_COLORS)],
+        )
 
 
 def build_world(
@@ -331,7 +382,8 @@ def build_world(
             scene.get("ground_reflectivity"),
         )
     if config.wheeled is not None:
-        _add_wheeled(world, scene, config, terrain)
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        _add_wheeled(world, scene, config, terrain, Path(output).parent)
     else:
         build_drone(world, render_sensors, control_mode, config, terrain=terrain)
     if config.data["payload"]["enabled"]:

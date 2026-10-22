@@ -141,6 +141,18 @@ KIND_PRIORITY = {
 }
 
 
+# Wheeled opponents: truth odometry of other vehicles ("opponent:<name>"),
+# processed just before the ego odometry of the same period.
+OPPONENT_KIND_PREFIX = "opponent:"
+
+
+def kind_priority(kind: str) -> float:
+    """Processing priority of a message kind at equal stamps (lower first)."""
+    if kind.startswith(OPPONENT_KIND_PREFIX):
+        return KIND_PRIORITY["odometry"] - 0.5
+    return KIND_PRIORITY.get(kind, len(KIND_PRIORITY) - 1)
+
+
 def scheduled_stamp_ns(period_ns: float, step_ns: int, barrier_ns: int) -> int:
     """Stamp of a sensor's last sample at or before ``barrier_ns``.
 
@@ -197,7 +209,7 @@ class LockstepOrderer:
         self._step_ns = step_ns
         self._wait_timeout_s = wait_timeout_s
         self._clock = clock
-        self._buffer: list[tuple[int, int, int, str, Any, float]] = []
+        self._buffer: list[tuple[int, float, str, int, str, Any, float]] = []
         self._ready: deque = deque()
         self._barriers: deque[tuple[int, float]] = deque()
         self._last_ns: dict[str, int] = {}
@@ -237,9 +249,18 @@ class LockstepOrderer:
             return
         self._last_ns[kind] = stamp
         self._sequence += 1
-        priority = KIND_PRIORITY.get(kind, len(KIND_PRIORITY) - 1)
+        # The kind name breaks ties between kinds of equal priority
+        # (opponents), so their order never depends on arrival.
         self._buffer.append(
-            (stamp, priority, self._sequence, kind, message, received_at)
+            (
+                stamp,
+                kind_priority(kind),
+                kind,
+                self._sequence,
+                kind,
+                message,
+                received_at,
+            )
         )
         if kind == "odometry":
             self._barriers.append((stamp, self._clock()))

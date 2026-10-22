@@ -15,7 +15,10 @@ Surface zones (``scene["surfaces"]``) scale tyre friction and rolling
 resistance by region: axis-aligned-or-rotated rectangles and polyline
 strips (a road or race track: a centreline with a width). Later zones
 override earlier ones; outside every zone ``scene["ground_surface"]``
-applies (default: scale 1). Units: m, world ENU.
+applies (default: scale 1). For speed the zones are rasterized once into a
+grid of surface indices (``RASTER_RESOLUTION_M``, cell centres tested
+exactly), so a zone boundary is resolved to within half a cell diagonal
+(0.18 m); a lookup is one array index per wheel. Units: m, world ENU.
 
 Gazebo's terrain collision mesh is the same height field sampled at the
 terrain resolution, so wheels and chassis see slightly different surfaces
@@ -34,6 +37,8 @@ from ..terrain import Terrain
 # Fixed-point iterations for a ray against the height field (converges for
 # struts steeper than the terrain slope; vehicles are upright).
 TERRAIN_ITERATIONS = 4
+# Surface raster cell size (m); see module docs.
+RASTER_RESOLUTION_M = 0.25
 
 SURFACE_KEYS = {"name", "friction_scale", "rolling_resistance_scale"}
 ZONE_KEYS = SURFACE_KEYS | {
@@ -200,6 +205,111 @@ def surfaces_from_scene(
     return default, tuple(parse_zone(entry, i) for i, entry in enumerate(zones))
 
 
+class SurfaceRaster:
+    """Grid of surface indices (0: default, k: zone k−1) over the zones'
+    bounding box; later zones overwrite earlier ones (see module docs)."""
+
+    def __init__(
+        self,
+        default: Surface,
+        zones: Sequence[SurfaceZone],
+        resolution_m: float = RASTER_RESOLUTION_M,
+    ) -> None:
+        self.resolution_m = resolution_m
+        surfaces = [default, *(zone.surface for zone in zones)]
+        self.friction = np.array([s.friction_scale for s in surfaces])
+        self.rolling = np.array([s.rolling_resistance_scale for s in surfaces])
+        self.names = [s.name for s in surfaces]
+        boxes = (
+            np.array([_zone_bounds(zone) for zone in zones])
+            if zones
+            else np.zeros((0, 4))
+        )
+        if not len(boxes):
+            self.origin = np.zeros(2)
+            self.grid = np.zeros((0, 0), np.uint8)
+            return
+        low, high = boxes[:, :2].min(axis=0), boxes[:, 2:].max(axis=0)
+        self.origin = low
+        shape = np.ceil((high - low) / resolution_m).astype(int) + 1
+        self.grid = np.zeros(tuple(shape), np.uint16 if len(zones) > 254 else np.uint8)
+        for index, zone in enumerate(zones, start=1):
+            self._paint(zone, index)
+
+    def _paint(self, zone: SurfaceZone, index: int) -> None:
+        """Mark the cells whose centres lie in ``zone`` (per strip segment,
+        only within that segment's bounding box)."""
+        if zone.shape == "rectangle":
+            parts = [zone]
+        else:
+            points = list(zone.points_m) + ([zone.points_m[0]] if zone.closed else [])
+            parts = [
+                SurfaceZone(
+                    zone.surface, "strip", points_m=(a, b), width_m=zone.width_m
+                )
+                for a, b in zip(points[:-1], points[1:])
+            ]
+        for part in parts:
+            x0, y0, x1, y1 = _zone_bounds(part)
+            i0, j0 = self._cell(x0, y0)
+            i1, j1 = self._cell(x1, y1)
+            ii, jj = np.meshgrid(
+                np.arange(i0, i1 + 1), np.arange(j0, j1 + 1), indexing="ij"
+            )
+            x = self.origin[0] + ii * self.resolution_m
+            y = self.origin[1] + jj * self.resolution_m
+            inside = part.contains(x.ravel(), y.ravel()).reshape(ii.shape)
+            self.grid[ii[inside], jj[inside]] = index
+
+    def _cell(self, x: float, y: float) -> tuple[int, int]:
+        i = int(
+            np.clip(
+                round((x - self.origin[0]) / self.resolution_m),
+                0,
+                self.grid.shape[0] - 1,
+            )
+        )
+        j = int(
+            np.clip(
+                round((y - self.origin[1]) / self.resolution_m),
+                0,
+                self.grid.shape[1] - 1,
+            )
+        )
+        return i, j
+
+    def lookup(self, x: NDArray, y: NDArray) -> NDArray[np.int64]:
+        """Surface index per point (0 outside the raster)."""
+        if not self.grid.size:
+            return np.zeros(np.shape(x), np.int64)
+        i = np.rint((np.asarray(x) - self.origin[0]) / self.resolution_m).astype(
+            np.int64
+        )
+        j = np.rint((np.asarray(y) - self.origin[1]) / self.resolution_m).astype(
+            np.int64
+        )
+        inside = (
+            (i >= 0) & (j >= 0) & (i < self.grid.shape[0]) & (j < self.grid.shape[1])
+        )
+        index = np.zeros(np.shape(i), np.int64)
+        index[inside] = self.grid[i[inside], j[inside]]
+        return index
+
+
+def _zone_bounds(zone: SurfaceZone) -> tuple[float, float, float, float]:
+    """Axis-aligned bounds (x0, y0, x1, y1) of a zone (m)."""
+    if zone.shape == "rectangle":
+        c, s = abs(np.cos(zone.yaw_rad)), abs(np.sin(zone.yaw_rad))
+        half_x = 0.5 * (c * zone.size_m[0] + s * zone.size_m[1])
+        half_y = 0.5 * (s * zone.size_m[0] + c * zone.size_m[1])
+        x, y = zone.center_m
+        return x - half_x, y - half_y, x + half_x, y + half_y
+    points = np.asarray(zone.points_m, float)
+    margin = zone.width_m / 2
+    low, high = points.min(axis=0) - margin, points.max(axis=0) + margin
+    return float(low[0]), float(low[1]), float(high[0]), float(high[1])
+
+
 @dataclass(frozen=True)
 class RayHits:
     """Per-ray results: ``hit`` mask, ``distance_m`` along the ray (NaN when
@@ -227,6 +337,7 @@ class GroundModel:
         self._ground_half_m = ground_half_m
         self._default = default_surface
         self._zones = tuple(zones)
+        self._raster = SurfaceRaster(default_surface, self._zones)
         if boxes:
             centre = np.array([b["position"] for b in boxes], float)
             size = np.array([b["size"] for b in boxes], float)
@@ -302,18 +413,11 @@ class GroundModel:
         return best, np.isfinite(best)
 
     def _surface(self, x: NDArray, y: NDArray) -> tuple[NDArray, NDArray]:
-        friction = np.full(len(x), self._default.friction_scale)
-        rolling = np.full(len(x), self._default.rolling_resistance_scale)
-        for zone in self._zones:
-            inside = zone.contains(x, y)
-            friction = np.where(inside, zone.surface.friction_scale, friction)
-            rolling = np.where(inside, zone.surface.rolling_resistance_scale, rolling)
-        return friction, rolling
+        index = self._raster.lookup(x, y)
+        return self._raster.friction[index], self._raster.rolling[index]
 
     def surface_name(self, x: float, y: float) -> str:
         """Name of the surface at one point (telemetry and health)."""
-        name = self._default.name
-        for zone in self._zones:
-            if bool(zone.contains(np.array([x]), np.array([y]))[0]):
-                name = zone.surface.name
-        return name
+        return self._raster.names[
+            int(self._raster.lookup(np.array([x]), np.array([y]))[0])
+        ]

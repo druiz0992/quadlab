@@ -210,6 +210,9 @@ robotlab --headless --control-mode rotor-thrust --drone configs/sensors/imu_cons
 robotlab --robot car --keyboard --headless --scene worlds/airfield.json --output outputs/car
 robotlab --robot rover --keyboard --headless --scene worlds/hills.json --output outputs/rover
 robotlab --robot tractor --keyboard --headless --output outputs/tractor
+# Race on the circuit against three track-following opponents (lap times in summary.json)
+robotlab --robot car --keyboard --headless --scene worlds/race_circuit.json \
+  --config configs/scenarios/race_opponents.json --output outputs/race
 # Your wheeled controller: algorithms.controller in a config layer; start from
 # control/wheeled_template.py and check it with check_wheeled_controller
 

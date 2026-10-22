@@ -29,7 +29,8 @@ document and update the status below.
 | Acro (rate-mode) controller for racing and freestyle handling (flips, rolls) | Future |
 | Freestyle/acrobatic 5-inch preset | Implemented ([3 Configuration](3_configuration.md#vehicle-presets)) |
 | Ground vehicles: rover, race car, tractor (`--robot`), Python tyre/suspension model, wheel encoders, keyboard driver, wheeled controller contract | Implemented ([8 Ground vehicles](8_ground_vehicles.md)) |
-| Ground-vehicle worlds (off-road, race circuit with opponent cars, field), tractor implements (3-point hitch tool with draft force) and towed trailer | In progress (see [Ground vehicles](#ground-vehicles)) |
+| Race circuit world with track, lap timing, track limits; opponent cars with the track follower | Implemented ([8 Ground vehicles](8_ground_vehicles.md#race-circuit-and-opponents)) |
+| Ground-vehicle worlds (off-road, field), tractor implements (3-point hitch tool with draft force) and towed trailer | In progress (see [Ground vehicles](#ground-vehicles)) |
 | Wheel encoders on the sensor bus (estimator input), wheeled randomization, mission references for wheeled robots | Future |
 | ApplyLinkWrench persistent wrenches accumulate (multirotor body drag and fixed-wing aerodynamics publish a delta every period, so long runs slow down quadratically); wheeled robots use one-step impulses | Known issue; fix proposed below |
 | Reversible (3D) motors with negative thrust | Future (schema change) |
@@ -277,12 +278,10 @@ before claiming autonomous laps or realistic wind response.
 
 Next steps after the vehicle core ([8 Ground vehicles](8_ground_vehicles.md)):
 
-- **Worlds:** off-road rover terrain (rocks, slopes, ditches), a race
-  circuit (track strip with kerbs and track limits, lap timing), and a
-  farm field (boundary, headlands, crop rows, RTK scenario).
-- **Opponent cars:** several physics cars on the circuit, each driven by
-  its own controller slot (default: a simple centreline follower as
-  traffic), so racing algorithms can be developed against them.
+- **Worlds:** off-road rover terrain (rocks, slopes, ditches) and a farm
+  field (boundary, headlands, crop rows, RTK scenario).
+- **Faster ego loop:** the ego's per-period Python work (about 1.9 ms with
+  opponents) limits keyboard racing to about half real time.
 - **Tractor implements:** a three-point-hitch tool with soil draft force
   (ASABE D497 form) lowered and raised by the keyboard, and a towed trailer
   on a hitch joint with its own wheels.

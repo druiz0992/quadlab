@@ -25,15 +25,20 @@ from scipy.spatial.transform import Rotation
 from ..control.wheeled import WheeledController
 from ..control.wheeled_keyboard import DriverInput, KeyboardDriver
 from ..core.algorithms import AlgorithmContext
+from ..core.track import Track
+from ..evaluation.laps import LapTimer
 from ..evaluation.health import HealthThresholds, RunHealth
 from ..sensors.wheel_encoders import WheelEncoderModel
 from ..simulation.gazebo.config import DroneConfig
 from ..simulation.gazebo.ingress import (
+    OPPONENT_KIND_PREFIX,
     LockstepOrderer,
     MessageIngress,
     gz_sim_command,
     subscriptions,
 )
+from ..simulation.gazebo.wheeled_vehicle import OPPONENT_ODOMETRY_TOPIC, opponent_name
+from .opponents import Opponent, build_opponent_controller, opponent_options
 from ..simulation.gazebo.odometry import OdometryVelocityFix
 from ..simulation.gazebo.plugins import lockstep_barrier
 from ..simulation.gazebo.world import world_elevation_m
@@ -52,6 +57,7 @@ from .wheeled_mission import WheeledMissionLoop, WheeledParts
 BUILTIN_CONTROLLERS = {
     "keyboard": "robotlab.control.wheeled_keyboard:KeyboardDriver",
     "template": "robotlab.control.wheeled_template:TemplateWheeledController",
+    "track_follower": "robotlab.control.track_follower:TrackFollower",
 }
 
 
@@ -203,9 +209,18 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
         rotor_mode=False,
         log=debug,
         wheeled=vehicle,
+        track=Track.from_scene(scene),
     )
     controller = build_wheeled_controller(settings, stack.context, args.keyboard)
     ground = GroundModel.from_scene(scene, terrain)
+    steps = steps_per_period(
+        1 / settings["control"]["odometry_rate_hz"], settings["simulation"]["step_s"]
+    )
+    ego_wrench = Wrench(node, f"{vehicle.model_name}::base_link", steps)
+    opponents = _opponents(
+        settings, vehicle, stack.context, ground, Wrench, node, ego_wrench.publisher
+    )
+    names = frozenset(o.name for o in opponents)
     keyboard = settings["ground_vehicle"]["keyboard"]
     parts = WheeledParts(
         args=args,
@@ -220,22 +235,25 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
         node=node,
         ingress=ingress,
         orderer=LockstepOrderer(
-            ingress, _scheduled_periods_ns(settings, pipeline), _step_ns(settings)
+            ingress,
+            {
+                **_scheduled_periods_ns(settings, pipeline),
+                # Opponents publish every period; wait for each of them.
+                **{
+                    OPPONENT_KIND_PREFIX
+                    + name: 1e9 / settings["control"]["odometry_rate_hz"]
+                    for name in names
+                },
+            },
+            _step_ns(settings),
         ),
         barrier=lockstep_barrier(settings),
         recorder=recorder,
         pipeline=pipeline,
         stack=stack,
         controller=controller,
-        model=WheeledVehicleModel(vehicle, ground),
-        wrench=Wrench(
-            node,
-            f"{vehicle.model_name}::base_link",
-            steps_per_period(
-                1 / settings["control"]["odometry_rate_hz"],
-                settings["simulation"]["step_s"],
-            ),
-        ),
+        model=WheeledVehicleModel(vehicle, ground, vehicles=1 + len(opponents)),
+        wrench=ego_wrench,
         encoders=WheelEncoderModel(
             settings["sensors"]["wheel_encoders"], vehicle.wheel_count
         ),
@@ -246,6 +264,7 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
             weight_n=None,
             own_models=frozenset({vehicle.model_name}),
             wheeled=True,
+            vehicles=names,
         ),
         evaluation=RunEvaluation(
             settings,
@@ -258,13 +277,33 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
         odometry_fix=OdometryVelocityFix(),
         debug=debug,
         keyboard=window,
+        laps=LapTimer(stack.context.track) if stack.context.track else None,
+        opponents=tuple(opponents),
         driver_input=(
             DriverInput(keyboard["throttle_rate_per_s"], keyboard["steer_rate_per_s"])
             if window is not None
             else None
         ),
     )
-    ingress.subscribe(node, subscriptions(settings["sensors"], False))
+    # Poses only move Rerun obstacles; without moving obstacles they cost
+    # ~0.2 ms per period for nothing.
+    topics = [
+        topic
+        for topic in subscriptions(settings["sensors"], False)
+        if topic[2] != "poses" or scene.get("moving_obstacles")
+    ]
+    ingress.subscribe(
+        node,
+        topics
+        + [
+            (
+                "odometry_pb2.Odometry",
+                OPPONENT_ODOMETRY_TOPIC.format(name=o.name),
+                OPPONENT_KIND_PREFIX + o.name,
+            )
+            for o in opponents
+        ],
+    )
     loop = WheeledMissionLoop(parts)
     try:
         summary = loop.run()
@@ -279,6 +318,37 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
     )
     _print_health(summary["health"])
     return summary
+
+
+def _opponents(settings, vehicle, context, ground, Wrench, node, publisher):
+    """Runtime parts of every configured opponent (experiments/opponents.py);
+    their wrenches share the ego's wrench ``publisher``."""
+    from ..simulation.gazebo.stepping import steps_per_period
+
+    section = settings["ground_vehicle"]["opponents"]
+    control = settings["control"]
+    period_s = 1 / control["odometry_rate_hz"]
+    steps = steps_per_period(period_s, settings["simulation"]["step_s"])
+    opponents = []
+    for index in range(section["count"]):
+        name = opponent_name(vehicle, index + 1)
+        opponents.append(
+            Opponent(
+                name=name,
+                index=index + 1,
+                controller=build_opponent_controller(
+                    section["controller"],
+                    BUILTIN_CONTROLLERS,
+                    context,
+                    opponent_options(settings, index),
+                ),
+                wrench=Wrench(node, f"{name}::base_link", steps, publisher),
+                laps=LapTimer(context.track) if context.track else None,
+                control_period_ns=round(1e9 / control["control_rate_hz"]),
+                odometry_fix=OdometryVelocityFix(),
+            )
+        )
+    return opponents
 
 
 def _sensor_pipeline(settings, config, scene, terrain, world, recorder, truth):

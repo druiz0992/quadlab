@@ -32,6 +32,24 @@ KIND_COLORS = {
     "tractor": ".15 .55 .25 1",
 }
 TYRE_COLOR = ".08 .08 .08 1"
+# Opponent body colours, in order (the ego keeps its kind colour).
+OPPONENT_COLORS = (
+    ".1 .3 .85 1",
+    ".95 .75 .1 1",
+    ".55 .2 .7 1",
+    ".1 .65 .65 1",
+    ".9 .45 .1 1",
+    ".35 .35 .35 1",
+    ".95 .95 .95 1",
+)
+OPPONENT_ODOMETRY_TOPIC = "/robotlab/opponents/{name}/odometry"
+
+
+def opponent_name(properties: WheeledProperties, index: int) -> str:
+    """Gazebo model name of opponent ``index`` (1-based): ``car_1``, ..."""
+    return f"{properties.model_name}_{index}"
+
+
 # Friction of the bump-stop cylinders (rubber on ground, sliding).
 BUMP_STOP_FRICTION = 0.7
 
@@ -85,9 +103,18 @@ def build_wheeled_vehicle(
     properties: WheeledProperties,
     settings: dict,
     pose: SpawnPose,
+    *,
+    name: str | None = None,
+    sensors: bool = True,
+    odometry_topic: str = "/robotlab/odometry",
+    color: str | None = None,
 ) -> ET.Element:
-    """Add the vehicle model to ``world`` (see module docs)."""
-    model = element(world, "model", name=properties.model_name)
+    """Add the vehicle model to ``world`` (see module docs).
+
+    Opponents pass their ``name``, ``sensors=False`` (truth odometry only,
+    on ``odometry_topic``), and a body ``color``.
+    """
+    model = element(world, "model", name=name or properties.model_name)
     element(model, "pose", _pose((*pose.position_m, 0, 0, pose.yaw_rad)))
     base = element(model, "link", name="base_link")
     inertial = element(base, "inertial")
@@ -122,9 +149,10 @@ def build_wheeled_vehicle(
         collision=False,
     )
     _add_wheels(base, properties)
-    add_body_sensors(base, settings["sensors"])
+    if sensors:
+        add_body_sensors(base, settings["sensors"])
     odometry = plugin(model, "odometry-publisher", "OdometryPublisher")
     element(odometry, "dimensions", 3)
     element(odometry, "odom_publish_frequency", settings["control"]["odometry_rate_hz"])
-    element(odometry, "odom_topic", "/robotlab/odometry")
+    element(odometry, "odom_topic", odometry_topic)
     return model

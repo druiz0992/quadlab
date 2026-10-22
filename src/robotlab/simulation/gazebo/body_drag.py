@@ -80,14 +80,20 @@ class BurstImpulseWrench:
     guarantees the message is read before the burst's first step.
     """
 
-    def __init__(self, node: Any, link: str, steps_per_burst: int) -> None:
+    def __init__(
+        self, node: Any, link: str, steps_per_burst: int, publisher: Any = None
+    ) -> None:
+        """``publisher``: an existing advertisement of the instantaneous
+        wrench topic (one node can advertise a topic only once, so several
+        vehicles share it); None advertises it on ``node``."""
         from gz.msgs10.entity_pb2 import Entity
         from gz.msgs10.entity_wrench_pb2 import EntityWrench
 
         if steps_per_burst < 1:
             raise ValueError("BurstImpulseWrench needs at least one step per burst")
         self._message_type, self._link = EntityWrench, Entity.LINK
-        self._publisher = node.advertise(INSTANT_WRENCH_TOPIC, EntityWrench)
+        self.publisher = publisher or node.advertise(INSTANT_WRENCH_TOPIC, EntityWrench)
+        self._publisher = self.publisher
         self._entity_name = link
         self._steps = steps_per_burst
         self.messages = 0

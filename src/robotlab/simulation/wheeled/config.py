@@ -139,6 +139,16 @@ GROUND_VEHICLE_DEFAULTS: dict[str, Any] = {
     # simulation.spawn_position_m); with them, the ego's grid slot.
     "spawn_yaw_deg": 0.0,
     "spawn_index": 0,
+    # Other cars of the same kind on the scene's next spawn points, each
+    # with its own controller (default: the centreline follower); see
+    # experiments/opponents.py. per_opponent_options (one dict per
+    # opponent, optional) merge over controller_options.
+    "opponents": {
+        "count": 0,
+        "controller": "track_follower",
+        "controller_options": {},
+        "per_opponent_options": [],
+    },
     # Tyre/wheel-spin integration substeps per odometry period.
     "substeps": 2,
     # Keyboard driving (see control/wheeled_keyboard.py): fraction of the
@@ -320,11 +330,14 @@ def _section(value: Any, template: Mapping[str, Any], name: str) -> None:
         elif isinstance(default, str):
             if not isinstance(item, str):
                 raise ValueError(f"{path} must be a string")
+        elif key in FREE_FORM:
+            if not isinstance(item, dict):
+                raise ValueError(f"{path} must be an object")
         elif isinstance(default, list):
-            if key != "wheels":
+            if key not in LIST_KEYS:
                 _vector(item, path, positive=key in POSITIVE_VECTORS)
         elif isinstance(default, int) and not isinstance(default, bool):
-            minimum = 0 if key == "spawn_index" else 1
+            minimum = 0 if key in {"spawn_index", "count"} else 1
             if type(item) is not int or item < minimum:
                 raise ValueError(f"{path} must be an integer >= {minimum}")
         elif key in SIGNED_KEYS:
@@ -334,6 +347,10 @@ def _section(value: Any, template: Mapping[str, Any], name: str) -> None:
 
 
 POSITIVE_VECTORS = {"inertia_kg_m2", "collision_size_m"}
+# Validated by their consumers (plug-in options) or by dedicated checks.
+FREE_FORM = {"controller_options"}
+LIST_KEYS = {"wheels", "per_opponent_options"}
+MAX_OPPONENTS = 7
 SIGNED_KEYS = {"spawn_yaw_deg"}
 ZERO_ALLOWED = {
     "rolling_resistance",
@@ -385,6 +402,7 @@ def validate_ground_vehicle(data: Mapping[str, Any]) -> None:
     ):
         raise ValueError("ground_vehicle.model_name must be an identifier")
     _check_layout(g, layout)
+    _check_opponents(g["opponents"])
     for key in ("c", "e"):
         for direction in ("longitudinal", "lateral"):
             value = g["tyre"][direction][key]
@@ -417,6 +435,22 @@ def _check_layout(g: Mapping[str, Any], layout: str) -> None:
             raise ValueError("four_wheel steering needs steered front and rear wheels")
     if g["steering"]["max_angle_rad"] >= 1.2:
         raise ValueError("ground_vehicle.steering.max_angle_rad must be < 1.2 rad")
+
+
+def _check_opponents(opponents: Mapping[str, Any]) -> None:
+    if opponents["count"] > MAX_OPPONENTS:
+        raise ValueError(f"ground_vehicle.opponents.count must be <= {MAX_OPPONENTS}")
+    per = opponents["per_opponent_options"]
+    if not isinstance(per, list) or not all(isinstance(o, dict) for o in per):
+        raise ValueError(
+            "ground_vehicle.opponents.per_opponent_options must be a list of objects"
+        )
+    if len(per) > opponents["count"]:
+        raise ValueError(
+            "ground_vehicle.opponents: more per_opponent_options than opponents"
+        )
+    if opponents["count"] and not opponents["controller"]:
+        raise ValueError("ground_vehicle.opponents.controller must name a controller")
 
 
 def _check_lockstep(data: Mapping[str, Any]) -> None:

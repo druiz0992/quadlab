@@ -26,6 +26,11 @@ are added. The result is one world-axis wrench about the centre of mass,
 applied by Gazebo for the next period (explicit coupling: the default
 500 Hz period resolves the suspension and tyre carcass modes).
 
+One model can step several identical vehicles at once (``vehicles``; the
+ego and its opponents): every per-wheel array has one row per wheel of
+every vehicle (vehicle-major), so the per-call overhead of the small numpy
+operations is paid once per period instead of once per vehicle.
+
 Inputs and outputs are SI, world ENU, body x forward / y left / z up;
 quaternions are xyzw body-to-world. This is a textbook vehicle model with
 constant coefficients, not a calibrated vehicle.
@@ -125,11 +130,13 @@ class _Contacts:
 
 
 class WheeledVehicleModel:
-    """Python half of a wheeled vehicle (see module docs).
+    """Python half of ``vehicles`` identical wheeled vehicles (module docs).
 
-    ``actuators`` holds the accepted command; ``step`` advances the wheels
-    over one period ``dt_s`` from the chassis state and returns the wrench
-    for Gazebo plus telemetry. Raises ValueError for a non-positive step.
+    ``actuators`` holds the accepted commands; ``step`` advances one
+    vehicle (``step_all`` every vehicle) over one period ``dt_s`` from the
+    chassis state(s) and returns the wrench(es) for Gazebo; ``telemetry``
+    is vehicle 0's (``telemetry_of(i)`` any vehicle's). Raises ValueError
+    for a non-positive step or a wrong number of states.
     """
 
     def __init__(
@@ -137,16 +144,22 @@ class WheeledVehicleModel:
         properties: WheeledProperties,
         ground: GroundModel,
         actuators: WheelActuators | None = None,
+        vehicles: int = 1,
     ) -> None:
         self.properties = properties
         self.ground = ground
-        self.actuators = actuators or WheelActuators(properties)
-        count = properties.wheel_count
+        self.vehicles = vehicles
+        self.actuators = actuators or WheelActuators(properties, vehicles)
+        if self.actuators.vehicles != vehicles:
+            raise ValueError("actuators and model need the same vehicle count")
+        n = properties.wheel_count
+        count = vehicles * n
         self.tyres = TyreModel(properties.tyre, count)
         self.wheel_speed_rad_s = np.zeros(count)
         # Integrated wheel rotation (rad), for the encoders.
         self.wheel_angle_rad = np.zeros(count)
-        self._mounts_body = properties.mount_positions_m()
+        self._vehicle_of_row = np.repeat(np.arange(vehicles), n)
+        self._mounts_body = np.tile(properties.mount_positions_m(), (vehicles, 1))
         self._ray_length_m = np.full(
             count,
             properties.suspension.travel_m + properties.tyre.radius_m / MIN_COS_STRUT,
@@ -156,58 +169,92 @@ class WheeledVehicleModel:
         self._axle_points_body = np.array([[x.max(), 0.0, 0.0], [x.min(), 0.0, 0.0]])
         front = properties.aero.downforce_front_fraction
         self._downforce_split = np.array([front, 1 - front])
-        self.telemetry: WheelTelemetry | None = None
+        self._telemetry: list[WheelTelemetry] = []
+
+    @property
+    def telemetry(self) -> WheelTelemetry | None:
+        """Vehicle 0's telemetry of the last step (None before the first)."""
+        return self._telemetry[0] if self._telemetry else None
+
+    def telemetry_of(self, vehicle: int) -> WheelTelemetry:
+        return self._telemetry[vehicle]
+
+    def rows(self, vehicle: int) -> slice:
+        return self.actuators.rows(vehicle)
 
     def step(self, chassis: ChassisState, dt_s: float) -> ChassisWrench:
-        """Advance wheels and tyres by ``dt_s``; return the chassis wrench."""
+        """Advance a single-vehicle model by ``dt_s``; return its wrench."""
+        if self.vehicles != 1:
+            raise ValueError("step() is for one vehicle; use step_all()")
+        return self.step_all([chassis], dt_s)[0]
+
+    def step_all(self, chassis: list[ChassisState], dt_s: float) -> list[ChassisWrench]:
+        """Advance every vehicle by ``dt_s``; return their wrenches in order."""
         if not dt_s > 0:
             raise ValueError("WheeledVehicleModel.step needs dt_s > 0")
-        rotation = rotation_matrix(chassis.quaternion_xyzw)
-        omega_world = rotation @ chassis.body_rates_rad_s
+        if len(chassis) != self.vehicles:
+            raise ValueError(f"step_all needs {self.vehicles} chassis states")
+        p = np.array([c.position_m for c in chassis], float)
+        v = np.array([c.velocity_world_mps for c in chassis], float)
+        rotation = np.array([rotation_matrix(c.quaternion_xyzw) for c in chassis])
+        rates = np.array([c.body_rates_rad_s for c in chassis], float)
+        omega = np.einsum("kij,kj->ki", rotation, rates)
+        rows = self._vehicle_of_row
+        state = _Rows(p[rows], v[rows], rotation[rows], omega[rows])
         self.actuators.slew_steering(dt_s)
-        contacts = self._suspension(chassis, rotation, omega_world)
-        e_x, e_y, axle = self._contact_axes(rotation, contacts.normal)
-        v_contact = chassis.velocity_world_mps + cross(
-            omega_world, contacts.contact_m - chassis.position_m
+        contacts = self._suspension(state)
+        e_x, e_y, axle = self._contact_axes(state.rotation, contacts.normal)
+        v_contact = state.velocity + cross(
+            state.omega, contacts.contact_m - state.position
         )
-        vx = _dot(v_contact, e_x)
-        vy = _dot(v_contact, e_y)
+        vx, vy = _dot(v_contact, e_x), _dot(v_contact, e_y)
         fx, fy, reaction, drive = self._spin(contacts, vx, vy, dt_s)
-        wrench = self._assemble(chassis, rotation, contacts, e_x, e_y, axle, fx, fy)
-        torque = wrench.torque_world_nm - np.sum(reaction[:, None] * axle, axis=0)
+        force, torque = self._assemble(state, contacts, e_x, e_y, axle, fx, fy)
+        torque = torque - reaction[:, None] * axle
         kappa, tan_alpha = self.tyres.slips()
-        self.telemetry = WheelTelemetry(
-            contacts.in_contact,
-            contacts.compression_m,
-            contacts.normal_n,
-            fx,
-            fy,
-            kappa,
-            np.arctan(tan_alpha),
-            self.wheel_speed_rad_s.copy(),
-            self.actuators.steer_rad.copy(),
-            drive,
-            contacts.friction,
-            contacts.contact_m,
-            contacts.hub_m,
-        )
-        return ChassisWrench(wrench.force_world_n, torque)
+        wrenches, telemetry = [], []
+        for vehicle in range(self.vehicles):
+            r = self.rows(vehicle)
+            aero_force, aero_torque = self._aero(v[vehicle], rotation[vehicle])
+            wrenches.append(
+                ChassisWrench(
+                    force[r].sum(axis=0) + aero_force,
+                    torque[r].sum(axis=0) + aero_torque,
+                )
+            )
+            telemetry.append(
+                WheelTelemetry(
+                    contacts.in_contact[r],
+                    contacts.compression_m[r],
+                    contacts.normal_n[r],
+                    fx[r],
+                    fy[r],
+                    kappa[r],
+                    np.arctan(tan_alpha[r]),
+                    self.wheel_speed_rad_s[r].copy(),
+                    self.actuators.steer_rad[r].copy(),
+                    drive[r],
+                    contacts.friction[r],
+                    contacts.contact_m[r],
+                    contacts.hub_m[r],
+                )
+            )
+        self._telemetry = telemetry
+        return wrenches
 
-    def _suspension(
-        self, chassis: ChassisState, rotation: NDArray, omega_world: NDArray
-    ) -> _Contacts:
+    def _suspension(self, state: "_Rows") -> _Contacts:
         p, s = self.properties, self.properties.suspension
         radius = p.tyre.radius_m
-        mounts = chassis.position_m + self._mounts_body @ rotation.T
-        down = np.tile(-rotation[:, 2], (p.wheel_count, 1))
+        mounts = state.position + np.einsum(
+            "kij,kj->ki", state.rotation, self._mounts_body
+        )
+        down = -state.rotation[:, :, 2]
         hits = self.ground.cast(mounts, down, self._ray_length_m)
         cos_strut = np.maximum(-_dot(down, hits.normal), MIN_COS_STRUT)
         length = np.where(hits.hit, hits.distance_m - radius / cos_strut, s.travel_m)
         compression = s.travel_m - length
         in_contact = hits.hit & (compression > 0)
-        v_mount = chassis.velocity_world_mps + cross(
-            omega_world, mounts - chassis.position_m
-        )
+        v_mount = state.velocity + cross(state.omega, mounts - state.position)
         # ẋ = −dL/dt; the ground is static, so L changes with the mount's
         # velocity along the normal (scaled to the strut direction).
         rate = -_dot(v_mount, hits.normal) / cos_strut
@@ -237,8 +284,8 @@ class WheeledVehicleModel:
         steer = self.actuators.steer_rad
         c, s = np.cos(steer)[:, None], np.sin(steer)[:, None]
         # Columns of R: body x and y in world axes.
-        heading = c * rotation[:, 0] + s * rotation[:, 1]
-        axle = c * rotation[:, 1] - s * rotation[:, 0]
+        heading = c * rotation[:, :, 0] + s * rotation[:, :, 1]
+        axle = c * rotation[:, :, 1] - s * rotation[:, :, 0]
         e_x = heading - _dot(heading, normal)[:, None] * normal
         e_x /= np.maximum(np.linalg.norm(e_x, axis=1, keepdims=True), 1e-9)
         return e_x, cross(normal, e_x), axle
@@ -254,7 +301,7 @@ class WheeledVehicleModel:
         h = dt_s / n
         inertia, radius = p.wheel_inertia_kg_m2, p.tyre.radius_m
         brake = self.actuators.brake_nm
-        sums = np.zeros((4, p.wheel_count))
+        sums = np.zeros((4, len(vx)))
         omega = self.wheel_speed_rad_s
         for _ in range(n):
             forces = self.tyres.forces(
@@ -277,16 +324,15 @@ class WheeledVehicleModel:
 
     def _assemble(
         self,
-        chassis: ChassisState,
-        rotation: NDArray,
+        state: "_Rows",
         contacts: _Contacts,
         e_x: NDArray,
         e_y: NDArray,
         axle: NDArray,
         fx: NDArray,
         fy: NDArray,
-    ) -> ChassisWrench:
-        """Ground forces and aerodynamics as one wrench about the centre of mass."""
+    ) -> tuple[NDArray, NDArray]:
+        """Per-row ground force and its torque about the vehicle's centre of mass."""
         ground = (
             contacts.normal_n[:, None] * contacts.normal
             + fx[:, None] * e_x
@@ -296,22 +342,16 @@ class WheeledVehicleModel:
         # hub except its spin-axis part (that spins the wheel instead).
         moment_hub = cross(contacts.contact_m - contacts.hub_m, ground)
         moment_hub -= _dot(moment_hub, axle)[:, None] * axle
-        arm = contacts.hub_m - chassis.position_m
-        force = ground.sum(axis=0)
-        torque = (cross(arm, ground) + moment_hub).sum(axis=0)
-        aero_force, aero_torque = self._aero(chassis, rotation)
-        return ChassisWrench(force + aero_force, torque + aero_torque)
+        arm = contacts.hub_m - state.position
+        return ground, cross(arm, ground) + moment_hub
 
-    def _aero(
-        self, chassis: ChassisState, rotation: NDArray
-    ) -> tuple[NDArray, NDArray]:
+    def _aero(self, velocity: NDArray, rotation: NDArray) -> tuple[NDArray, NDArray]:
         """Still-air drag ½ρC_dA|v|v at the centre of mass and downforce
         ½ρC_LA v_x² split over the front and rear axle lines."""
         a = self.properties.aero
-        v = chassis.velocity_world_mps
         q = 0.5 * a.air_density_kg_m3
-        drag = -q * a.drag_area_m2 * np.linalg.norm(v) * v
-        forward = float(rotation[:, 0] @ v)
+        drag = -q * a.drag_area_m2 * np.linalg.norm(velocity) * velocity
+        forward = float(rotation[:, 0] @ velocity)
         down = q * a.downforce_area_m2 * forward * forward
         if down == 0.0:
             return drag, np.zeros(3)
@@ -319,3 +359,13 @@ class WheeledVehicleModel:
         forces = (down * self._downforce_split)[:, None] * -rotation[:, 2]
         torque = cross(points, forces).sum(axis=0)
         return drag + forces.sum(axis=0), torque
+
+
+@dataclass(frozen=True)
+class _Rows:
+    """Chassis state repeated per wheel row (internal)."""
+
+    position: NDArray[np.float64]
+    velocity: NDArray[np.float64]
+    rotation: NDArray[np.float64]
+    omega: NDArray[np.float64]

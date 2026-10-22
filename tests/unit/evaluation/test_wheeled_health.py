@@ -13,7 +13,12 @@ def detector():
     from robotlab.simulation.gazebo.config import load_drone_config
 
     thresholds = HealthThresholds.from_settings(load_drone_config().data["health"])
-    return RunHealth(thresholds, own_models=frozenset({"car"}), wheeled=True)
+    return RunHealth(
+        thresholds,
+        own_models=frozenset({"car"}),
+        wheeled=True,
+        vehicles=frozenset({"car_1"}),
+    )
 
 
 def kinds(health):
@@ -46,3 +51,15 @@ def test_obstacle_contact_fails():
     health.on_truth(0, [0, 0, 0.3], [5, 0, 0], [0, 0, 0, 1])
     health.on_contact(1, "robotlab::car::base_link::body", "robotlab::wall::link::box")
     assert {"obstacle_contact", "hard_impact"} <= kinds(health)
+
+
+def test_opponent_contact_is_a_warning():
+    health = detector()
+    health.on_truth(0, [0, 0, 0.3], [0, 0, 0], [0, 0, 0, 1])
+    health.on_contact(
+        1, "robotlab::car::base_link::body", "robotlab::car_1::base_link::body"
+    )
+    assert kinds(health) == {"vehicle_contact"}
+    health.on_off_track(2)
+    summary = health.summary(completed=True, exit_reason="duration", dropped={})
+    assert summary["verdict"] == "warning"

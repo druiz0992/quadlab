@@ -205,3 +205,15 @@ def test_wait_for_subscribers_fails_fast_when_gazebo_exits():
             never, timeout_s=3600, monotonic=clock, sleep=lambda s: None, alive=alive
         )
     assert len(checks) == 3
+
+
+def test_opponent_odometry_precedes_ego_odometry_in_name_order():
+    from robotlab.simulation.gazebo.ingress import KIND_PRIORITY, kind_priority
+
+    assert (
+        kind_priority("contacts")
+        < kind_priority("opponent:car_2")
+        < kind_priority("odometry")
+    )
+    assert kind_priority("opponent:car_1") == kind_priority("opponent:car_2")
+    assert kind_priority("unknown") == KIND_PRIORITY["odometry"]

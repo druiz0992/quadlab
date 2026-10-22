@@ -28,6 +28,10 @@ robotlab --robot tractor --keyboard --headless --output outputs/tractor
 
 # Your controller (see "Controllers"); here the template at a 10 m/s cruise
 robotlab --robot car --headless --config my_controller.json --duration 20 --output outputs/car-auto
+
+# Race: you drive the car on the circuit against three opponents
+robotlab --robot car --keyboard --headless --scene worlds/race_circuit.json \
+  --config configs/scenarios/race_opponents.json --output outputs/race
 ```
 
 `--robot` loads the vehicle's preset (`simulation/wheeled/config.py`) under
@@ -138,15 +142,59 @@ Scene keys for wheeled robots (ignored by multirotors):
   "rectangle"` with `center_m`, `size_m`, `yaw_deg`, or `"shape": "strip"`
   with `points_m`, `width_m`, `closed` (a road or track centreline). Named
   surfaces (`asphalt`, `gravel`, `grass`, `mud`, `soil`, `sand`, `ice`,
-  `snow`, `kerb`) get matching colours in Gazebo (flat ground only) and
-  Rerun.
+  `snow`, `kerb`) get matching colours in Gazebo (one flat mesh per zone;
+  flat ground only) and Rerun. Zones are rasterized at 0.25 m for the wheel
+  lookups, so a boundary is resolved to within 0.18 m;
+- `track`: `{"centreline_m": [[x, y], ...], "width_m": w, "closed": true}`,
+  a race track (`core/track.py`): lap timing, track limits, and map
+  knowledge for controllers (`context.track`).
+
+## Race circuit and opponents
+
+`worlds/race_circuit.json` is a 1.23 km closed circuit: 12 m asphalt
+(friction scale 1), kerbs on the corners, three gravel traps (0.45, high
+rolling resistance), grass run-off (0.5), a pit building and grandstand,
+and a six-slot grid behind the start/finish line (centreline point 0).
+
+`ground_vehicle.opponents` adds up to seven cars of the ego's kind on the
+next grid slots:
+
+| Key | Meaning |
+| --- | --- |
+| `count` | number of opponents (0: none) |
+| `controller` | their controller (`package.module:Class` or an alias); default `track_follower` |
+| `controller_options` | options for every opponent |
+| `per_opponent_options` | list of option dicts merged per opponent (first opponent first) |
+
+`configs/scenarios/race_opponents.json` sets three followers with
+different grip fractions and lines. Opponents run their controller on their
+own truth; the batched wheel model steps all cars together, and each
+publishes its own wrench. The ego controller receives their ground-truth
+states in `state.opponents` (labelled truth: a stand-in for perception).
+Contact with an opponent is a `vehicle_contact` warning, not a failed run.
+
+**Track follower** (`control/track_follower.py`, alias `track_follower`)
+is the traffic driver: pure pursuit on the (optionally offset) centreline,
+a curvature-limited speed target (`grip_fraction` × μ g), and acceleration
+and braking capped by grip so a rear-drive car does not spin its wheels.
+Options: `lateral_offset_m`, `lookahead_s`, `min_lookahead_m`, `preview_m`,
+`grip_fraction`, `max_speed_mps`, `speed_gain_per_s`. It is a baseline,
+not a racing line; it can also drive the ego (`algorithms.controller:
+track_follower`).
+
+Lap timing (`evaluation/laps.py`) counts forward crossings of the
+start/finish line (the first one starts timing; reversing over the line
+undoes it) and track limits (every wheel contact beyond the track edge).
+`summary.json.track` and each `summary.json.opponents[].track` report lap
+times, best lap, progress along the track, and off-track episodes and
+time; the health verdict warns with `off_track`.
 
 ## Controllers
 
 A wheeled controller is `cls(context, options)` with `update(state,
 request, dt_s) -> WheelCommands` (`control/wheeled.py`), selected by
-`algorithms.controller` (`package.module:Class`, or the aliases `keyboard`
-and `template`) with `algorithms.controller_options`, and called at
+`algorithms.controller` (`package.module:Class`, or the aliases `keyboard`,
+`template`, and `track_follower`) with `algorithms.controller_options`, and called at
 `control.control_rate_hz` (100 Hz in the presets):
 
 - `context.wheeled` is the nominal vehicle (`core/wheeled_vehicle.py`): wheel
@@ -157,6 +205,8 @@ and `template`) with `algorithms.controller_options`, and called at
 - `request` is the keyboard's `DriverCommand` (throttle, brake, steer,
   steering mode, implement) or None; with `--keyboard` and a controller set,
   the controller receives the driver input (driver assists);
+- `context.track` is the scene's track (or None) and `state.opponents` the
+  other cars' ground-truth states;
 - `WheelCommands` (`core/wheeled.py`) has per-wheel drive torque, brake
   torque, and steering angle. Structural errors (wrong length, non-finite
   values, negative brake, a command on a wheel without that actuator) raise
@@ -193,5 +243,8 @@ pins, verified on 2026-10-22: the car on the template controller at 10 m/s
 covers 48.53 m in 6 s and agrees with the same model on the Python
 reference integrator (`rigid_body.py`) within 0.1 m; parked ride heights
 0.219 m (rover), 0.358 m (car), 1.023 m (tractor); repeated rover runs are
-identical. A 10 s car run takes about 14 s wall time on the reference
-desktop (Python load 0.69 per simulated second).
+identical; a race with two opponents is deterministic (identical ego
+telemetry and opponent summaries). On the reference desktop a 10 s car run
+takes about 13 s wall time (Python load 0.7 per simulated second); a car
+with three opponents runs at about half real time (20 s in 43 s, load 1.4:
+each opponent adds about 0.25 ms per 2 ms period).

@@ -31,11 +31,26 @@ STEERING_MODES = ("front", "coordinated", "crab")
 
 
 @dataclass(frozen=True)
+class OpponentState:
+    """Ground-truth state of another vehicle (simulator truth, labelled as
+    such: a stand-in for perception) at ``sim_time_ns``; world ENU, xyzw."""
+
+    name: str
+    sim_time_ns: int
+    position_m: NDArray[np.float64]
+    velocity_world_mps: NDArray[np.float64]
+    quaternion_xyzw: NDArray[np.float64]
+    body_rates_rad_s: NDArray[np.float64]
+
+
+@dataclass(frozen=True)
 class WheeledControlState:
     """State the controller drives on: chassis in world ENU (xyzw body-to-world,
     body-axis rates) plus per-wheel encoder speed (rad/s, positive rolling
     forward) and measured steering angle (rad, positive left), in the
-    vehicle's wheel order. ``source`` is "truth" or "estimate"."""
+    vehicle's wheel order. ``source`` is "truth" or "estimate".
+    ``opponents`` holds the other vehicles' ground-truth states of the
+    same period (empty without opponents)."""
 
     sim_time_ns: int
     position_m: NDArray[np.float64]
@@ -45,6 +60,7 @@ class WheeledControlState:
     wheel_speed_rad_s: NDArray[np.float64]
     steer_angle_rad: NDArray[np.float64]
     source: str = "truth"
+    opponents: tuple[OpponentState, ...] = ()
 
 
 @dataclass(frozen=True)

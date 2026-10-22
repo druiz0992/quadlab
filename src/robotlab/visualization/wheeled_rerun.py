@@ -40,6 +40,7 @@ WHEELED_TABS = (
 )
 KIND_COLORS = {"rover": (220, 140, 30), "car": (205, 30, 30), "tractor": (40, 140, 65)}
 TYRE_COLOR = (25, 25, 25)
+OPPONENT_COLOR = (30, 80, 215)
 
 
 def _rgba(text: str) -> list[int]:
@@ -73,6 +74,7 @@ class WheeledRerunRecorder(GazeboRerunRecorder):
         self.decimation = decimation
         self._ticks = 0
         self._odometry = 0
+        self._opponent_ticks: dict[str, int] = {}
         rr = self.rr
         rr.log(
             f"world/{self.vehicle}/body",
@@ -199,6 +201,39 @@ class WheeledRerunRecorder(GazeboRerunRecorder):
         self._scalar("vehicle/speed_kmh", forward_mps * 3.6)
         self._scalar("vehicle/yaw_rate_deg_s", float(np.degrees(yaw_rate_rad_s)))
         self._scalar("vehicle/lateral_accel_mps2", lateral_mps2)
+
+    def log_opponent(self, state: Any) -> None:
+        """Opponent body at its pose (every ``decimation`` periods per car)."""
+        count = self._opponent_ticks.get(state.name, 0) + 1
+        self._opponent_ticks[state.name] = count
+        if count % self.decimation != 1 and self.decimation > 1:
+            return
+        rr = self.rr
+        self._set_time(state.sim_time_ns * 1e-9)
+        path = f"world/opponents/{state.name}"
+        if count == 1:
+            rr.log(
+                f"{path}/body",
+                rr.Boxes3D(
+                    half_sizes=[np.asarray(self.wheeled.collision_size_m) / 2],
+                    centers=[self.wheeled.collision_offset_m],
+                    colors=[OPPONENT_COLOR],
+                    labels=[state.name],
+                ),
+                static=True,
+            )
+        rr.log(
+            path,
+            rr.Transform3D(
+                translation=state.position_m, quaternion=state.quaternion_xyzw
+            ),
+        )
+
+    def log_track(self, sim_time_s: float, laps: Any) -> None:
+        """Lap progress (m) and completed laps on the scene track."""
+        self._set_time(sim_time_s)
+        self._scalar("vehicle/track_progress_m", laps.progress_m)
+        self._scalar("vehicle/laps_completed", float(len(laps.lap_times_s)))
 
     def log_driver(self, sim_time_s: float, command: Any) -> None:
         """Driver input (throttle, brake, steer) at the control rate."""

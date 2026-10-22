@@ -1,0 +1,14 @@
+{
+  "robot": {"kind": "car"},
+  "ground_vehicle": {
+    "opponents": {
+      "count": 3,
+      "controller": "track_follower",
+      "per_opponent_options": [
+        {"grip_fraction": 0.65},
+        {"grip_fraction": 0.6, "lateral_offset_m": 2.0},
+        {"grip_fraction": 0.55, "lateral_offset_m": -2.0}
+      ]
+    }
+  }
+}

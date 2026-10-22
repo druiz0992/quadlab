@@ -123,3 +123,49 @@ def test_invalid_zones(zone, message):
 def test_default_surface():
     default, zones = surfaces_from_scene(dict(obstacles=[]))
     assert default == Surface("ground") and zones == ()
+
+
+def test_raster_matches_exact_zones_away_from_edges():
+    from robotlab.simulation.wheeled.ground import RASTER_RESOLUTION_M, SurfaceRaster
+
+    zones = [
+        parse_zone(
+            dict(
+                shape="rectangle",
+                center_m=[0, 0],
+                size_m=[20, 10],
+                yaw_deg=30,
+                name="a",
+            ),
+            0,
+        ),
+        parse_zone(
+            dict(
+                shape="strip",
+                points_m=[[-15, -15], [0, 5], [15, -15]],
+                width_m=4,
+                name="b",
+            ),
+            1,
+        ),
+    ]
+    raster = SurfaceRaster(Surface("ground"), zones)
+    rng = np.random.default_rng(1)
+    x, y = rng.uniform(-25, 25, (2, 4000))
+    exact = np.zeros(4000, int)
+    for index, zone in enumerate(zones, start=1):
+        exact = np.where(zone.contains(x, y), index, exact)
+    looked_up = raster.lookup(x, y)
+    # Disagreements only within a cell of a boundary.
+    near = np.zeros(4000, bool)
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            shifted = np.zeros(4000, int)
+            for index, zone in enumerate(zones, start=1):
+                inside = zone.contains(
+                    x + dx * RASTER_RESOLUTION_M, y + dy * RASTER_RESOLUTION_M
+                )
+                shifted = np.where(inside, index, shifted)
+            near |= shifted != exact
+    assert np.all((looked_up == exact) | near)
+    assert np.mean(looked_up == exact) > 0.97

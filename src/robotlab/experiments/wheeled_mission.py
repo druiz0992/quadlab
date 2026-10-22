@@ -42,12 +42,14 @@ from scipy.spatial.transform import Rotation
 from ..control.wheeled import DriverCommand, WheeledControlState
 from ..core.wheeled import WheelCommandReceipt, WheelCommands
 from ..simulation.gazebo.environment import gazebo_environment
+from ..simulation.gazebo.ingress import OPPONENT_KIND_PREFIX
 from ..simulation.gazebo.messages import timestamp, timestamp_ns, vector
 from ..simulation.gazebo.process import GazeboProcess
 from ..simulation.gazebo.stepping import wait_for_subscribers
 from ..simulation.wheeled.model import ChassisState
 from .interrupts import shielded
 from .loop_timing import LoopTiming
+from .opponents import latest_states
 from .mission_loop import (
     GAZEBO_STOP_TIMEOUT_WALL_S,
     KEYBOARD_POLL_PERIOD_WALL_S,
@@ -60,6 +62,8 @@ from .run_summary import final_exit_reason
 
 # Wheel telemetry is written to wheels.jsonl at most at this rate (Hz).
 WHEEL_LOG_RATE_HZ = 50.0
+# Lap timing and track limits are evaluated at this rate (Hz).
+LAP_RATE_HZ = 100.0
 # Blocking wait for the world-control reply per burst (ms). The reply is
 # ignored (stepping.py); at 500 bursts/s the default 10 ms cap cost ~1.5 ms
 # per burst on average.
@@ -92,7 +96,9 @@ class WheeledParts:
     odometry_fix: Any
     debug: Any
     keyboard: Any | None
+    laps: Any | None
     driver_input: Any | None
+    opponents: tuple[Any, ...] = ()
 
 
 class WheeledMissionLoop:
@@ -126,6 +132,7 @@ class WheeledMissionLoop:
         self._last_control_ns: int | None = None
         self._next_encoder_ns: int | None = None
         self._next_wheel_log_ns = 0
+        self._next_lap_ns = 0
         self._encoder = None
         self._driver = DriverCommand()
         self._receipt: WheelCommandReceipt | None = None
@@ -134,6 +141,7 @@ class WheeledMissionLoop:
         self._last_keyboard_wall_s: float | None = None
         self._keys: frozenset[str] = frozenset()
         self.max_speed_mps = 0.0
+        self._opponents = {OPPONENT_KIND_PREFIX + o.name: o for o in parts.opponents}
 
     # Lifecycle --------------------------------------------------------------
 
@@ -274,6 +282,11 @@ class WheeledMissionLoop:
     def _handle(self, kind: str, message: Any) -> bool:
         parts = self.parts
         self.counts[kind] += 1
+        if kind.startswith(OPPONENT_KIND_PREFIX):
+            # Truth of another vehicle: no sensor pipeline or estimator.
+            state = self._opponents[kind].on_odometry(message, parts.model)
+            parts.recorder.log_opponent(state)
+            return True
         message = parts.pipeline.apply_errors(kind, message)
         if message is None:
             return True
@@ -486,6 +499,7 @@ class WheeledMissionLoop:
                 chassis.body_rates_rad_s,
                 encoder.wheel_speed_rad_s,
                 encoder.steer_angle_rad,
+                opponents=latest_states(self.parts.opponents),
             )
         estimated = source.state(stamp, self.parts.stack.runner.latest_estimate)
         if estimated is None:
@@ -499,13 +513,26 @@ class WheeledMissionLoop:
             encoder.wheel_speed_rad_s,
             encoder.steer_angle_rad,
             source="estimate",
+            opponents=latest_states(self.parts.opponents),
         )
 
     def _apply_physics(self, stamp: int, t: float, chassis: ChassisState) -> None:
-        """Advance the Python wheel model; apply its wrench for the next period."""
+        """Advance every vehicle's wheels in one batched step; apply each
+        wrench for the next period. An opponent whose odometry of this
+        period is missing steps from its previous state (counted)."""
         parts = self.parts
-        wrench = parts.model.step(chassis, self.period_s)
+        states = [chassis]
+        for opponent in parts.opponents:
+            if opponent.chassis is None or opponent.stamp_ns != stamp:
+                self.counts["stale_opponent_states"] += 1
+            states.append(opponent.chassis if opponent.chassis is not None else chassis)
+        wrenches = parts.model.step_all(states, self.period_s)
+        wrench = wrenches[0]
         parts.wrench.set(wrench.force_world_n, wrench.torque_world_nm)
+        evaluate_laps = stamp >= self._next_lap_ns
+        for opponent, opponent_wrench in zip(parts.opponents, wrenches[1:]):
+            if opponent.chassis is not None:
+                opponent.after_step(opponent_wrench, parts.model, evaluate_laps)
         telemetry = parts.model.telemetry
         parts.recorder.log_wheels(t, telemetry, self._receipt)
         rotation = parts.truth.attitude
@@ -517,11 +544,26 @@ class WheeledMissionLoop:
             float(body_rates[2]),
             float(body_velocity[0] * body_rates[2]),
         )
+        if parts.laps is not None and stamp >= self._next_lap_ns:
+            self._next_lap_ns = stamp + round(1e9 / LAP_RATE_HZ)
+            self._update_laps(stamp, t, chassis, telemetry)
         if stamp >= self._next_wheel_log_ns:
             self._next_wheel_log_ns = stamp + round(1e9 / WHEEL_LOG_RATE_HZ)
             self._files["wheels"].write(
                 json.dumps(_wheel_record(t, telemetry, wrench)) + "\n"
             )
+
+    def _update_laps(
+        self, stamp: int, t: float, chassis: ChassisState, telemetry: Any
+    ) -> None:
+        laps = self.parts.laps
+        if laps is None:
+            return
+        episodes = laps.off_track_episodes
+        laps.on_truth(t, chassis.position_m, telemetry.contact_point_m[:, :2])
+        if laps.off_track_episodes > episodes:
+            self.parts.health.on_off_track(stamp)
+        self.parts.recorder.log_track(t, laps)
 
 
 def _wheel_record(t: float, telemetry: Any, wrench: Any) -> dict[str, Any]:

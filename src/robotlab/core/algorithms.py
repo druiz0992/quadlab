@@ -16,6 +16,7 @@ from types import MappingProxyType
 
 from .measurements import GpsReading
 from .vehicle import DroneProperties
+from .track import Track
 from .wheeled_vehicle import WheeledProperties
 
 
@@ -73,6 +74,8 @@ class AlgorithmContext:
     wheeled: WheeledProperties | None = field(
         default=None, metadata={"serialize": False}
     )
+    # The scene's race track (map knowledge, core/track.py), else None.
+    track: Track | None = field(default=None, metadata={"serialize": False})
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "sensors", MappingProxyType(dict(self.sensors)))

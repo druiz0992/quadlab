@@ -128,3 +128,29 @@ def test_wheeled_lockstep_is_deterministic(tmp_path):
     first = drive(tmp_path / "a", "rover", layer, 3.0, "worlds/training.json")[1]
     second = drive(tmp_path / "b", "rover", layer, 3.0, "worlds/training.json")[1]
     assert first == second
+
+
+RACE = {
+    **FAST,
+    "algorithms": {"controller": "track_follower"},
+    "ground_vehicle": {
+        "opponents": {
+            "count": 2,
+            "per_opponent_options": [{"grip_fraction": 0.6}, {"grip_fraction": 0.55}],
+        }
+    },
+}
+
+
+def test_race_with_opponents_is_deterministic(tmp_path):
+    first, rows_a = drive(tmp_path / "a", "car", RACE, 8.0, "worlds/race_circuit.json")
+    second, rows_b = drive(tmp_path / "b", "car", RACE, 8.0, "worlds/race_circuit.json")
+    assert rows_a == rows_b
+    assert first["opponents"] == second["opponents"]
+    assert first["messages"]["opponent:car_1"] == first["messages"]["odometry"]
+    assert first["message_ordering"]["barrier_timeouts"] == 0
+    assert "stale_opponent_states" not in first["messages"]
+    assert first["track"]["progress_m"] > 150
+    for opponent in first["opponents"]:
+        assert opponent["track"]["progress_m"] > 100
+        assert opponent["track"]["off_track_episodes"] == 0

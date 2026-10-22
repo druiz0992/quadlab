@@ -19,6 +19,8 @@ worst value seen:
 | ``interrupted`` | warning | the user interrupted the run |
 | ``ground_contact`` | warning | touchdown after ``touchdown_gap_s`` without contact |
 | ``chassis_ground_contact`` | warning | wheeled robots: the body box touched the ground (bottoming out, rollover) |
+| ``vehicle_contact`` | warning | wheeled robots: contact with an opponent vehicle (racing incident) |
+| ``off_track`` | warning | wheeled robots on a scene track: every wheel beyond the track edge (count: episodes) |
 | ``tracking_lost`` | warning | position error above ``tracking_lost_m`` for ``tracking_lost_s`` (kept in batch aggregates: it is a result, not a broken run) |
 | ``left_ground_area`` | warning | flew past the ground plane's edge (nothing below collides) |
 | ``saturated`` | warning | more than ``saturated_fraction`` of commands saturated |
@@ -150,6 +152,7 @@ class RunHealth:
         weight_n: float | None = None,
         own_models: frozenset[str] = IGNORED_MODELS,
         wheeled: bool = False,
+        vehicles: frozenset[str] = frozenset(),
     ) -> None:
         self.thresholds = thresholds
         # Models whose collisions are the vehicle's own (never obstacles).
@@ -157,6 +160,8 @@ class RunHealth:
         # Wheeled robots rest on wheels the contact sensor does not watch:
         # any body-ground contact is a chassis contact, not a touchdown.
         self._wheeled = wheeled
+        # Other vehicles (opponents): contact is a warning, not an obstacle.
+        self._vehicles = vehicles
         self._ground_height_m = ground_height_m
         self._ground_half_m = ground_half_m
         self._origin_ns: int | None = None
@@ -271,7 +276,15 @@ class RunHealth:
             return
         t = self._time_s(sim_time_ns)
         for model in others:
-            if model not in GROUND_MODELS:
+            if model in self._vehicles:
+                self._report(
+                    "vehicle_contact",
+                    WARNING,
+                    t,
+                    f"contact with {model}",
+                    subject=model,
+                )
+            elif model not in GROUND_MODELS:
                 self._report(
                     "obstacle_contact",
                     FAILED,
@@ -367,6 +380,15 @@ class RunHealth:
                 f"{limits.no_liftoff_s:g} s without lift-off",
                 total_thrust_n / self._weight_n,
             )
+
+    def on_off_track(self, sim_time_ns: int) -> None:
+        """A new episode with every wheel beyond the track edge (laps.py)."""
+        self._report(
+            "off_track",
+            WARNING,
+            self._time_s(sim_time_ns),
+            "all wheels beyond the track edge",
+        )
 
     def on_tracking_error(self, sim_time_ns: int, position_error_m: float) -> None:
         """Mission position error (m) at one truth sample."""
