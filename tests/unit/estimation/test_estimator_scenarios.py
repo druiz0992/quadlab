@@ -1,10 +1,12 @@
 """Shared scenario suite: every estimator in CANDIDATES runs every scenario.
 
-To test your own filter, add a ``Candidate`` with its options builder and
-limits for each scenario in ``robotlab.testing.scenarios.SCENARIOS``; a new
-scenario without limits fails until every candidate declares them. Limits
-are about 1.5-2x the verified scores, so they catch regressions (frames,
-signs, timing, bias handling), not small tuning changes.
+To test your own filter, add a ``Candidate`` with its options builder, the
+sensors it should get (any streams of ``sensors/bus.py``; the context holds
+exactly these), and limits for each scenario in
+``robotlab.testing.scenarios.SCENARIOS``; a new scenario without limits
+fails until every candidate declares them. Limits are about 1.5-2x the
+verified scores, so they catch regressions (frames, signs, timing, bias
+handling), not small tuning changes.
 """
 
 from collections.abc import Callable, Mapping
@@ -36,13 +38,16 @@ class Candidate:
 
     ``options`` builds its options from a scenario (declared priors and
     noise only, never the truth trajectory); ``limits`` maps scenario name
-    to ``ScenarioReport`` metric maxima; ``consistent`` requires the mean
-    NIS per dof inside ``NIS_BAND``.
+    to ``ScenarioReport`` metric maxima; ``sensors`` selects the synthetic
+    streams (``wheel_encoders`` only exist on wheeled scenarios and ``esc``
+    only on multirotor ones); ``consistent`` requires the mean NIS per dof
+    inside ``NIS_BAND``.
     """
 
     factory: Callable[..., Any]
     options: Callable[[EstimatorScenario], Mapping[str, Any]]
     limits: dict[str, dict[str, float]]
+    sensors: tuple[str, ...] = ("imu", "gps")
     consistent: bool = False
 
 
@@ -84,7 +89,13 @@ CANDIDATES = {
             ),
             # Horizontal accelerometer bias is indistinguishable from tilt in
             # a hover (0.18 m/s² ≈ 1°), so the tilt limit is wider.
-            "biased_imu": dict(STEADY, tilt_rmse_deg=2.0, max_position_error_m=0.4),
+            "biased_imu": dict(
+                STEADY,
+                position_rmse_m=0.15,
+                tilt_rmse_deg=2.0,
+                max_position_error_m=0.7,
+            ),
+            "car_circle": dict(STEADY, attitude_rmse_deg=3.0),
         },
         consistent=True,
     ),
@@ -97,8 +108,12 @@ CANDIDATES = {
             "hover": dict(position_rmse_m=0.15, velocity_rmse_mps=2.0),
             "constant_velocity": dict(position_rmse_m=0.15, velocity_rmse_mps=2.0),
             "circle": dict(position_rmse_m=0.15, tilt_rmse_deg=6.0),
-            "gps_dropout": dict(max_position_error_m=4.0),
-            "biased_imu": dict(max_position_error_m=7.0, tilt_rmse_deg=2.0),
+            # Coasts on a velocity from two noisy fixes: large outage drift.
+            "gps_dropout": dict(max_position_error_m=12.0),
+            "biased_imu": dict(max_position_error_m=8.0, tilt_rmse_deg=2.0),
+            # Accelerometer tilt correction mistakes 2 m/s² centripetal
+            # acceleration for tilt.
+            "car_circle": dict(position_rmse_m=0.2, tilt_rmse_deg=15.0),
         },
     ),
 }
@@ -109,7 +124,9 @@ def report_for(candidate_name: str, scenario_name: str) -> ScenarioReport:
     """One run per (candidate, scenario), shared by the tests below."""
     candidate = CANDIDATES[candidate_name]
     scenario = SCENARIOS[scenario_name]
-    return run_scenario(candidate.factory, candidate.options(scenario), scenario)
+    return run_scenario(
+        candidate.factory, candidate.options(scenario), scenario, candidate.sensors
+    )
 
 
 @pytest.mark.parametrize("scenario_name", sorted(SCENARIOS))

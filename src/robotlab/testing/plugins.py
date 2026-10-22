@@ -58,7 +58,12 @@ import numpy as np
 
 from ..control.interface import ControlState
 from ..control.references import ReferencePoint
-from ..core.algorithms import AlgorithmContext, SensorDescription, ignore_debug
+from ..core.algorithms import (
+    AlgorithmContext,
+    DebugLog,
+    SensorDescription,
+    ignore_debug,
+)
 from ..core.measurements import EstimatedState, GpsReading, ImuReading, Sample
 from ..core.vehicle import DroneProperties
 from ..core.wheeled import WheelCommands
@@ -247,9 +252,13 @@ def run_estimator(
     factory: Callable[[AlgorithmContext, Mapping[str, Any]], Any],
     options: Mapping[str, Any],
     samples: list[tuple[str, Sample]],
+    context: Callable[[DebugLog], AlgorithmContext] | None = None,
 ) -> EstimatorRun:
-    """Deliver ``samples`` (kind, sample) in order to a new estimator built
-    on ``synthetic_context``, checking the contract after every delivery.
+    """Deliver ``samples`` (kind, sample) in order to a new estimator,
+    checking the contract after every delivery.
+
+    ``context`` builds the estimator's context around the checked debug
+    log; default: ``synthetic_context`` (IMU and GPS).
 
     Samples of kinds the estimator does not declare in ``inputs`` are
     skipped. Raises ``PluginContractError`` on the first violation.
@@ -263,8 +272,8 @@ def run_estimator(
             raise PluginContractError(f"invalid context.log entry: {error}")
         debug_entries[0] += 1
 
-    context = synthetic_context(log=log)
-    estimator = factory(context, dict(options))
+    built = (context or (lambda debug: synthetic_context(log=debug)))(log)
+    estimator = factory(built, dict(options))
     declared = getattr(estimator, "inputs", None)
     _fail(
         isinstance(declared, tuple)

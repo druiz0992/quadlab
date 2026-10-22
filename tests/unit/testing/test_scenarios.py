@@ -53,7 +53,7 @@ def test_outage_removes_fixes_and_keeps_sequences_consecutive():
 
 
 def test_biases_are_added_to_the_imu():
-    scenario = dataclasses.replace(_quiet("biased_imu"))
+    scenario = _quiet("biased_imu")
     imu = next(s.payload for k, s in scenario_samples(scenario) if k == "imu")
     np.testing.assert_allclose(imu.specific_force_mps2, [0.15, -0.1, 10.01])
     np.testing.assert_allclose(imu.angular_rate_rad_s, [0.003, -0.002, 0.004])
@@ -63,7 +63,7 @@ class Perfect:
     """Reads the truth from the scenario (only possible in a test) and
     reports it at each IMU sample: scores must be zero."""
 
-    inputs = ("imu",)
+    inputs = ("imu",)  # the context may hold more sensors
 
     def __init__(self, context, options):
         self.trajectory = options["trajectory"]

@@ -149,7 +149,10 @@ src/robotlab/
 ├── testing/
 │   ├── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo),
 │                           #   including check_wheeled_controller
-│   └── scenarios.py        # Estimator scenario suite: truth trajectories, scores
+│   ├── scenarios.py        # Estimator scenario suite: scenarios, sensor selection, scores
+│   ├── synthetic_scene.py  # Ray-cast ground + boxes for synthetic ray sensors
+│   ├── synthetic_sensors.py  # Truth → bus payloads for every sensor stream
+│   └── trajectories.py     # Truth trajectories (hover, straight, circle)
 └── visualization/
     ├── gazebo_rerun.py     # Gazebo-message-to-Rerun recording adapter
     ├── wheeled_rerun.py    # Wheeled-robot Rerun layout (wheels, surfaces, plots)

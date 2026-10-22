@@ -1,76 +1,119 @@
 """Shared synthetic scenarios for scoring estimator plug-ins (no Gazebo).
 
-Every estimator, built-in or yours, can run the same seeded scenarios and
-be scored against the known truth::
+Every estimator, built-in or yours, can run the same seeded scenarios with
+the sensors it chooses and be scored against the known truth::
 
     from robotlab.testing.scenarios import SCENARIOS, run_scenario
 
-    report = run_scenario(MyFilter, options, SCENARIOS["circle"])
+    report = run_scenario(
+        MyFilter, options, SCENARIOS["circle"],
+        sensors=("imu", "gps", "magnetometer", "baro"),
+    )
     assert not report.violations({"position_rmse_m": 0.1})
 
-A scenario is a truth trajectory (position, velocity, acceleration,
-attitude, body rates as functions of time) plus sensor settings. From it,
-``scenario_samples`` synthesizes what the bus would deliver:
+A scenario is a truth trajectory (``testing/trajectories.py``), a vehicle
+(``multirotor`` or a wheeled ``rover``/``car``/``tractor``), a ray-cast
+scene, and sensor settings. ``scenario_samples`` synthesizes bus samples for
+any selection of the streams in ``sensors/bus.py`` (see
+``testing/synthetic_sensors.py`` for how each is made):
 
-- IMU at 200 Hz from t = 0: specific force ``R^T (a - g)`` and body rates,
-  in body axes (body-origin mount), plus a constant bias and white noise
-  per sample (``imu_noise``: m/s², rad/s). Each sample is the value at its
-  timestamp, which the filter holds until the next one; the built-in
-  trajectories have constant body-frame IMU values, so holding is exact.
-- GPS at 10 Hz from t = 0.1 s (antenna at the body origin): the true
-  position plus white noise per axis (``gps_noise_m``), with the true ENU
-  velocity plus 0.05 m/s noise; none inside ``gps_outages_s``.
-- At equal timestamps the IMU sample comes first.
+- IMU at 200 Hz from t = 0 and GPS at 10 Hz from 0.1 s are set by the
+  scenario's own fields (``imu_noise``, biases, ``gps_noise_m``,
+  ``gps_outages_s``); IMU values are those at the sample time, held by
+  the filter until the next one (exact for the built-in trajectories).
+- Every other sensor follows the drone configuration (same keys and
+  defaults as ``configs/``: mounts, rates, ranges, noise), with
+  ``SENSOR_NOISE`` layered on so none is noise-free by default, then the
+  scenario's ``settings`` overrides.
+- Each kind samples at k · period on simulation time; equal timestamps are
+  delivered in bus priority order (IMU first). Sequence numbers are
+  consecutive per stream, as the bus assigns them.
 
-The estimator never sees the truth: ``run_scenario`` passes only the
-samples (through ``plugins.run_estimator``, so the contract is checked on
-the way), and scores each estimate against the truth at its timestamp.
-Initial conditions are explicit: ``initial_truth(scenario)`` is the state at
-t = 0, which a test may translate into the estimator's declared priors.
+The context the estimator receives is built as in a Gazebo run
+(``experiments.algorithms.build_context``) from those settings, with only
+the selected sensors. The estimator never sees the truth: ``run_scenario``
+delivers samples through ``plugins.run_estimator`` (contract checks on the
+way) and scores each estimate against the truth at its timestamp. Initial
+conditions are explicit: ``initial_truth(scenario)`` is the state at t = 0,
+which a test may translate into declared priors.
 
-The data are idealized (no latency, no vibration, a level or yawing body),
-so these scenarios catch frame, sign, timing, and observability mistakes,
-not tuning for a real vehicle; judge that with Gazebo runs and batches.
+The data are idealized (no latency, vibration, banking, or wind), so these
+scenarios catch frame, sign, timing, and sensor-fusion mistakes, not tuning
+for a real vehicle; judge that with Gazebo runs and batches.
 """
 
 from collections.abc import Callable, Mapping
+from copy import deepcopy
 from dataclasses import dataclass, field, fields
+from functools import cache
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
-from ..core.algorithms import AlgorithmContext
-from ..core.frames import GRAVITY
-from ..core.measurements import EstimatedState, GpsReading, ImuReading, Sample
-from .plugins import _sample, enu_to_gps, run_estimator
+from ..core.algorithms import AlgorithmContext, DebugLog
+from ..core.measurements import EstimatedState, Sample
+from .plugins import REFERENCE, _sample, run_estimator
+from .synthetic_scene import DEFAULT_SCENE, SyntheticScene
+from .synthetic_sensors import (
+    GPS_RATE_HZ,
+    IMU_RATE_HZ,
+    BUILDERS,
+    SynthesisInputs,
+    build_synthesizer,
+)
+from .trajectories import Trajectory, TruthPoint, circling, hovering, straight
 
-IMU_RATE_HZ = 200
-GPS_RATE_HZ = 10
-GPS_VELOCITY_NOISE_MPS = 0.05
+__all__ = [
+    "EstimatorScenario",
+    "GPS_RATE_HZ",
+    "IMU_RATE_HZ",
+    "SCENARIOS",
+    "SENSOR_KINDS",
+    "SENSOR_NOISE",
+    "ScenarioReport",
+    "Trajectory",
+    "TruthPoint",
+    "circling",
+    "hovering",
+    "initial_truth",
+    "run_scenario",
+    "scenario_context",
+    "scenario_samples",
+    "scenario_settings",
+    "straight",
+]
 
+SENSOR_KINDS = tuple(BUILDERS)
+DEFAULT_SENSORS = ("imu", "gps")
+WHEELED_KINDS = ("rover", "car", "tractor")
 
-@dataclass(frozen=True)
-class TruthPoint:
-    """True state at one time (world ENU, body-to-world quaternion xyzw)."""
-
-    position_m: NDArray[np.float64]
-    velocity_mps: NDArray[np.float64]
-    acceleration_mps2: NDArray[np.float64]
-    quaternion_xyzw: NDArray[np.float64]
-    body_rate_rad_s: NDArray[np.float64]
-
-
-Trajectory = Callable[[float], TruthPoint]
+# Modest noise for sensors whose configured default is ideal (config keys).
+SENSOR_NOISE: dict[str, Any] = {
+    "sensors": {
+        "baro": {"pressure_pa": {"noise_stddev": 3.0}},
+        "magnetometer": {"field_ut": {"noise_stddev": [0.3, 0.3, 0.3]}},
+        "rangefinder": {"range_m": {"noise_stddev": 0.02}},
+        "lidar": {"range_m": {"noise_stddev": 0.02}},
+        "camera": {"intensity": {"noise_stddev": 0.01}},
+        "optical_flow": {"noise_std_rad_s": 0.01},
+        "airspeed": {"noise_std_pa": 1.0},
+        "battery_monitor": {"voltage_noise_std_v": 0.02, "current_noise_std_a": 0.1},
+        "wheel_encoders": {"steering_noise_std_rad": 0.002},
+    },
+    "motors": {"esc": {"telemetry": {"noise_std_rad_s": 5.0}}},
+}
 
 
 @dataclass(frozen=True)
 class EstimatorScenario:
-    """One seeded scenario: a truth trajectory and its sensor settings.
+    """One seeded scenario: truth, vehicle, scene, and sensor settings.
 
     ``settle_s`` excludes the initial convergence from the scores;
-    ``gps_outages_s`` lists [start, end) windows without GPS fixes.
+    ``gps_outages_s`` lists [start, end) windows without GPS (and GPS
+    heading) epochs; ``settings`` overrides configuration keys (as in a
+    ``configs/`` layer) after ``SENSOR_NOISE``.
     """
 
     name: str
@@ -78,11 +121,15 @@ class EstimatorScenario:
     trajectory: Trajectory
     duration_s: float = 20.0
     settle_s: float = 2.0
+    vehicle: str = "multirotor"
+    scene: SyntheticScene = DEFAULT_SCENE
     accel_bias_mps2: tuple[float, float, float] = (0.0, 0.0, 0.0)
     gyro_bias_rad_s: tuple[float, float, float] = (0.0, 0.0, 0.0)
     imu_noise: tuple[float, float] = (0.02, 0.002)  # m/s², rad/s per sample
     gps_noise_m: float = 0.05  # per axis, per fix
     gps_outages_s: tuple[tuple[float, float], ...] = ()
+    battery_current_a: float = 10.0
+    settings: Mapping[str, Any] = field(default_factory=dict)
     seed: int = 0  # each built-in scenario has its own
 
 
@@ -127,59 +174,9 @@ class ScenarioReport:
         return messages
 
 
-# Trajectories ---------------------------------------------------------------------
-
-
-def _level(yaw_rad: float) -> NDArray[np.float64]:
-    return Rotation.from_euler("z", yaw_rad).as_quat()
-
-
-def hovering(position_m: tuple[float, float, float] = (0.0, 0.0, 1.0)) -> Trajectory:
-    """Level, still, facing east."""
-    point = TruthPoint(
-        np.array(position_m, float), np.zeros(3), np.zeros(3), _level(0.0), np.zeros(3)
-    )
-    return lambda t: point
-
-
-def straight(
-    velocity_mps: tuple[float, float, float],
-    start_m: tuple[float, float, float] = (0.0, 0.0, 1.0),
-    yaw_rad: float = 0.0,
-) -> Trajectory:
-    """Constant velocity, level, fixed heading ``yaw_rad`` (from east)."""
-    velocity = np.array(velocity_mps, float)
-    start = np.array(start_m, float)
-    attitude = _level(yaw_rad)
-    return lambda t: TruthPoint(
-        start + velocity * t, velocity, np.zeros(3), attitude, np.zeros(3)
-    )
-
-
-def circling(radius_m: float, speed_mps: float, height_m: float = 1.0) -> Trajectory:
-    """Counter-clockwise level circle about the origin, nose along the path.
-
-    Starts at (radius, 0) heading north. In body axes the specific force
-    (0, v²/r, g) and the yaw rate v/r are constant.
-    """
-    if radius_m <= 0 or speed_mps <= 0:
-        raise ValueError("circle radius and speed must be positive")
-    rate = speed_mps / radius_m
-
-    def at(t: float) -> TruthPoint:
-        angle = rate * t
-        radial = np.array([np.cos(angle), np.sin(angle), 0.0])
-        tangent = np.array([-np.sin(angle), np.cos(angle), 0.0])
-        return TruthPoint(
-            radius_m * radial + [0.0, 0.0, height_m],
-            speed_mps * tangent,
-            -rate * speed_mps * radial,
-            _level(angle + np.pi / 2),
-            np.array([0.0, 0.0, rate]),
-        )
-
-    return at
-
+# A car's body origin sits at tyre radius minus hub height above flat
+# ground (0.30 + 0.08 m, ignoring suspension sag); a unit test checks it.
+CAR_BODY_HEIGHT_M = 0.38
 
 SCENARIOS: dict[str, EstimatorScenario] = {
     s.name: s
@@ -211,10 +208,18 @@ SCENARIOS: dict[str, EstimatorScenario] = {
             hovering(),
             duration_s=40.0,
             settle_s=10.0,
-            gps_outages_s=((30.0, 35.0),),
             accel_bias_mps2=(0.15, -0.1, 0.2),
             gyro_bias_rad_s=(0.003, -0.002, 0.004),
+            gps_outages_s=((30.0, 35.0),),
             seed=4,
+        ),
+        EstimatorScenario(
+            "car_circle",
+            "car on a 12 m radius circle at 5 m/s on flat ground",
+            circling(12.0, 5.0, CAR_BODY_HEIGHT_M),
+            duration_s=30.0,
+            vehicle="car",
+            seed=5,
         ),
     )
 }
@@ -225,55 +230,106 @@ def initial_truth(scenario: EstimatorScenario) -> TruthPoint:
     return scenario.trajectory(0.0)
 
 
+# Settings and context -------------------------------------------------------------
+
+
+@cache
+def _base_config(vehicle: str) -> Any:
+    from ..simulation.gazebo.config import load_drone_config
+
+    if vehicle != "multirotor" and vehicle not in WHEELED_KINDS:
+        raise ValueError(
+            f"scenario vehicle must be multirotor or one of {WHEELED_KINDS}"
+        )
+    return load_drone_config(robot=None if vehicle == "multirotor" else vehicle)
+
+
+def scenario_settings(scenario: EstimatorScenario) -> dict[str, Any]:
+    """Merged configuration: vehicle defaults, ``SENSOR_NOISE``, then the
+    scenario's ``settings`` (unknown keys raise ``ValueError``)."""
+    from ..simulation.gazebo.config import merge
+
+    data = deepcopy(_base_config(scenario.vehicle).data)
+    return merge(merge(data, SENSOR_NOISE), dict(scenario.settings))
+
+
+def _check_sensors(scenario: EstimatorScenario, sensors: tuple[str, ...]) -> None:
+    unknown = set(sensors) - set(SENSOR_KINDS)
+    if not sensors or unknown or len(set(sensors)) != len(sensors):
+        raise ValueError(
+            f"sensors must be distinct kinds of {list(SENSOR_KINDS)}, got {sensors}"
+        )
+    wheeled = scenario.vehicle in WHEELED_KINDS
+    if "wheel_encoders" in sensors and not wheeled:
+        raise ValueError(f"{scenario.name}: wheel_encoders need a wheeled vehicle")
+    if "esc" in sensors and wheeled:
+        raise ValueError(f"{scenario.name}: esc telemetry needs a multirotor")
+
+
+def scenario_context(
+    scenario: EstimatorScenario,
+    sensors: tuple[str, ...] = DEFAULT_SENSORS,
+    log: DebugLog | None = None,
+) -> AlgorithmContext:
+    """The context a Gazebo run with these settings and sensors would give."""
+    from ..core.algorithms import ignore_debug
+    from ..experiments.algorithms import build_context
+
+    _check_sensors(scenario, sensors)
+    config = _base_config(scenario.vehicle)
+    return build_context(
+        scenario_settings(scenario),
+        config.properties,
+        REFERENCE,
+        sensors,
+        log or ignore_debug,
+        wheeled=config.wheeled,
+    )
+
+
 # Samples --------------------------------------------------------------------------
 
 
-def scenario_samples(scenario: EstimatorScenario) -> list[tuple[str, Sample]]:
-    """Seeded IMU and GPS samples for ``scenario`` (see module docs)."""
-    rng = np.random.default_rng(scenario.seed)
-    accel_bias = np.array(scenario.accel_bias_mps2, float)
-    gyro_bias = np.array(scenario.gyro_bias_rad_s, float)
-    accel_noise, gyro_noise = scenario.imu_noise
-    imu_period_ns = 1_000_000_000 // IMU_RATE_HZ
-    per_fix = IMU_RATE_HZ // GPS_RATE_HZ
+def scenario_samples(
+    scenario: EstimatorScenario, sensors: tuple[str, ...] = DEFAULT_SENSORS
+) -> list[tuple[str, Sample]]:
+    """Seeded samples of the selected ``sensors`` (see module docs)."""
+    from ..sensors.bus import PRIORITY
+
+    _check_sensors(scenario, sensors)
+    settings = scenario_settings(scenario)
+    config = _base_config(scenario.vehicle)
+    inputs = SynthesisInputs(
+        REFERENCE,
+        scenario.scene,
+        config.properties,
+        config.wheeled,
+        scenario.seed,
+        scenario.imu_noise,
+        scenario.accel_bias_mps2,
+        scenario.gyro_bias_rad_s,
+        scenario.gps_noise_m,
+        scenario.gps_outages_s,
+        scenario.battery_current_a,
+    )
+    synthesizers = {k: build_synthesizer(k, inputs, settings) for k in sensors}
+    end_ns = round(scenario.duration_s * 1e9)
+    events = sorted(
+        (t_ns, PRIORITY[kind], kind)
+        for kind, synthesizer in synthesizers.items()
+        for t_ns in range(0, end_ns + 1, synthesizer.period_ns)
+    )
     samples: list[tuple[str, Sample]] = []
-    fixes = 0
-    for step in range(round(scenario.duration_s * IMU_RATE_HZ) + 1):
-        t_ns = step * imu_period_ns
-        truth = scenario.trajectory(t_ns * 1e-9)
-        to_body = Rotation.from_quat(truth.quaternion_xyzw).inv()
-        imu = ImuReading(
-            to_body.apply(truth.acceleration_mps2 - GRAVITY)
-            + accel_bias
-            + rng.normal(0, accel_noise, 3),
-            truth.body_rate_rad_s + gyro_bias + rng.normal(0, gyro_noise, 3),
-        )
-        samples.append(("imu", _sample("imu", step + 1, t_ns, imu)))
-        if step == 0 or step % per_fix or _in_outage(scenario, t_ns * 1e-9):
-            continue
-        fixes += 1
-        samples.append(("gps", _gps_sample(truth, rng, scenario, t_ns, fixes)))
+    sequence = dict.fromkeys(sensors, 0)
+    truth: tuple[int, TruthPoint] | None = None
+    for t_ns, _, kind in events:
+        if truth is None or truth[0] != t_ns:
+            truth = (t_ns, scenario.trajectory(t_ns * 1e-9))
+        payload = synthesizers[kind].sample(t_ns, truth[1])
+        if payload is not None:
+            sequence[kind] += 1
+            samples.append((kind, _sample(kind, sequence[kind], t_ns, payload)))
     return samples
-
-
-def _in_outage(scenario: EstimatorScenario, t_s: float) -> bool:
-    return any(start <= t_s < end for start, end in scenario.gps_outages_s)
-
-
-def _gps_sample(
-    truth: TruthPoint,
-    rng: np.random.Generator,
-    scenario: EstimatorScenario,
-    t_ns: int,
-    sequence: int,
-) -> Sample:
-    noisy = truth.position_m + rng.normal(0, scenario.gps_noise_m, 3)
-    fix = enu_to_gps((float(noisy[0]), float(noisy[1]), float(noisy[2])))
-    velocity = truth.velocity_mps + rng.normal(0, GPS_VELOCITY_NOISE_MPS, 3)
-    reading = GpsReading(fix.latitude_deg, fix.longitude_deg, fix.altitude_m, velocity)
-    # Consecutive sequence numbers, as the bus assigns them: an outage is a
-    # time gap, not lost samples.
-    return _sample("gps", sequence, t_ns, reading)
 
 
 # Scoring --------------------------------------------------------------------------
@@ -283,13 +339,22 @@ def run_scenario(
     factory: Callable[[AlgorithmContext, Mapping[str, Any]], Any],
     options: Mapping[str, Any],
     scenario: EstimatorScenario,
+    sensors: tuple[str, ...] = DEFAULT_SENSORS,
 ) -> ScenarioReport:
-    """Run an estimator on ``scenario`` and score it against the truth.
+    """Run an estimator on ``scenario`` with the selected ``sensors`` and
+    score it against the truth.
 
-    Raises ``PluginContractError`` if the estimator breaks its contract and
-    ``ValueError`` if it publishes no estimate after ``settle_s``.
+    The context holds exactly ``sensors``; the estimator receives the
+    samples of the kinds in its ``inputs``. Raises ``PluginContractError``
+    if it breaks its contract and ``ValueError`` for an invalid selection
+    or no estimate after ``settle_s``.
     """
-    run = run_estimator(factory, options, scenario_samples(scenario))
+    run = run_estimator(
+        factory,
+        options,
+        scenario_samples(scenario, sensors),
+        lambda log: scenario_context(scenario, sensors, log),
+    )
     settle_ns = round(scenario.settle_s * 1e9)
     scored = [s for s in run.states if s.sim_time_ns >= settle_ns]
     if not scored:
