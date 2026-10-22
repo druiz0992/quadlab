@@ -393,3 +393,26 @@ def test_randomized_car_follows_a_route(tmp_path):
     assert track["progress_m"] > track["length_m"] - 1.5
     assert track["off_track_episodes"] == 0
     assert track["rms_lateral_offset_m"] < 1.0
+
+
+def test_rover_crosses_the_ditch_field(tmp_path):
+    """Both x-axis ditches of worlds/ditch_field.json (0.25 m and 0.5 m
+    deep): the rover dips into each and climbs out on its wheels."""
+    layer = {
+        **FAST,
+        "algorithms": {
+            "controller": "template",
+            "controller_options": {"cruise_speed_mps": 2.0, "speed_gain_per_s": 10.0},
+        },
+    }
+    summary, rows = drive(tmp_path, "rover", layer, 22.0, "worlds/ditch_field.json")
+    assert summary["health"]["verdict"] == "ok"
+    p = np.array([r["position"] for r in rows])
+    assert p[-1, 0] > 24.0
+    # Settled ride height on the flat before the first ditch.
+    ride = p[np.argmin(np.abs(p[:, 0] - 5.0)), 2]
+    for centre, depth in ((10.0, 0.25), (22.0, 0.5)):
+        near = np.abs(p[:, 0] - centre) < 0.5
+        # The body sinks by most of the ditch depth near the floor.
+        assert ride - p[near, 2].min() > 0.6 * depth
+    assert p[-1, 2] == pytest.approx(ride, abs=0.01)

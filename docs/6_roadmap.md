@@ -280,13 +280,15 @@ before claiming autonomous laps or realistic wind response.
 
 Next steps after the vehicle core ([8 Ground vehicles](8_ground_vehicles.md)):
 
-- **Terrain features:** ditches and negative relief (the height field adds
-  only bumps), surface patches drawn on terrain, climbable steps.
+- **Terrain features:** surface patches drawn on terrain, climbable steps,
+  embankments (ditches are implemented: [2 Simulation](2_simulation.md#terrain-terrain-in-a-scene)).
 - **More implements:** chisel plough, harrows, seeders (ASABE D497
   coefficients per tool), vertical soil forces, PTO power.
-- **Faster races:** with three opponents a race runs at about 0.87× real
-  time; the batched wheel model (0.9 ms per period for four cars) and
-  Gazebo's per-burst work are the remaining costs.
+- **Faster ego loop:** with kinematic opponents a three-opponent race runs
+  at 1.06× real time unthrottled; the ego's own Python loop (about 1.7 ms
+  per 4 ms period, the wheel model 0.7 ms of it, mostly NumPy call
+  overhead on 4-element arrays) is now the main cost. A scalar or
+  compiled wheel model would help but must reproduce the pinned numbers.
 - **Persistent wrenches:** move multirotor body drag and fixed-wing
   aerodynamics off accumulating ApplyLinkWrench deltas (one-step impulses
   as for wheeled robots, or a small replace-semantics Gazebo plugin).

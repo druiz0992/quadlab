@@ -180,6 +180,7 @@ Scene keys for wheeled robots (ignored by multirotors):
 | --- | --- | --- |
 | `worlds/race_circuit.json` | car | 1.23 km circuit, kerbs, gravel traps, grass, grid, `track` (below) |
 | `worlds/farm_field.json` | tractor | concrete yard, gravel farm track, 160 × 100 m soil field with crop rows on its south half, grass headlands, barn, shed, silo, trees; flat |
+| `worlds/ditch_field.json` | rover, tractor | flat grass with three ditches (0.25 m and 0.5 m deep across the x axis, a 0.4 m diagonal channel); see [terrain ditches](2_simulation.md#terrain-terrain-in-a-scene) |
 | `worlds/rover_terrain.json` | rover | seeded height field (140 overlapping bumps and slopes up to about 2.5 m; median slope 6°, 95th percentile 13°), sand, gravel and mud patches, boulders seated on the terrain; flat start disc |
 
 The terrain height field has a step down to flat ground at the edge of its

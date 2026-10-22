@@ -374,6 +374,24 @@ the origin for spawning.
 | `max_height_m` | 3.0 | Maximum height of one hill; overlapping hills add up |
 | `hill_radius_m` | [3, 10] | Range of hill widths σ (m) |
 | `flat_radius_m` | 5.0 | Flat disc around the origin (blends in over the same distance) |
+| `ditches` | [] | Troughs cut into the surface: `[{"points_m": [[x, y], ...], "width_m": w, "depth_m": d}, ...]` |
+
+**Ditches** follow their polylines with a smooth cosine profile, d · ½(1 +
+cos(π ρ / (w/2))) deep at lateral distance ρ < w/2. The floor is d deep,
+the edges meet the surface without a step, and the steepest wall slope is
+π d / w. Where ditches overlap, the deepest wins. The flat spawn disc does
+not apply to them, and the whole trough must lie inside the terrain
+square. Ditches go below z = 0, so with ditches the flat ground becomes a
+frame of four boxes around the terrain square (without them the world is
+unchanged). Use a `resolution_m` of about w/10 so Gazebo's mesh follows
+the profile. `worlds/ditch_field.json` has three ditches, 0.25–0.5 m deep
+with walls up to 28°. Verified in lockstep (2026-10-22): the rover (on
+the template controller with `speed_gain_per_s` 10) and the tractor cross
+both x-axis ditches on their wheels. Limitation: a much steeper ditch
+(0.6 m deep and 2 m wide, 54° walls) made the rover nose-dive at 2.3 m/s,
+and Gazebo's box-on-mesh contact then threw it 2 m into the air instead
+of stopping it. Keep walls below about 30° for small vehicles at speed.
+The health verdict flags such impacts (`hard_impact`).
 
 The same height function generates the triangle mesh Gazebo uses for
 collision and visuals (`terrain.obj` next to `world.sdf`, with vertex normals,

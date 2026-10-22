@@ -152,6 +152,49 @@ def add_terrain(world, terrain, mesh_path, reflectivity=None):
                 element(shape, "laser_retro", RETRO_PER_REFLECTIVITY * reflectivity)
 
 
+GROUND_COLOR = ".45 .5 .45 1"
+
+
+def add_ground(world: ET.Element, scene: dict) -> None:
+    """Static ground: one 0.1 m box with its top at z = 0, or, when the
+    terrain has ditches (cut below z = 0), a frame of four boxes around the
+    terrain square so the terrain mesh is the only surface inside it."""
+    size = scene.get("ground_size_m", 100.0)
+    model = element(world, "model", name="ground")
+    element(model, "static", "true")
+    link = element(model, "link", name="link")
+    terrain = scene.get("terrain")
+    reflectivity = scene.get("ground_reflectivity")
+    if not terrain or not terrain.get("ditches"):
+        box(
+            link,
+            "ground_collision",
+            [size, size, 0.1],
+            GROUND_COLOR,
+            "0 0 -.05 0 0 0",
+            reflectivity=reflectivity,
+        )
+        return
+    half_x, half_y = (v / 2 for v in terrain["size_m"])
+    outer = size / 2
+    # Two full-width strips (north/south) and two between them (east/west).
+    strips = (
+        ("north", (0, (outer + half_y) / 2), (size, outer - half_y)),
+        ("south", (0, -(outer + half_y) / 2), (size, outer - half_y)),
+        ("east", ((outer + half_x) / 2, 0), (outer - half_x, 2 * half_y)),
+        ("west", (-(outer + half_x) / 2, 0), (outer - half_x, 2 * half_y)),
+    )
+    for name, (x, y), (length_x, length_y) in strips:
+        box(
+            link,
+            f"ground_{name}",
+            [length_x, length_y, 0.1],
+            GROUND_COLOR,
+            f"{x:.6g} {y:.6g} -.05 0 0 0",
+            reflectivity=reflectivity,
+        )
+
+
 def world_elevation_m(path):
     """Spherical-coordinates elevation of an SDF world in metres (0 if absent)."""
     text = ET.parse(path).findtext("./world/spherical_coordinates/elevation")
@@ -369,16 +412,7 @@ def build_world(
     element(light, "pose", "0 0 20 0 0 0")
     element(light, "diffuse", ".9 .9 .9 1")
     element(light, "direction", "-.3 -.4 -1")
-    ground = element(world, "model", name="ground")
-    element(ground, "static", "true")
-    box(
-        element(ground, "link", name="link"),
-        "ground_collision",
-        [scene.get("ground_size_m", 100.0), scene.get("ground_size_m", 100.0), 0.1],
-        ".45 .5 .45 1",
-        "0 0 -.05 0 0 0",
-        reflectivity=scene.get("ground_reflectivity"),
-    )
+    add_ground(world, scene)
     for obstacle in scene["obstacles"]:
         model = element(world, "model", name=obstacle["name"])
         element(model, "static", "true")

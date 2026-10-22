@@ -1,0 +1,78 @@
+{
+  "description": "Ditch crossings for the rover and tractor on flat grass: from the origin heading +x, a shallow drainage ditch (0.25 m deep, 3 m wide, walls up to 15 degrees) at x = 10 m, a deep ditch (0.5 m deep, 3 m wide, up to 28 degrees) at x = 22 m, and a diagonal irrigation channel (0.4 m deep, 2.5 m wide) crossing the field. Cosine-profile troughs; stay inside the 60 m terrain square.",
+  "ground_size_m": 80.0,
+  "ground_surface": {
+    "name": "grass",
+    "friction_scale": 0.8,
+    "rolling_resistance_scale": 1.5
+  },
+  "terrain": {
+    "seed": 3,
+    "size_m": [
+      60.0,
+      60.0
+    ],
+    "resolution_m": 0.25,
+    "hills": 0,
+    "max_height_m": 0.0,
+    "flat_radius_m": 0.0,
+    "ditches": [
+      {
+        "points_m": [
+          [
+            10.0,
+            -25.0
+          ],
+          [
+            10.0,
+            25.0
+          ]
+        ],
+        "width_m": 3.0,
+        "depth_m": 0.25
+      },
+      {
+        "points_m": [
+          [
+            22.0,
+            -25.0
+          ],
+          [
+            22.0,
+            25.0
+          ]
+        ],
+        "width_m": 3.0,
+        "depth_m": 0.5
+      },
+      {
+        "points_m": [
+          [
+            -25.0,
+            -20.0
+          ],
+          [
+            0.0,
+            -12.0
+          ],
+          [
+            25.0,
+            15.0
+          ]
+        ],
+        "width_m": 2.5,
+        "depth_m": 0.4
+      }
+    ]
+  },
+  "obstacles": [],
+  "spawn_points": [
+    {
+      "position_m": [
+        0.0,
+        0.0
+      ],
+      "yaw_deg": 0.0
+    }
+  ]
+}

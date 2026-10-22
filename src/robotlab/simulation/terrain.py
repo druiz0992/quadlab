@@ -8,7 +8,17 @@ flat for spawning:
 
 Hill centres, heights (up to ``max_height_m``), and widths σ (within
 ``hill_radius_m``) come from a local seeded RNG, so a seed reproduces the
-terrain. The same function generates the triangle mesh Gazebo uses for
+terrain.
+
+Ditches (``ditches``: ``[{"points_m": [[x, y], ...], "width_m": w,
+"depth_m": d}, ...]``) are cut into that surface along polylines with a
+smooth cosine trough: at lateral distance ρ from the polyline,
+
+    depth(ρ) = d · ½ (1 + cos(π ρ / (w/2)))   for ρ < w/2, else 0,
+
+so the floor is d deep and the edges meet the surface without a step
+(steepest wall slope π d / w). Where ditches overlap the deepest one wins.
+The flat spawn disc does not apply to ditches. The same function generates the triangle mesh Gazebo uses for
 collision and visuals and answers height and ray queries for models that
 previously assumed flat ground (optical flow, ground effect, ground start).
 The mesh is a grid at ``resolution_m``; Gazebo's surface therefore differs
@@ -30,7 +40,9 @@ DEFAULTS = {
     "max_height_m": 3.0,
     "hill_radius_m": [3.0, 10.0],
     "flat_radius_m": 5.0,
+    "ditches": [],
 }
+DITCH_KEYS = {"points_m", "width_m", "depth_m"}
 
 
 def validate_terrain(settings: Mapping[str, Any]) -> dict[str, Any]:
@@ -61,7 +73,61 @@ def validate_terrain(settings: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("terrain hills and seed must be nonnegative integers")
     if data["max_height_m"] < 0 or data["flat_radius_m"] < 0:
         raise ValueError("terrain max_height_m and flat_radius_m must be nonnegative")
+    if not isinstance(data["ditches"], list):
+        raise ValueError("terrain ditches must be a list")
+    for index, ditch in enumerate(data["ditches"]):
+        _validate_ditch(ditch, f"terrain.ditches[{index}]", size)
     return data
+
+
+def _validate_ditch(ditch: Any, name: str, size_m: list[float]) -> None:
+    """One ditch: keys, at least two distinct finite points, positive width
+    and depth, and the whole trough inside the terrain square."""
+    if not isinstance(ditch, Mapping) or set(ditch) != DITCH_KEYS:
+        raise ValueError(f"{name} needs exactly {sorted(DITCH_KEYS)}")
+    for key in ("width_m", "depth_m"):
+        value = ditch[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{name}.{key} must be a number")
+        if not (np.isfinite(value) and value > 0):
+            raise ValueError(f"{name}.{key} must be positive")
+    try:
+        points = np.asarray(ditch["points_m"], float)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name}.points_m must be [[x, y], ...] numbers")
+    if points.ndim != 2 or points.shape[1] != 2 or len(points) < 2:
+        raise ValueError(f"{name}.points_m needs at least two [x, y] points")
+    if not np.isfinite(points).all():
+        raise ValueError(f"{name}.points_m must be finite")
+    if np.any(np.linalg.norm(np.diff(points, axis=0), axis=1) < 1e-6):
+        raise ValueError(f"{name}.points_m has repeated consecutive points")
+    reach = np.abs(points) + ditch["width_m"] / 2
+    if np.any(reach > np.asarray(size_m, float) / 2):
+        raise ValueError(f"{name} must lie inside the terrain square")
+
+
+def _ditch_segments(
+    ditches: list[Mapping[str, Any]],
+) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray] | None:
+    """Per segment of every ditch: start (K×2), start-to-end vector (K×2),
+    squared length, half width, and depth; None without ditches."""
+    if not ditches:
+        return None
+    starts, alongs, halves, depths = [], [], [], []
+    for ditch in ditches:
+        points = np.asarray(ditch["points_m"], float)
+        starts.append(points[:-1])
+        alongs.append(np.diff(points, axis=0))
+        halves += [ditch["width_m"] / 2] * (len(points) - 1)
+        depths += [ditch["depth_m"]] * (len(points) - 1)
+    along = np.vstack(alongs)
+    return (
+        np.vstack(starts),
+        along,
+        (along**2).sum(axis=1),
+        np.asarray(halves, float),
+        np.asarray(depths, float),
+    )
 
 
 class Terrain:
@@ -77,6 +143,7 @@ class Terrain:
         self._sigmas = rng.uniform(*s["hill_radius_m"], size=s["hills"])
         self._half = half
         self._flat = s["flat_radius_m"]
+        self._ditches = _ditch_segments(s["ditches"])
 
     def height(self, x: ArrayLike, y: ArrayLike) -> NDArray[np.float64]:
         """Terrain height (m) at world x, y; 0 outside the terrain square."""
@@ -104,7 +171,23 @@ class Terrain:
             else 1.0
         )
         inside = (np.abs(x) <= self._half[0]) & (np.abs(y) <= self._half[1])
-        return np.where(inside, h * u * u * (3 - 2 * u), 0.0)
+        surface = h * u * u * (3 - 2 * u)
+        if self._ditches is not None:
+            surface = surface - self._ditch_depth(x, y)
+        return np.where(inside, surface, 0.0)
+
+    def _ditch_depth(self, x: NDArray, y: NDArray) -> NDArray[np.float64]:
+        """Deepest ditch cut (m, ≥ 0) at each point (module docs)."""
+        assert self._ditches is not None
+        start, along, length2, half_width, depth = self._ditches
+        px = x[..., None] - start[:, 0]
+        py = y[..., None] - start[:, 1]
+        # Closest point on each segment: clamp the projection to [0, 1].
+        t = np.clip((px * along[:, 0] + py * along[:, 1]) / length2, 0.0, 1.0)
+        rho = np.hypot(px - t * along[:, 0], py - t * along[:, 1])
+        ratio = np.minimum(rho / half_width, 1.0)
+        cut = depth * 0.5 * (1.0 + np.cos(np.pi * ratio))
+        return np.asarray(cut.max(axis=-1))
 
     def mesh(self) -> tuple[NDArray[np.float64], NDArray[np.int64]]:
         """Grid vertices (N×3) and triangle faces (M×3, zero-based)."""

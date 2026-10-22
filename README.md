@@ -218,6 +218,8 @@ robotlab --robot car --keyboard --headless --scene worlds/race_circuit.json \
 # Tractor ploughing the farm field (H lowers/raises the plough; RTK GPS), or towing a trailer
 robotlab --keyboard --headless --scene worlds/farm_field.json --config configs/scenarios/field_plough.json --output outputs/plough
 robotlab --keyboard --headless --scene worlds/farm_field.json --config configs/scenarios/tractor_trailer.json --output outputs/trailer
+# Rover across drainage ditches (terrain "ditches")
+robotlab --robot rover --keyboard --headless --scene worlds/ditch_field.json --output outputs/ditches
 # Rover on rough off-road terrain
 robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json --output outputs/rover-terrain
 # Your wheeled controller: algorithms.controller in a config layer; start from
