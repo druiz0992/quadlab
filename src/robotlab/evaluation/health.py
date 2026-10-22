@@ -20,6 +20,7 @@ worst value seen:
 | ``ground_contact`` | warning | touchdown after ``touchdown_gap_s`` without contact |
 | ``chassis_ground_contact`` | warning | wheeled robots: the body box touched the ground (bottoming out, rollover) |
 | ``vehicle_contact`` | warning | wheeled robots: contact with an opponent vehicle (racing incident) |
+| ``jackknife`` | warning | wheeled robots with a trailer: hitch yaw beyond 90 % of its limit |
 | ``off_track`` | warning | wheeled robots on a scene track: every wheel beyond the track edge (count: episodes) |
 | ``tracking_lost`` | warning | position error above ``tracking_lost_m`` for ``tracking_lost_s`` (kept in batch aggregates: it is a result, not a broken run) |
 | ``left_ground_area`` | warning | flew past the ground plane's edge (nothing below collides) |
@@ -380,6 +381,16 @@ class RunHealth:
                 f"{limits.no_liftoff_s:g} s without lift-off",
                 total_thrust_n / self._weight_n,
             )
+
+    def on_jackknife(self, sim_time_ns: int, yaw_deg: float) -> None:
+        """Trailer hitch yaw near its joint limit (experiments/trailer.py)."""
+        self._report(
+            "jackknife",
+            WARNING,
+            self._time_s(sim_time_ns),
+            "trailer jackknifed (hitch yaw near its limit)",
+            yaw_deg,
+        )
 
     def on_off_track(self, sim_time_ns: int) -> None:
         """A new episode with every wheel beyond the track edge (laps.py)."""

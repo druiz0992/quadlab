@@ -104,3 +104,75 @@ def test_zone_mesh_ribbon():
     assert vertices.shape == (6, 2) and faces.shape == (4, 3)
     np.testing.assert_allclose(vertices[0], [0, 1])
     np.testing.assert_allclose(vertices[1], [9, 1])  # mitred corner
+
+
+def test_tractor_implement_and_trailer_models(tmp_path):
+    implement = tmp_path / "implement.json"
+    implement.write_text('{"ground_vehicle": {"implement": {"enabled": true}}}')
+    root = ET.parse(
+        build_world(
+            {"obstacles": []},
+            tmp_path / "a.sdf",
+            config=load_drone_config(implement, robot="tractor"),
+        )
+    )
+    tractor = root.find('./world/model[@name="tractor"]')
+    assert tractor.find('joint[@name="implement_lift"]').get("type") == "prismatic"
+    assert tractor.find('link[@name="implement"]/collision') is None
+    servo = [
+        p
+        for p in tractor.findall("plugin")
+        if p.get("name").endswith("JointPositionController")
+    ]
+    assert servo and servo[0].findtext("topic") == "/robotlab/implement/lift"
+    trailer = tmp_path / "trailer.json"
+    trailer.write_text('{"ground_vehicle": {"trailer": {"enabled": true}}}')
+    root = ET.parse(
+        build_world(
+            {"obstacles": []},
+            tmp_path / "b.sdf",
+            config=load_drone_config(trailer, robot="tractor"),
+        )
+    )
+    tractor = root.find('./world/model[@name="tractor"]')
+    assert {j.get("name") for j in tractor.findall("joint")} == {
+        "trailer_yaw",
+        "trailer_pitch",
+    }
+    states = [
+        p
+        for p in tractor.findall("plugin")
+        if p.get("name").endswith("JointStatePublisher")
+    ]
+    assert states[0].findtext("topic") == "/robotlab/trailer/joint_state"
+    assert (
+        tractor.find('link[@name="trailer"]/collision[@name="trailer_body"]')
+        is not None
+    )
+    both = tmp_path / "both.json"
+    both.write_text(
+        '{"ground_vehicle": {"implement": {"enabled": true}, "trailer": {"enabled": true}}}'
+    )
+    with pytest.raises(ValueError, match="one rear hitch"):
+        load_drone_config(both, robot="tractor")
+
+
+@pytest.mark.parametrize(
+    "scene, robot, configs",
+    [
+        ("worlds/race_circuit.json", "car", ["configs/scenarios/race_opponents.json"]),
+        ("worlds/farm_field.json", "tractor", ["configs/scenarios/field_plough.json"]),
+        (
+            "worlds/farm_field.json",
+            "tractor",
+            ["configs/scenarios/tractor_trailer.json"],
+        ),
+        ("worlds/rover_terrain.json", "rover", []),
+    ],
+)
+def test_ground_vehicle_worlds_generate(tmp_path, scene, robot, configs):
+    config = load_drone_config(configs, robot=robot)
+    root = ET.parse(
+        build_world(load_scene(scene), tmp_path / "world.sdf", config=config)
+    )
+    assert root.find(f'./world/model[@name="{robot}"]') is not None

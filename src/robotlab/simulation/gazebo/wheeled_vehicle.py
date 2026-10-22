@@ -18,6 +18,7 @@ Wheel forces are not Gazebo contacts: Python applies them through
 ApplyLinkWrench (see simulation/wheeled/model.py).
 """
 
+import math
 import xml.etree.ElementTree as ET
 
 from ...core.wheeled_vehicle import WheeledProperties
@@ -43,6 +44,169 @@ OPPONENT_COLORS = (
     ".95 .95 .95 1",
 )
 OPPONENT_ODOMETRY_TOPIC = "/robotlab/opponents/{name}/odometry"
+IMPLEMENT_LIFT_TOPIC = "/robotlab/implement/lift"
+IMPLEMENT_COLOR = ".75 .2 .1 1"
+# Implement lift servo: joint velocity = gain × position error (1/s), capped.
+LIFT_SERVO_GAIN_PER_S = 50.0
+
+
+TRAILER_JOINT_TOPIC = "/robotlab/trailer/joint_state"
+TRAILER_COLOR = ".55 .4 .2 1"
+
+
+def add_trailer(
+    model: ET.Element, trailer: dict, properties: WheeledProperties
+) -> None:
+    """Towed trailer: links ``hitch_yaw`` and ``trailer`` on revolute yaw
+    (body z) and pitch joints at the hitch; joint states on
+    ``TRAILER_JOINT_TOPIC`` every step. Its wheel forces are Python's (one
+    instantaneous wrench on ``<model>::trailer``); the trailer box and wheel
+    bump stops collide in Gazebo."""
+    hx, hy, hz = trailer["hitch_position_m"]
+    hitch = element(model, "link", name="hitch_yaw")
+    element(hitch, "pose", _pose((hx, hy, hz, 0, 0, 0)))
+    inertial = element(hitch, "inertial")
+    element(inertial, "mass", 1.0)
+    inertia = element(inertial, "inertia")
+    for key in ("ixx", "iyy", "izz"):
+        element(inertia, key, 0.01)
+    link = element(model, "link", name="trailer")
+    centre = (hx - trailer["drawbar_m"], hy, hz - trailer["cg_below_hitch_m"])
+    element(link, "pose", _pose((*centre, 0, 0, 0)))
+    inertial = element(link, "inertial")
+    element(inertial, "mass", trailer["mass_kg"])
+    inertia = element(inertial, "inertia")
+    for key, value in zip(("ixx", "iyy", "izz"), trailer["inertia_kg_m2"]):
+        element(inertia, key, value)
+    box(link, "trailer_body", trailer["size_m"], TRAILER_COLOR)
+    drawbar = trailer["drawbar_m"] - trailer["size_m"][0] / 2
+    box(
+        link,
+        "drawbar",
+        [drawbar, 0.12, 0.12],
+        ".2 .2 .2 1",
+        _pose(
+            (
+                trailer["size_m"][0] / 2 + drawbar / 2,
+                0,
+                trailer["cg_below_hitch_m"],
+                0,
+                0,
+                0,
+            )
+        ),
+        collision=False,
+    )
+    radius, width = trailer["wheel_radius_m"], properties.wheel_width_m
+    for wheel in trailer["wheels"]:
+        x, y, z = wheel["position_m"]
+        _cylinder(
+            link,
+            f"trailer_wheel_{wheel['name']}",
+            "collision",
+            radius,
+            width,
+            _pose((x, y, z + properties.suspension.travel_m, 1.5707963, 0, 0)),
+        )
+        visual = _cylinder(
+            link,
+            f"trailer_wheel_{wheel['name']}_visual",
+            "visual",
+            radius,
+            width,
+            _pose((x, y, z + properties.ride_drop_m, 1.5707963, 0, 0)),
+        )
+        material = element(visual, "material")
+        element(material, "ambient", TYRE_COLOR)
+        element(material, "diffuse", TYRE_COLOR)
+    for name, parent, child, axis, limit, pose in (
+        (
+            "trailer_yaw",
+            "base_link",
+            "hitch_yaw",
+            "0 0 1",
+            trailer["yaw_limit_deg"],
+            (0, 0, 0),
+        ),
+        (
+            "trailer_pitch",
+            "hitch_yaw",
+            "trailer",
+            "0 1 0",
+            trailer["pitch_limit_deg"],
+            (trailer["drawbar_m"], 0, trailer["cg_below_hitch_m"]),
+        ),
+    ):
+        joint = element(model, "joint", name=name, type="revolute")
+        element(joint, "pose", _pose((*pose, 0, 0, 0)))
+        element(joint, "parent", parent)
+        element(joint, "child", child)
+        axis_element = element(joint, "axis")
+        element(axis_element, "xyz", axis)
+        limits = element(axis_element, "limit")
+        element(limits, "lower", -math.radians(limit))
+        element(limits, "upper", math.radians(limit))
+    states = plugin(model, "joint-state-publisher", "JointStatePublisher")
+    element(states, "topic", TRAILER_JOINT_TOPIC)
+    for name in ("trailer_yaw", "trailer_pitch"):
+        element(states, "joint_name", name)
+
+
+def add_implement(model: ET.Element, implement: dict) -> None:
+    """Rear hitch implement: a visual-only link (soil forces are Python's)
+    on a vertical prismatic joint whose position follows the lift published
+    on ``IMPLEMENT_LIFT_TOPIC`` (metres, ≤ 0 below raised)."""
+    size = implement["size_m"]
+    link = element(model, "link", name="implement")
+    element(link, "pose", _pose((*implement["hitch_position_m"], 0, 0, 0)))
+    inertial = element(link, "inertial")
+    mass = implement["mass_kg"]
+    element(inertial, "mass", mass)
+    inertia = element(inertial, "inertia")
+    x, y, z = size
+    for key, value in (
+        ("ixx", y * y + z * z),
+        ("iyy", x * x + z * z),
+        ("izz", x * x + y * y),
+    ):
+        element(inertia, key, mass * value / 12)
+    # Frame beam on top and tines reaching down to the tool point.
+    box(
+        link,
+        "frame",
+        [x * 0.3, y, z * 0.2],
+        IMPLEMENT_COLOR,
+        _pose((0, 0, z * 0.4, 0, 0, 0)),
+        collision=False,
+    )
+    for side in (-0.35, 0.0, 0.35):
+        box(
+            link,
+            f"tine_{side:+.2f}",
+            [0.06, 0.06, z * 0.8],
+            ".2 .2 .2 1",
+            _pose((0, side * y, -z * 0.1, 0, 0, 0)),
+            collision=False,
+        )
+    joint = element(model, "joint", name="implement_lift", type="prismatic")
+    element(joint, "parent", "base_link")
+    element(joint, "child", "implement")
+    axis = element(joint, "axis")
+    element(axis, "xyz", "0 0 1")
+    limit = element(axis, "limit")
+    element(limit, "lower", -implement["lift_travel_m"] - 0.05)
+    element(limit, "upper", 0.05)
+    servo = plugin(model, "joint-position-controller", "JointPositionController")
+    for key, value in (
+        ("joint_name", "implement_lift"),
+        ("topic", IMPLEMENT_LIFT_TOPIC),
+        ("use_velocity_commands", "true"),
+        ("p_gain", LIFT_SERVO_GAIN_PER_S),
+        ("cmd_max", 4 * implement["lift_rate_mps"] + 0.5),
+        ("cmd_min", -(4 * implement["lift_rate_mps"] + 0.5)),
+        ("initial_position", 0.0),
+    ):
+        element(servo, key, value)
 
 
 def opponent_name(properties: WheeledProperties, index: int) -> str:
@@ -151,6 +315,12 @@ def build_wheeled_vehicle(
     _add_wheels(base, properties)
     if sensors:
         add_body_sensors(base, settings["sensors"])
+    implement = settings["ground_vehicle"]["implement"]
+    if sensors and implement["enabled"]:
+        add_implement(model, implement)
+    trailer = settings["ground_vehicle"]["trailer"]
+    if sensors and trailer["enabled"]:
+        add_trailer(model, trailer, properties)
     odometry = plugin(model, "odometry-publisher", "OdometryPublisher")
     element(odometry, "dimensions", 3)
     element(odometry, "odom_publish_frequency", settings["control"]["odometry_rate_hz"])

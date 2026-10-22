@@ -81,9 +81,21 @@ class Terrain:
     def height(self, x: ArrayLike, y: ArrayLike) -> NDArray[np.float64]:
         """Terrain height (m) at world x, y; 0 outside the terrain square."""
         x, y = np.asarray(x, float), np.asarray(y, float)
-        h = np.zeros(np.broadcast(x, y).shape)
-        for (cx, cy), height, sigma in zip(self._centres, self._heights, self._sigmas):
-            h = h + height * np.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * sigma**2))
+        shape = np.broadcast(x, y).shape
+        if len(self._heights):
+            # All hills at once; the cumulative sum along the hill axis adds
+            # the terms in the same order as a loop over hills, so heights
+            # are bit-identical to the sequential sum (and ~50× faster for
+            # the few points of a wheel ray cast).
+            cx, cy = self._centres[:, 0], self._centres[:, 1]
+            dx2 = (x[..., None] - cx) ** 2
+            dy2 = (y[..., None] - cy) ** 2
+            terms = self._heights * np.exp(-(dx2 + dy2) / (2 * self._sigmas**2))
+            h = np.cumsum(
+                np.broadcast_to(terms, (*shape, len(self._heights))), axis=-1
+            )[..., -1]
+        else:
+            h = np.zeros(shape)
         r = np.hypot(x, y)
         # Smoothstep from 0 inside the flat disc to 1 at twice its radius.
         u = (

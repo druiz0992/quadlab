@@ -30,7 +30,7 @@ document and update the status below.
 | Freestyle/acrobatic 5-inch preset | Implemented ([3 Configuration](3_configuration.md#vehicle-presets)) |
 | Ground vehicles: rover, race car, tractor (`--robot`), Python tyre/suspension model, wheel encoders, keyboard driver, wheeled controller contract | Implemented ([8 Ground vehicles](8_ground_vehicles.md)) |
 | Race circuit world with track, lap timing, track limits; opponent cars with the track follower | Implemented ([8 Ground vehicles](8_ground_vehicles.md#race-circuit-and-opponents)) |
-| Ground-vehicle worlds (off-road, field), tractor implements (3-point hitch tool with draft force) and towed trailer | In progress (see [Ground vehicles](#ground-vehicles)) |
+| Farm field and off-road rover worlds; tractor implement (ASABE D497 draft) and towed trailer | Implemented ([8 Ground vehicles](8_ground_vehicles.md#tractor-implement-and-trailer)) |
 | Wheel encoders on the sensor bus (estimator input), wheeled randomization, mission references for wheeled robots | Future |
 | ApplyLinkWrench persistent wrenches accumulate (multirotor body drag and fixed-wing aerodynamics publish a delta every period, so long runs slow down quadratically); wheeled robots use one-step impulses | Known issue; fix proposed below |
 | Reversible (3D) motors with negative thrust | Future (schema change) |
@@ -278,13 +278,12 @@ before claiming autonomous laps or realistic wind response.
 
 Next steps after the vehicle core ([8 Ground vehicles](8_ground_vehicles.md)):
 
-- **Worlds:** off-road rover terrain (rocks, slopes, ditches) and a farm
-  field (boundary, headlands, crop rows, RTK scenario).
+- **Terrain features:** ditches and negative relief (the height field adds
+  only bumps), surface patches drawn on terrain, climbable steps.
+- **More implements:** chisel plough, harrows, seeders (ASABE D497
+  coefficients per tool), vertical soil forces, PTO power.
 - **Faster ego loop:** the ego's per-period Python work (about 1.9 ms with
   opponents) limits keyboard racing to about half real time.
-- **Tractor implements:** a three-point-hitch tool with soil draft force
-  (ASABE D497 form) lowered and raised by the keyboard, and a towed trailer
-  on a hitch joint with its own wheels.
 - **Persistent wrenches:** move multirotor body drag and fixed-wing
   aerodynamics off accumulating ApplyLinkWrench deltas (one-step impulses
   as for wheeled robots, or a small replace-semantics Gazebo plugin).

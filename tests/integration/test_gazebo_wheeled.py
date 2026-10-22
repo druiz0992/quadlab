@@ -154,3 +154,59 @@ def test_race_with_opponents_is_deterministic(tmp_path):
     for opponent in first["opponents"]:
         assert opponent["track"]["progress_m"] > 100
         assert opponent["track"]["off_track_episodes"] == 0
+
+
+class PloughDriver:
+    """Test controller: constant drive torque; implement down after 5 s."""
+
+    def __init__(self, context, options):
+        self.vehicle = context.wheeled
+        self.time_s = 0.0
+
+    def update(self, state, request, dt_s):
+        from robotlab.core.wheeled import WheelCommands
+
+        self.time_s = state.sim_time_ns * 1e-9
+        n = self.vehicle.wheel_count
+        drive = np.where(self.vehicle.mask("driven"), 4000.0, 0.0)
+        return WheelCommands(tuple(drive), (0.0,) * n, (0.0,) * n)
+
+    def implement_lowered(self):
+        return self.time_s >= 5.0
+
+
+def test_trailer_static_loads(tmp_path):
+    layer = {**FAST, "ground_vehicle": {"trailer": {"enabled": True}}}
+    summary, rows = drive(tmp_path, "tractor", layer, 3.0, "worlds/airfield.json")
+    assert summary["health"]["verdict"] == "ok"
+    assert summary["trailer"]["stale_periods"] == 0
+    wheels = [json.loads(line) for line in (tmp_path / "run" / "wheels.jsonl").open()]
+    last = wheels[-1]
+    trailer = load_drone_config(tmp_path / "layer.json", robot="tractor").data[
+        "ground_vehicle"
+    ]["trailer"]
+    # Axle 0.3 m behind the trailer's centre of mass, drawbar 3 m ahead.
+    axle_n = trailer["mass_kg"] * 9.81 * 3.0 / 3.3
+    assert sum(last["trailer"]["normal_load_n"]) == pytest.approx(axle_n, rel=0.03)
+    total = (3500.0 + trailer["mass_kg"] + 1.0) * 9.81
+    assert sum(last["normal_load_n"]) + sum(
+        last["trailer"]["normal_load_n"]
+    ) == pytest.approx(total, rel=0.005)
+
+
+def test_plough_draft_slows_the_tractor(tmp_path):
+    layer = {
+        **FAST,
+        "ground_vehicle": {"implement": {"enabled": True}},
+        "algorithms": {"controller": "test_gazebo_wheeled:PloughDriver"},
+    }
+    summary, rows = drive(tmp_path, "tractor", layer, 20.0, "worlds/airfield.json")
+    assert summary["health"]["verdict"] == "ok"
+    wheels = [json.loads(line) for line in (tmp_path / "run" / "wheels.jsonl").open()]
+    last = wheels[-1]["implement"]
+    # Verified 2026-10-22: lowered at 5 s from top speed, ploughing at
+    # 0.20 m depth and 2.15 m/s against 21.5 kN.
+    assert last["depth_m"] == pytest.approx(0.2, abs=0.005)
+    assert last["tool_speed_mps"] == pytest.approx(2.153, abs=0.05)
+    assert last["draft_n"] == pytest.approx(21466.0, rel=0.02)
+    assert summary["implement"]["worked_area_m2"] > 20.0

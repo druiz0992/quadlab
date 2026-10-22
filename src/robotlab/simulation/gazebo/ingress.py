@@ -135,6 +135,7 @@ KIND_PRIORITY = {
             "lidar",
             "poses",
             "contacts",
+            "trailer",
             "odometry",
         )
     )

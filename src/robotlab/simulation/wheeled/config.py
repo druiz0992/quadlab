@@ -25,7 +25,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
-from ...core.wheeled_vehicle import STEERING_LAYOUTS
+from ...core.wheeled_vehicle import STEERING_LAYOUTS, WheeledProperties
 
 ROBOT_KINDS = ("multirotor", "rover", "car", "tractor")
 WHEELED_KINDS = ("rover", "car", "tractor")
@@ -139,6 +139,64 @@ GROUND_VEHICLE_DEFAULTS: dict[str, Any] = {
     # simulation.spawn_position_m); with them, the ego's grid slot.
     "spawn_yaw_deg": 0.0,
     "spawn_index": 0,
+    # Rear three-point-hitch implement (tractor); see
+    # simulation/wheeled/implement.py. hitch_position_m: implement box
+    # centre when raised (body axes from the centre of mass).
+    "implement": {
+        "enabled": False,
+        "type": "moldboard_plough",
+        "texture": "medium",
+        "draft_a": 0.0,
+        "draft_b": 0.0,
+        "draft_c": 0.0,
+        "texture_factor": 1.0,
+        "width_m": 1.6,
+        "working_depth_m": 0.2,
+        "mass_kg": 700.0,
+        "size_m": [1.0, 1.8, 0.7],
+        "hitch_position_m": [-2.4, 0.0, -0.1],
+        "lift_travel_m": 0.8,
+        "lift_rate_mps": 0.15,
+        "start_lowered": False,
+    },
+    # Towed trailer on a drawbar hitch (tractor); see
+    # experiments/trailer.py. hitch_position_m: hitch point on the tractor
+    # (body axes from its centre of mass); drawbar_m: hitch to trailer
+    # centre of mass along the trailer's −x; cg_below_hitch_m: trailer
+    # centre of mass below the hitch; wheel positions in trailer axes (hub
+    # at full droop). Tyres and suspension: a load-scaled copy of the
+    # tractor's (see trailer_properties).
+    "trailer": {
+        "enabled": False,
+        "mass_kg": 1500.0,
+        "inertia_kg_m2": [900.0, 1800.0, 2200.0],
+        "size_m": [3.5, 1.9, 1.0],
+        "hitch_position_m": [-2.0, 0.0, -0.35],
+        "drawbar_m": 3.0,
+        "cg_below_hitch_m": -0.1,
+        "wheel_radius_m": 0.45,
+        # Axle 0.3 m behind the centre of mass (positive drawbar load);
+        # hubs at static ride height clear the ground by the tyre radius.
+        "wheels": [
+            {
+                "name": "left",
+                "position_m": [-0.3, 0.85, -0.38],
+                "steered": False,
+                "driven": False,
+                "braked": True,
+            },
+            {
+                "name": "right",
+                "position_m": [-0.3, -0.85, -0.38],
+                "steered": False,
+                "driven": False,
+                "braked": True,
+            },
+        ],
+        "max_brake_torque_nm": 3000.0,
+        "yaw_limit_deg": 80.0,
+        "pitch_limit_deg": 25.0,
+    },
     # Other cars of the same kind on the scene's next spawn points, each
     # with its own controller (default: the centreline follower); see
     # experiments/opponents.py. per_opponent_options (one dict per
@@ -330,6 +388,9 @@ def _section(value: Any, template: Mapping[str, Any], name: str) -> None:
         elif isinstance(default, str):
             if not isinstance(item, str):
                 raise ValueError(f"{path} must be a string")
+        elif isinstance(default, bool):
+            if type(item) is not bool:
+                raise ValueError(f"{path} must be true or false")
         elif key in FREE_FORM:
             if not isinstance(item, dict):
                 raise ValueError(f"{path} must be an object")
@@ -346,12 +407,58 @@ def _section(value: Any, template: Mapping[str, Any], name: str) -> None:
             _positive(item, path, allow_zero=key in ZERO_ALLOWED)
 
 
-POSITIVE_VECTORS = {"inertia_kg_m2", "collision_size_m"}
+POSITIVE_VECTORS = {"inertia_kg_m2", "collision_size_m", "size_m"}
 # Validated by their consumers (plug-in options) or by dedicated checks.
 FREE_FORM = {"controller_options"}
 LIST_KEYS = {"wheels", "per_opponent_options"}
+
+
+def trailer_properties(
+    trailer: Mapping[str, Any], tractor: "WheeledProperties"
+) -> "WheeledProperties":
+    """Nominal trailer as a wheeled vehicle without drive or steering.
+
+    Tyre: the tractor's curves and friction with the trailer's radius;
+    suspension stiffness and damping scaled by the per-wheel load ratio, so
+    the static sag matches the tractor's (an assumption, documented).
+    """
+    from dataclasses import replace
+
+    from ...core.wheeled_vehicle import DriveProperties, WheelProperties
+
+    wheels = tuple(
+        WheelProperties(w["name"], tuple(w["position_m"]), False, False, w["braked"])
+        for w in trailer["wheels"]
+    )
+    load_ratio = (trailer["mass_kg"] / len(wheels)) / (
+        tractor.mass_kg / tractor.wheel_count
+    )
+    suspension = replace(
+        tractor.suspension,
+        stiffness_n_per_m=tractor.suspension.stiffness_n_per_m * load_ratio,
+        damping_n_s_per_m=tractor.suspension.damping_n_s_per_m * load_ratio,
+        bump_stiffness_n_per_m=tractor.suspension.bump_stiffness_n_per_m * load_ratio,
+    )
+    return replace(
+        tractor,
+        model_name=f"{tractor.model_name}::trailer",
+        steering_layout="skid",
+        mass_kg=trailer["mass_kg"],
+        inertia_kg_m2=tuple(trailer["inertia_kg_m2"]),
+        collision_size_m=tuple(trailer["size_m"]),
+        collision_offset_m=(0.0, 0.0, 0.0),
+        wheels=wheels,
+        wheel_inertia_kg_m2=tractor.wheel_inertia_kg_m2
+        * (trailer["wheel_radius_m"] / tractor.tyre.radius_m) ** 2,
+        tyre=replace(tractor.tyre, radius_m=trailer["wheel_radius_m"]),
+        suspension=suspension,
+        drive=DriveProperties(0.0, 0.0, 1e9, trailer["max_brake_torque_nm"], 0.0, 0.0),
+        aero=replace(tractor.aero, drag_area_m2=0.0, downforce_area_m2=0.0),
+    )
+
+
 MAX_OPPONENTS = 7
-SIGNED_KEYS = {"spawn_yaw_deg"}
+SIGNED_KEYS = {"spawn_yaw_deg", "cg_below_hitch_m"}
 ZERO_ALLOWED = {
     "rolling_resistance",
     "e",
@@ -363,14 +470,19 @@ ZERO_ALLOWED = {
     "max_speed_mps",
     "max_brake_torque_nm",
     "damping_n_s_per_m",
+    "draft_a",
+    "draft_b",
+    "draft_c",
     "low_speed_damping_n_s_per_m",
 }
 
 
-def validate_wheels(wheels: Any, name: str = "ground_vehicle.wheels") -> None:
-    """At least three uniquely named wheels with flags and positions."""
-    if not isinstance(wheels, list) or len(wheels) < 3:
-        raise ValueError(f"{name} needs at least three wheels")
+def validate_wheels(
+    wheels: Any, name: str = "ground_vehicle.wheels", minimum: int = 3
+) -> None:
+    """At least ``minimum`` uniquely named wheels with flags and positions."""
+    if not isinstance(wheels, list) or len(wheels) < minimum:
+        raise ValueError(f"{name} needs at least {minimum} wheels")
     names = set()
     for index, wheel in enumerate(wheels):
         path = f"{name}[{index}]"
@@ -403,6 +515,8 @@ def validate_ground_vehicle(data: Mapping[str, Any]) -> None:
         raise ValueError("ground_vehicle.model_name must be an identifier")
     _check_layout(g, layout)
     _check_opponents(g["opponents"])
+    _check_implement(g["implement"], data["robot"]["kind"])
+    _check_trailer(g)
     for key in ("c", "e"):
         for direction in ("longitudinal", "lateral"):
             value = g["tyre"][direction][key]
@@ -451,6 +565,48 @@ def _check_opponents(opponents: Mapping[str, Any]) -> None:
         )
     if opponents["count"] and not opponents["controller"]:
         raise ValueError("ground_vehicle.opponents.controller must name a controller")
+
+
+def _check_implement(implement: Mapping[str, Any], kind: str) -> None:
+    from .implement import IMPLEMENT_TYPES, TEXTURES
+
+    if not implement["enabled"]:
+        return
+    if implement["type"] not in (*IMPLEMENT_TYPES, "custom"):
+        raise ValueError(
+            "ground_vehicle.implement.type must be one of "
+            f"{sorted((*IMPLEMENT_TYPES, 'custom'))}"
+        )
+    if implement["texture"] not in TEXTURES:
+        raise ValueError(f"ground_vehicle.implement.texture must be one of {TEXTURES}")
+    if implement["hitch_position_m"][0] >= 0:
+        raise ValueError(
+            "ground_vehicle.implement.hitch_position_m must be behind the centre of mass (x < 0)"
+        )
+
+
+def _check_trailer(g: Mapping[str, Any]) -> None:
+    trailer = g["trailer"]
+    if not trailer["enabled"]:
+        return
+    if g["implement"]["enabled"]:
+        raise ValueError(
+            "ground_vehicle: choose the implement or the trailer (one rear hitch)"
+        )
+    validate_wheels(trailer["wheels"], "ground_vehicle.trailer.wheels", minimum=2)
+    if any(w["driven"] or w["steered"] for w in trailer["wheels"]):
+        raise ValueError("ground_vehicle.trailer.wheels are neither driven nor steered")
+    if trailer["hitch_position_m"][0] >= 0:
+        raise ValueError(
+            "ground_vehicle.trailer.hitch_position_m must be behind the centre of mass (x < 0)"
+        )
+    if (
+        not 0 < trailer["yaw_limit_deg"] < 120
+        or not 0 < trailer["pitch_limit_deg"] < 60
+    ):
+        raise ValueError(
+            "ground_vehicle.trailer yaw_limit_deg in (0, 120), pitch_limit_deg in (0, 60)"
+        )
 
 
 def _check_lockstep(data: Mapping[str, Any]) -> None:

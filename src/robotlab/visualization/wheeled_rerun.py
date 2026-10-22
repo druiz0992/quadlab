@@ -32,6 +32,7 @@ WHEELED_TABS = (
     ("wheels", "Wheels"),
     ("driver", "Driver input"),
     ("commands", "Wheel commands"),
+    ("implement", "Implement"),
     ("estimation", "Estimate vs truth"),
     ("imu", "IMU"),
     ("gps", "GPS"),
@@ -41,6 +42,7 @@ WHEELED_TABS = (
 KIND_COLORS = {"rover": (220, 140, 30), "car": (205, 30, 30), "tractor": (40, 140, 65)}
 TYRE_COLOR = (25, 25, 25)
 OPPONENT_COLOR = (30, 80, 215)
+TRAILER_COLOR = (140, 100, 50)
 
 
 def _rgba(text: str) -> list[int]:
@@ -75,6 +77,7 @@ class WheeledRerunRecorder(GazeboRerunRecorder):
         self._ticks = 0
         self._odometry = 0
         self._opponent_ticks: dict[str, int] = {}
+        self._trailer_logged = False
         rr = self.rr
         rr.log(
             f"world/{self.vehicle}/body",
@@ -228,6 +231,39 @@ class WheeledRerunRecorder(GazeboRerunRecorder):
                 translation=state.position_m, quaternion=state.quaternion_xyzw
             ),
         )
+
+    def log_trailer(self, sim_time_s: float, trailer: Any) -> None:
+        """Trailer body at its computed pose and the hitch angle (decimated)."""
+        if self._ticks % self.decimation:
+            return
+        rr = self.rr
+        self._set_time(sim_time_s)
+        state = trailer.state
+        if not self._trailer_logged:
+            self._trailer_logged = True
+            rr.log(
+                "world/trailer/body",
+                rr.Boxes3D(
+                    half_sizes=[np.asarray(trailer.properties.collision_size_m) / 2],
+                    colors=[TRAILER_COLOR],
+                ),
+                static=True,
+            )
+        rr.log(
+            "world/trailer",
+            rr.Transform3D(
+                translation=state.position_m, quaternion=state.quaternion_xyzw
+            ),
+        )
+        self._scalar("vehicle/trailer_yaw_deg", float(np.degrees(trailer.yaw)))
+
+    def log_implement(self, sim_time_s: float, telemetry: Any) -> None:
+        """Implement lift, depth, and draft (at the wheel-log rate)."""
+        self._set_time(sim_time_s)
+        self._scalar("implement/lift_m", telemetry.lift_m)
+        self._scalar("implement/depth_m", telemetry.depth_m)
+        self._scalar("implement/draft_n", telemetry.draft_n)
+        self._scalar("implement/lowered", float(telemetry.lowered))
 
     def log_track(self, sim_time_s: float, laps: Any) -> None:
         """Lap progress (m) and completed laps on the scene track."""

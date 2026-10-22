@@ -48,6 +48,8 @@ def build_wheeled_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
         max_speed_mps=loop.max_speed_mps,
         track=parts.laps.summary() if parts.laps is not None else None,
         opponents=[o.summary() for o in parts.opponents],
+        implement=parts.implement.summary() if parts.implement is not None else None,
+        trailer=parts.trailer.summary() if parts.trailer is not None else None,
         wheel_encoders=parts.encoders.summary(),
         messages={k: v for k, v in loop.counts.items() if k != "control_ticks"},
         dropped=dict(parts.ingress.dropped),

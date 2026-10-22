@@ -1,0 +1,7 @@
+{
+  "extends": ["../sensors/gps_rtk_dual_antenna.json"],
+  "robot": {"kind": "tractor"},
+  "ground_vehicle": {
+    "implement": {"enabled": true, "type": "moldboard_plough", "texture": "medium"}
+  }
+}

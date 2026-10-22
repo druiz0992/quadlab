@@ -64,7 +64,7 @@ def test_layer_overrides_preset(tmp_path):
         ({"ground_vehicle": {"steering_layout": "tank"}}, "steering_layout"),
         ({"ground_vehicle": {"tyre": {"lateral": {"c": 2.5}}}}, "c must be"),
         ({"ground_vehicle": {"chassis": {"mass_kg": -1}}}, "positive"),
-        ({"ground_vehicle": {"wheels": []}}, "three wheels"),
+        ({"ground_vehicle": {"wheels": []}}, "at least 3 wheels"),
         ({"ground_vehicle": {"model_name": "my car"}}, "identifier"),
         ({"ground_vehicle": {"spawn_index": -1}}, "integer"),
         ({"ground_vehicle": {"opponents": {"count": 9}}}, "count"),

@@ -1,0 +1,4 @@
+{
+  "robot": {"kind": "tractor"},
+  "ground_vehicle": {"trailer": {"enabled": true}}
+}

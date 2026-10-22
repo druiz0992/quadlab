@@ -99,6 +99,9 @@ class WheeledParts:
     laps: Any | None
     driver_input: Any | None
     opponents: tuple[Any, ...] = ()
+    implement: Any | None = None
+    lift_publisher: Any | None = None
+    trailer: Any | None = None
 
 
 class WheeledMissionLoop:
@@ -133,6 +136,7 @@ class WheeledMissionLoop:
         self._next_encoder_ns: int | None = None
         self._next_wheel_log_ns = 0
         self._next_lap_ns = 0
+        self._published_lift_m: float | None = None
         self._encoder = None
         self._driver = DriverCommand()
         self._receipt: WheelCommandReceipt | None = None
@@ -295,6 +299,9 @@ class WheeledMissionLoop:
         self._advance_estimator(kind, message)
         if kind == "odometry":
             return self._on_odometry(message, t)
+        if kind == "trailer" and parts.trailer is not None:
+            parts.trailer.on_joint_state(message)
+            return True
         if kind == "contacts":
             for contact in message.contact:
                 a, b = contact.collision1.name, contact.collision2.name
@@ -424,6 +431,7 @@ class WheeledMissionLoop:
         else:
             commands = parts.controller.update(state, request, dt_s)
         receipt = parts.model.actuators.accept(commands, stamp)
+        self._command_implement(request)
         self._receipt = receipt
         for channel, wheels in receipt.limited.items():
             if wheels:
@@ -455,6 +463,27 @@ class WheeledMissionLoop:
             parts.recorder.log_driver(stamp * 1e-9, request)
         self._files["commands"].write(json.dumps(record) + "\n")
         parts.recorder.log_receipt(receipt)
+
+    def _step_trailer(self, stamp: int, chassis: ChassisState) -> None:
+        trailer = self.parts.trailer
+        if trailer is None:
+            return
+        brake = self.parts.model.actuators.commands[0].brake_torque_nm
+        if trailer.step(stamp, chassis, trailer.brake_fraction(brake), self.period_s):
+            self.parts.health.on_jackknife(stamp, abs(float(np.degrees(trailer.yaw))))
+        if trailer.state is not None:
+            self.parts.recorder.log_trailer(stamp * 1e-9, trailer)
+
+    def _command_implement(self, request: DriverCommand | None) -> None:
+        """Lower or raise the implement: the controller's optional
+        ``implement_lowered()`` decides, else the driver's request."""
+        implement, controller = self.parts.implement, self.parts.controller
+        if implement is None:
+            return
+        if controller is not None and hasattr(controller, "implement_lowered"):
+            implement.command(bool(controller.implement_lowered()))
+        elif request is not None:
+            implement.command(request.implement_lowered)
 
     def _driver_request(
         self, chassis: ChassisState, dt_s: float
@@ -528,7 +557,14 @@ class WheeledMissionLoop:
             states.append(opponent.chassis if opponent.chassis is not None else chassis)
         wrenches = parts.model.step_all(states, self.period_s)
         wrench = wrenches[0]
-        parts.wrench.set(wrench.force_world_n, wrench.torque_world_nm)
+        force, torque = wrench.force_world_n, wrench.torque_world_nm
+        if parts.implement is not None:
+            draft_force, draft_torque = parts.implement.step(chassis, self.period_s)
+            force, torque = force + draft_force, torque + draft_torque
+            self._publish_lift(parts.implement.lift_m)
+        parts.wrench.set(force, torque)
+        if parts.trailer is not None:
+            self._step_trailer(stamp, chassis)
         evaluate_laps = stamp >= self._next_lap_ns
         for opponent, opponent_wrench in zip(parts.opponents, wrenches[1:]):
             if opponent.chassis is not None:
@@ -549,9 +585,31 @@ class WheeledMissionLoop:
             self._update_laps(stamp, t, chassis, telemetry)
         if stamp >= self._next_wheel_log_ns:
             self._next_wheel_log_ns = stamp + round(1e9 / WHEEL_LOG_RATE_HZ)
-            self._files["wheels"].write(
-                json.dumps(_wheel_record(t, telemetry, wrench)) + "\n"
-            )
+            record = _wheel_record(t, telemetry, wrench)
+            if parts.trailer is not None and parts.trailer.model.telemetry is not None:
+                trailer = parts.trailer
+                record["trailer"] = dict(
+                    yaw_rad=trailer.yaw,
+                    pitch_rad=trailer.pitch,
+                    normal_load_n=np.round(
+                        trailer.model.telemetry.normal_load_n, 3
+                    ).tolist(),
+                    position_m=np.round(trailer.state.position_m, 4).tolist(),
+                )
+            if parts.implement is not None:
+                record["implement"] = parts.implement.telemetry.__dict__
+                parts.recorder.log_implement(t, parts.implement.telemetry)
+            self._files["wheels"].write(json.dumps(record) + "\n")
+
+    def _publish_lift(self, lift_m: float) -> None:
+        """Gazebo's implement link follows the Python lift position."""
+        if lift_m == self._published_lift_m or self.parts.lift_publisher is None:
+            return
+        from gz.msgs10.double_pb2 import Double
+
+        if not self.parts.lift_publisher.publish(Double(data=float(lift_m))):
+            raise RuntimeError("Unable to publish implement lift")
+        self._published_lift_m = lift_m
 
     def _update_laps(
         self, stamp: int, t: float, chassis: ChassisState, telemetry: Any

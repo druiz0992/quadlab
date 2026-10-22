@@ -213,6 +213,11 @@ robotlab --robot tractor --keyboard --headless --output outputs/tractor
 # Race on the circuit against three track-following opponents (lap times in summary.json)
 robotlab --robot car --keyboard --headless --scene worlds/race_circuit.json \
   --config configs/scenarios/race_opponents.json --output outputs/race
+# Tractor ploughing the farm field (H lowers/raises the plough; RTK GPS), or towing a trailer
+robotlab --keyboard --headless --scene worlds/farm_field.json --config configs/scenarios/field_plough.json --output outputs/plough
+robotlab --keyboard --headless --scene worlds/farm_field.json --config configs/scenarios/tractor_trailer.json --output outputs/trailer
+# Rover on rough off-road terrain
+robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json --output outputs/rover-terrain
 # Your wheeled controller: algorithms.controller in a config layer; start from
 # control/wheeled_template.py and check it with check_wheeled_controller
 

@@ -1,0 +1,262 @@
+{
+  "description": "Farm field for the tractor: concrete yard, gravel farm track, 160 x 100 m soil field (crop rows on its south half), grass headlands and verges, barn and trees; flat ground. Tractor starts in the yard facing the field.",
+  "ground_size_m": 400.0,
+  "ground_surface": {
+    "name": "grass",
+    "friction_scale": 0.9,
+    "rolling_resistance_scale": 1.5
+  },
+  "obstacles": [
+    {
+      "name": "barn",
+      "position": [-95.0, 22.0, 5.0],
+      "size": [24.0, 14.0, 10.0]
+    },
+    {
+      "name": "shed",
+      "position": [-70.0, 20.0, 2.5],
+      "size": [10.0, 8.0, 5.0]
+    },
+    {
+      "name": "silo",
+      "position": [-110.0, -10.0, 7.0],
+      "size": [6.0, 6.0, 14.0]
+    },
+    {
+      "name": "tree_ne",
+      "position": [146.0, 56.0, 3.0],
+      "size": [1.0, 1.0, 6.0]
+    },
+    {
+      "name": "tree_se",
+      "position": [146.0, -56.0, 3.0],
+      "size": [1.0, 1.0, 6.0]
+    },
+    {
+      "name": "tree_nw",
+      "position": [-26.0, 56.0, 3.0],
+      "size": [1.0, 1.0, 6.0]
+    },
+    {
+      "name": "tree_sw",
+      "position": [-26.0, -56.0, 3.0],
+      "size": [1.0, 1.0, 6.0]
+    }
+  ],
+  "surfaces": [
+    {
+      "shape": "rectangle",
+      "name": "soil",
+      "center_m": [60.0, 0.0],
+      "size_m": [160.0, 100.0],
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -48.0],
+        [136.0, -48.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -45.0],
+        [136.0, -45.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -42.0],
+        [136.0, -42.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -39.0],
+        [136.0, -39.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -36.0],
+        [136.0, -36.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -33.0],
+        [136.0, -33.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -30.0],
+        [136.0, -30.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -27.0],
+        [136.0, -27.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -24.0],
+        [136.0, -24.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -21.0],
+        [136.0, -21.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -18.0],
+        [136.0, -18.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -15.0],
+        [136.0, -15.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -12.0],
+        [136.0, -12.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -9.0],
+        [136.0, -9.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -6.0],
+        [136.0, -6.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "crop",
+      "points_m": [
+        [-16.0, -3.0],
+        [136.0, -3.0]
+      ],
+      "width_m": 0.6,
+      "friction_scale": 1.0,
+      "rolling_resistance_scale": 2.5
+    },
+    {
+      "shape": "strip",
+      "name": "gravel",
+      "points_m": [
+        [-80.0, 0.0],
+        [-40.0, 0.0],
+        [-20.0, 0.0]
+      ],
+      "width_m": 5.0,
+      "friction_scale": 1.1,
+      "rolling_resistance_scale": 1.2
+    },
+    {
+      "shape": "rectangle",
+      "name": "tarmac",
+      "center_m": [-92.0, 0.0],
+      "size_m": [30.0, 24.0],
+      "friction_scale": 1.2,
+      "rolling_resistance_scale": 1.0
+    }
+  ],
+  "spawn_points": [
+    {
+      "position_m": [-95.0, 0.0],
+      "yaw_deg": 0.0
+    },
+    {
+      "position_m": [-95.0, -8.0],
+      "yaw_deg": 0.0
+    }
+  ]
+}

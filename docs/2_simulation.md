@@ -408,11 +408,12 @@ hovering drone at 4.97 s, was recorded as a collision, and pushed it 9 m.
 Rerun follows moving obstacles. During keyboard flight, key 7 spawns an
 extra flying object (see [4 Control](4_control.md#keyboard-effect-toggles)).
 
-### Race circuit
+### Ground-vehicle worlds
 
 `worlds/race_circuit.json` is a race track for wheeled robots (asphalt,
-kerbs, gravel, grass, start grid, `track` for lap timing); see
-[8 Ground vehicles](8_ground_vehicles.md#race-circuit-and-opponents).
+kerbs, gravel, grass, start grid, `track` for lap timing); with
+`worlds/farm_field.json` (tractor) and `worlds/rover_terrain.json` (rover)
+see [8 Ground vehicles](8_ground_vehicles.md#worlds).
 
 ### Obstacle circuit
 

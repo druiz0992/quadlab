@@ -37,7 +37,11 @@ from ..simulation.gazebo.ingress import (
     gz_sim_command,
     subscriptions,
 )
-from ..simulation.gazebo.wheeled_vehicle import OPPONENT_ODOMETRY_TOPIC, opponent_name
+from ..simulation.gazebo.wheeled_vehicle import (
+    OPPONENT_ODOMETRY_TOPIC,
+    TRAILER_JOINT_TOPIC,
+    opponent_name,
+)
 from .opponents import Opponent, build_opponent_controller, opponent_options
 from ..simulation.gazebo.odometry import OdometryVelocityFix
 from ..simulation.gazebo.plugins import lockstep_barrier
@@ -221,6 +225,17 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
         settings, vehicle, stack.context, ground, Wrench, node, ego_wrench.publisher
     )
     names = frozenset(o.name for o in opponents)
+    implement, lift_publisher = _implement(settings, ground, node)
+    trailer = None
+    if settings["ground_vehicle"]["trailer"]["enabled"]:
+        from .trailer import Trailer
+
+        trailer = Trailer(
+            settings["ground_vehicle"]["trailer"],
+            vehicle,
+            ground,
+            Wrench(node, f"{vehicle.model_name}::trailer", steps, ego_wrench.publisher),
+        )
     keyboard = settings["ground_vehicle"]["keyboard"]
     parts = WheeledParts(
         args=args,
@@ -238,6 +253,12 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
             ingress,
             {
                 **_scheduled_periods_ns(settings, pipeline),
+                # Hitch joint states: every physics step.
+                **(
+                    {"trailer": float(_step_ns(settings))}
+                    if trailer is not None
+                    else {}
+                ),
                 # Opponents publish every period; wait for each of them.
                 **{
                     OPPONENT_KIND_PREFIX
@@ -279,6 +300,9 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
         keyboard=window,
         laps=LapTimer(stack.context.track) if stack.context.track else None,
         opponents=tuple(opponents),
+        implement=implement,
+        lift_publisher=lift_publisher,
+        trailer=trailer,
         driver_input=(
             DriverInput(keyboard["throttle_rate_per_s"], keyboard["steer_rate_per_s"])
             if window is not None
@@ -302,7 +326,12 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
                 OPPONENT_KIND_PREFIX + o.name,
             )
             for o in opponents
-        ],
+        ]
+        + (
+            [("model_pb2.Model", TRAILER_JOINT_TOPIC, "trailer")]
+            if trailer is not None
+            else []
+        ),
     )
     loop = WheeledMissionLoop(parts)
     try:
@@ -318,6 +347,19 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
     )
     _print_health(summary["health"])
     return summary
+
+
+def _implement(settings, ground, node):
+    """The hitch implement model and its lift publisher, or (None, None)."""
+    section = settings["ground_vehicle"]["implement"]
+    if not section["enabled"]:
+        return None, None
+    from gz.msgs10.double_pb2 import Double
+
+    from ..simulation.gazebo.wheeled_vehicle import IMPLEMENT_LIFT_TOPIC
+    from ..simulation.wheeled.implement import ImplementModel
+
+    return ImplementModel(section, ground), node.advertise(IMPLEMENT_LIFT_TOPIC, Double)
 
 
 def _opponents(settings, vehicle, context, ground, Wrench, node, publisher):

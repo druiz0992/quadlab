@@ -32,6 +32,15 @@ robotlab --robot car --headless --config my_controller.json --duration 20 --outp
 # Race: you drive the car on the circuit against three opponents
 robotlab --robot car --keyboard --headless --scene worlds/race_circuit.json \
   --config configs/scenarios/race_opponents.json --output outputs/race
+
+# Tractor on the farm: plough (H lowers/raises it, RTK GPS) or towing a trailer
+robotlab --keyboard --headless --scene worlds/farm_field.json \
+  --config configs/scenarios/field_plough.json --output outputs/plough
+robotlab --keyboard --headless --scene worlds/farm_field.json \
+  --config configs/scenarios/tractor_trailer.json --output outputs/trailer
+
+# Rover off-road (bumps, slopes, sand, gravel and mud patches)
+robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json --output outputs/rover-terrain
 ```
 
 `--robot` loads the vehicle's preset (`simulation/wheeled/config.py`) under
@@ -54,7 +63,7 @@ effect, optical flow, airspeed); the configuration rejects them.
 | ←/→ | Steer (rover: turn on the spot); returns to centre on release |
 | Space | Full brake |
 | 1 / 2 / 3 | Tractor steering: front / coordinated (front and rear opposite) / crab |
-| H | Tractor implement down / up (recorded; implements are not modelled yet) |
+| H | Tractor implement down / up |
 | Esc | End the run |
 
 Ramp rates are `ground_vehicle.keyboard.throttle_rate_per_s` and
@@ -149,6 +158,65 @@ Scene keys for wheeled robots (ignored by multirotors):
   a race track (`core/track.py`): lap timing, track limits, and map
   knowledge for controllers (`context.track`).
 
+## Worlds
+
+| Scene | For | Contents |
+| --- | --- | --- |
+| `worlds/race_circuit.json` | car | 1.23 km circuit, kerbs, gravel traps, grass, grid, `track` (below) |
+| `worlds/farm_field.json` | tractor | concrete yard, gravel farm track, 160 × 100 m soil field with crop rows on its south half, grass headlands, barn, shed, silo, trees; flat |
+| `worlds/rover_terrain.json` | rover | seeded height field (140 overlapping bumps and slopes up to about 2.5 m; median slope 6°, 95th percentile 13°), sand, gravel and mud patches, boulders seated on the terrain; flat start disc |
+
+The terrain height field has a step down to flat ground at the edge of its
+60 m square; stay inside it. Its heights are summed over all hills at once
+(bit-identical to the sequential sum), so wheel ray casts on terrain cost
+about 30 µs.
+
+## Tractor implement and trailer
+
+The tractor carries either a rear three-point-hitch implement or a towed
+trailer (one rear hitch; the configuration rejects both).
+
+**Implement** (`ground_vehicle.implement`, `simulation/wheeled/implement.py`).
+Soil draft follows the ASABE D497 form D = F_i (A + B S + C S²) W T (S in
+km/h, W width in m, T depth in cm; ASABE D497.7, 2015). The built-in
+`moldboard_plough` uses A = 652, B = 0, C = 5.1 and F_i = 1.0 / 0.70 / 0.45
+for fine / medium / coarse soil; `type: custom` takes `draft_a`,
+`draft_b`, `draft_c`, and `texture_factor`. The draft acts at the tool point
+(bottom centre of the implement) against its horizontal velocity, faded in
+from standstill (no draft without motion); vertical soil forces are not
+modelled. The lift moves at `lift_rate_mps` and, lowered, controls the
+working depth (`working_depth_m`) within `lift_travel_m`. In Gazebo the
+implement is a visual-only link with its mass on a prismatic joint that
+follows the Python lift. Keys: `enabled`, `type`, `texture`, `width_m`,
+`working_depth_m`, `mass_kg`, `size_m`, `hitch_position_m` (box centre when
+raised, body axes from the centre of mass), `lift_travel_m`,
+`lift_rate_mps`, `start_lowered`. The keyboard's H toggles it; a controller
+may define `implement_lowered() -> bool` (called each control tick) to
+command it instead. `summary.json.implement` reports worked area (width ×
+distance at ≥ half the working depth), draft energy, and peak draft;
+`wheels.jsonl` and Rerun (Implement tab) the lift, depth, and draft.
+Verified: lowered at 5 s from 40 km/h with 4000 N·m per wheel, the tractor
+ploughs at 0.20 m depth and 2.15 m/s against 21.5 kN, with 16 % front and
+6 % rear wheel slip; wheel loads sum to tractor plus implement weight.
+
+**Trailer** (`ground_vehicle.trailer`, `experiments/trailer.py`). A link in
+the tractor's model on revolute yaw and pitch joints at the drawbar hitch
+(roll follows the tractor: a simplification). Gazebo publishes the joint
+angles and rates every physics step; Python computes the trailer's state by
+forward kinematics, runs its own unpowered wheel model (tyres and
+suspension derived from the tractor's, scaled so the static sag matches),
+and applies its wrench. Its brakes follow the tractor's commanded brake
+fraction. Keys: `enabled`, `mass_kg`, `inertia_kg_m2`, `size_m`,
+`hitch_position_m`, `drawbar_m`, `cg_below_hitch_m`, `wheel_radius_m`,
+`wheels` (trailer axes, hub at full droop; `braked`), `max_brake_torque_nm`,
+`yaw_limit_deg`, `pitch_limit_deg`. A hitch yaw beyond 90 % of its limit is
+a `jackknife` warning. `summary.json.trailer` reports the peak articulation
+and jackknife time; `wheels.jsonl` the hitch angles and trailer wheel
+loads. Verified: parked, the trailer axle carries 13.5 kN (expected 13.4 kN
+for the axle 0.3 m behind the 1500 kg trailer's centre of mass) and the
+loads of both vehicles sum to their weight; a full-lock left turn
+articulates to −71°.
+
 ## Race circuit and opponents
 
 `worlds/race_circuit.json` is a 1.23 km closed circuit: 12 m asphalt
@@ -212,6 +280,8 @@ request, dt_s) -> WheelCommands` (`control/wheeled.py`), selected by
   values, negative brake, a command on a wheel without that actuator) raise
   ValueError; physical limits are applied and reported per channel in
   `commands.jsonl` (`limited`) and `summary.json.limited_commands`.
+
+Optional: `implement_lowered() -> bool` commands the tractor implement.
 
 Start from `control/wheeled_template.py` (speed and yaw-rate P control) and
 check a controller without Gazebo:
