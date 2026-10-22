@@ -1,0 +1,30 @@
+{
+  "name": "wheeled_route_randomized",
+  "robot": "car",
+  "scene": "worlds/airfield.json",
+  "drone": [
+    "configs/scenarios/route_airfield.json",
+    "configs/vehicles/randomized_wheeled.json"
+  ],
+  "duration_s": 90,
+  "seeds": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "metrics": [
+    "summary.track.best_lap_s",
+    "summary.track.rms_lateral_offset_m",
+    "summary.track.max_lateral_offset_m",
+    "summary.track.off_track_episodes",
+    "summary.max_speed_mps",
+    "summary.randomization.mass_factor",
+    "summary.randomization.tyre_friction_factor",
+    "summary.completed"
+  ],
+  "parallel": 2,
+  "set": {
+    "simulation.real_time_factor": 0
+  }
+}

@@ -43,3 +43,30 @@ def test_invalid_tracks(track, message):
 
 def test_scene_without_track():
     assert Track.from_scene({}) is None
+
+
+def test_route_is_resampled_and_closes_on_a_repeated_first_point():
+    open_route = Track.from_route([[0, 0], [10, 0], [10, 3]], 4.0)
+    assert not open_route.closed
+    assert open_route.length_m == pytest.approx(13.0)
+    points = np.asarray(open_route.centreline_m)
+    assert np.max(np.linalg.norm(np.diff(points, axis=0), axis=1)) <= 2.0 + 1e-12
+    np.testing.assert_allclose(points[[0, -1]], [[0, 0], [10, 3]])
+    loop = Track.from_route([[0, 0], [10, 0], [10, 10], [0, 0]], 4.0)
+    assert loop.closed and loop.length_m == pytest.approx(20 + np.hypot(10, 10))
+    assert tuple(loop.centreline_m[0]) != tuple(loop.centreline_m[-1])
+
+
+@pytest.mark.parametrize(
+    "waypoints, message",
+    [
+        ([[0, 0]], "two"),
+        ([[0, 0, 0], [1, 0, 0]], "two"),
+        ([[0, 0], [0, 0], [1, 0]], "repeated"),
+        ([[0, 0], [float("nan"), 0]], "finite"),
+        ([["a", 0], [1, 0]], "numbers"),
+    ],
+)
+def test_invalid_routes(waypoints, message):
+    with pytest.raises(ValueError, match=message):
+        Track.from_route(waypoints, 4.0)

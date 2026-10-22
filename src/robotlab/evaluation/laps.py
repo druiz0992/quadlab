@@ -10,6 +10,11 @@ and never feeds the run.
   behind the line (a grid slot) therefore times full laps from its first
   crossing. Crossing backwards undoes the lap count (no lap is credited for
   reversing over the line).
+- **Open routes** (``ground_vehicle.route`` without a closing point):
+  progress is the arc length gained since the first sample, and the route
+  is finished at the first sample within ``FINISH_TOLERANCE_M`` of its end.
+- **Path tracking**: maximum and root-mean-square lateral offset of the
+  vehicle position from the centreline, over every sample.
 - **Track limits**: the vehicle is off track while every wheel contact
   point lies more than ``width/2`` from the centreline (all four wheels
   over the line, as in motor racing). Episodes and time off track are
@@ -24,6 +29,9 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from ..core.track import Track
+
+# An open route counts as finished this close to its end (m of arc length).
+FINISH_TOLERANCE_M = 1.0
 
 
 class LapTimer:
@@ -41,7 +49,11 @@ class LapTimer:
         self._off_since: float | None = None
         self._last_t: float | None = None
         self.max_lateral_m = 0.0
+        self._lateral_sq_sum = 0.0
+        self._samples = 0
         self.progress_m = 0.0
+        self._start_s: float | None = None
+        self.finished_s: float | None = None
         # Previous nearest segment: a search hint (the car moves little
         # between samples).
         self._segment: int | None = None
@@ -53,11 +65,14 @@ class LapTimer:
         )
         self._segment = int(projection.segment[0])
         s = float(projection.s_m[0])
-        self.max_lateral_m = max(
-            self.max_lateral_m, abs(float(projection.lateral_m[0]))
-        )
+        lateral = abs(float(projection.lateral_m[0]))
+        self.max_lateral_m = max(self.max_lateral_m, lateral)
+        self._lateral_sq_sum += lateral * lateral
+        self._samples += 1
         if self.track.closed:
             self._laps(t, s)
+        else:
+            self._route(t, s)
         self._limits(t, contacts_xy)
         self._last_t = t
 
@@ -78,6 +93,13 @@ class LapTimer:
             self._lap_count -= 1
             self._lap_start_s = None
         self.progress_m += delta
+
+    def _route(self, t: float, s: float) -> None:
+        if self._start_s is None:
+            self._start_s = s
+        self.progress_m = s - self._start_s
+        if self.finished_s is None and s >= self._length - FINISH_TOLERANCE_M:
+            self.finished_s = t
 
     def _limits(self, t: float, contacts_xy: ArrayLike) -> None:
         points = np.atleast_2d(np.asarray(contacts_xy, float))
@@ -108,4 +130,11 @@ class LapTimer:
             off_track_episodes=self.off_track_episodes,
             off_track_s=self.off_track_s,
             max_lateral_offset_m=self.max_lateral_m,
+            rms_lateral_offset_m=(
+                float(np.sqrt(self._lateral_sq_sum / self._samples))
+                if self._samples
+                else None
+            ),
+            closed=self.track.closed,
+            finished_s=self.finished_s,
         )

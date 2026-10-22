@@ -361,3 +361,35 @@ def test_keyboard_driving_path_in_real_time(tmp_path, monkeypatch):
     assert summary["max_speed_mps"] > 10.0
     # Python paces the unthrottled world to real time.
     assert summary["real_time"]["achieved_factor"] == pytest.approx(1.0, abs=0.08)
+
+
+def test_randomized_car_follows_a_route(tmp_path):
+    layer = {
+        **FAST,
+        "algorithms": {"controller": "track_follower"},
+        "ground_vehicle": {
+            "route": {"waypoints_m": [[0, 0], [60, 0], [80, -20]], "width_m": 6.0},
+            "randomization": {
+                "enabled": True,
+                "seed": 2,
+                "mass_fraction_std": 0.05,
+                "inertia_fraction_std": 0.1,
+                "center_of_mass_std_m": [0.05, 0.02, 0.0],
+                "tyre_friction_fraction_std": 0.05,
+                "drive_torque_fraction_std": 0.05,
+            },
+        },
+    }
+    summary, _ = drive(tmp_path, "car", layer, 15.0, "worlds/airfield.json")
+    assert summary["health"]["verdict"] == "ok"
+    # The run simulates the true (randomized) car.
+    nominal = load_drone_config(robot="car").wheeled.mass_kg
+    factor = summary["randomization"]["mass_factor"]
+    assert factor != 1.0
+    assert summary["robot"]["mass_kg"] == pytest.approx(nominal * factor)
+    track = summary["track"]
+    assert track["closed"] is False
+    assert track["finished_s"] is not None and track["finished_s"] < 15.0
+    assert track["progress_m"] > track["length_m"] - 1.5
+    assert track["off_track_episodes"] == 0
+    assert track["rms_lateral_offset_m"] < 1.0

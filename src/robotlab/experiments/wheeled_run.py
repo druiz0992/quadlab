@@ -95,11 +95,13 @@ def validate_wheeled_run(
         raise ValueError("--keyboard requires mission mode; omit --edit")
     if settings["randomization"]["enabled"]:
         raise ValueError(
-            f"{kind}: randomization is not supported for wheeled robots yet"
+            f"{kind}: randomization is the multirotor section; "
+            "use ground_vehicle.randomization"
         )
     if settings["mission"]["type"] != "none":
         raise ValueError(
-            f"{kind}: mission references are not supported for wheeled robots yet"
+            f"{kind}: mission references are multirotor-only; "
+            "use ground_vehicle.route for a reference path"
         )
     if not np.isfinite(args.duration) or args.duration <= 0:
         raise ValueError("Duration must be positive")
@@ -186,7 +188,12 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
     from .gazebo import _print_health, _scheduled_periods_ns, _step_ns
     from ..simulation.gazebo.stepping import TrackedNode, steps_per_period
 
-    settings, vehicle = config.data, config.wheeled
+    # Gazebo and the wheel model simulate the true (possibly randomized)
+    # vehicle; algorithms keep the nominal one (simulation/randomization.py).
+    settings, nominal = config.data, config.wheeled
+    vehicle = prepared.true_config.wheeled
+    if nominal is None or vehicle is None:
+        raise ValueError("wheeled run without wheeled properties")
     output, scene, terrain, world = (
         prepared.output,
         prepared.scene,
@@ -220,8 +227,8 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
         pipeline.bus_kinds(),
         rotor_mode=False,
         log=debug,
-        wheeled=vehicle,
-        track=Track.from_scene(scene),
+        wheeled=nominal,
+        track=reference_track(settings, scene),
     )
     controller = build_wheeled_controller(settings, stack.context, args.keyboard)
     ground = GroundModel.from_scene(scene, terrain)
@@ -313,6 +320,7 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
         implement=implement,
         lift_publisher=lift_publisher,
         trailer=trailer,
+        randomization_draws=prepared.randomization_draws,
         driver_input=(
             DriverInput(keyboard["throttle_rate_per_s"], keyboard["steer_rate_per_s"])
             if window is not None
@@ -357,6 +365,15 @@ def _drive(args, config, prepared, window, Node, Wrench, Recorder):
     )
     _print_health(summary["health"])
     return summary
+
+
+def reference_track(settings: dict[str, Any], scene: dict[str, Any]) -> Track | None:
+    """``ground_vehicle.route`` as a track when it has waypoints, else the
+    scene's track (or None)."""
+    route = settings["ground_vehicle"]["route"]
+    if route["waypoints_m"]:
+        return Track.from_route(route["waypoints_m"], route["width_m"])
+    return Track.from_scene(scene)
 
 
 def _implement(settings, ground, node):

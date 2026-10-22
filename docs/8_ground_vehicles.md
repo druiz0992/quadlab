@@ -139,6 +139,8 @@ visuals neither spin nor steer; Rerun draws the live wheels.
 | `ground_vehicle.spawn_yaw_deg`, `spawn_index` | start heading without scene spawn points; grid slot with them |
 | `ground_vehicle.substeps` | tyre and wheel-spin integration substeps per period |
 | `ground_vehicle.keyboard` | keyboard ramps and speed limit (above) |
+| `ground_vehicle.randomization` | `enabled`, `seed`, `mass_fraction_std`, `inertia_fraction_std`, `center_of_mass_std_m`, `tyre_friction_fraction_std`, `drive_torque_fraction_std` (below) |
+| `ground_vehicle.route` | `waypoints_m`, `width_m` (below) |
 | `sensors.wheel_encoders` | `enabled`, `rate_hz`, `counts_per_revolution`, `steering_noise_std_rad`, `seed` |
 
 Encoders count floor(θ · cpr / 2π) of the true wheel angle and report the
@@ -294,6 +296,40 @@ undoes it) and track limits (every wheel contact beyond the track edge).
 `summary.json.track` and each `summary.json.opponents[].track` report lap
 times, best lap, progress along the track, and off-track episodes and
 time; the health verdict warns with `off_track`.
+
+## Routes, randomization, and batch runs
+
+**Routes.** `ground_vehicle.route.waypoints_m` (`[[x, y], ...]`, world m)
+is a reference path. It replaces the scene track as `context.track`, so
+`track_follower` and your own controllers can follow it. Lap timing and
+track limits are evaluated on it, with a corridor `width_m` wide. Straight
+legs are resampled at most 2 m apart. A last point equal to the first
+makes a closed loop. On an open route `summary.json.track` reports
+`progress_m` from the start and `finished_s`, the first time within 1 m of
+the end. Every route and track reports `max_lateral_offset_m` and
+`rms_lateral_offset_m`. The multirotor `mission` section is rejected for
+wheeled robots, with a pointer to the route. Example:
+`configs/scenarios/route_airfield.json` (a 313 m loop on the airfield).
+
+**Randomization.** `ground_vehicle.randomization` draws a true vehicle
+that differs from the nominal one, seeded and truncated at 3σ (see
+`simulation/randomization.py`). The draws cover mass, the mass
+distribution (second moments, which keeps the inertia physically valid),
+centre-of-mass shift, tyre friction, and drive torque/power. Gazebo and
+the Python wheel model simulate the true vehicle. Controllers and
+estimators get the nominal one in `context.wheeled`. Opponents are built
+from the true vehicle too. `summary.json.randomization` lists the draws,
+and `robot.mass_kg` is the true mass. Example layer:
+`configs/vehicles/randomized_wheeled.json`.
+
+**Batch runs.** An experiment file with `"robot": "car"` (or `rover`,
+`tractor`) runs wheeled robots in `robotlab-batch`
+([7 Experiments](7_experiments.md#batch-experiments-and-baselines)).
+`summary.track.*` and `summary.randomization.*` work as metrics.
+`configs/experiments/wheeled_route_randomized.json` drives the airfield
+loop with `track_follower` on four randomized cars for 90 s each. Result
+(2026-10-22): best lap 42.78 ± 0.18 s, lateral offset RMS 0.35 ± 0.10 m,
+maximum 1.5 ± 0.7 m, no off-track episodes.
 
 ## Controllers
 

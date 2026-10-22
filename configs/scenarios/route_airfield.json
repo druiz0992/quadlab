@@ -1,0 +1,13 @@
+{
+  "robot": {"kind": "car"},
+  "algorithms": {"controller": "track_follower"},
+  "ground_vehicle": {
+    "route": {
+      "waypoints_m": [
+        [0, 0], [60, 0], [80, -20], [80, -60], [60, -80],
+        [0, -80], [-20, -60], [-20, -20], [0, 0]
+      ],
+      "width_m": 6.0
+    }
+  }
+}

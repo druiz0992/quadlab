@@ -56,3 +56,27 @@ def test_off_track_needs_every_wheel_outside():
     assert summary["off_track_episodes"] == 2
     assert summary["off_track_s"] == pytest.approx(0.1)
     assert timer.off_track_since_s == pytest.approx(0.4)
+
+
+def test_open_route_progress_finish_and_rms_offset():
+    route = Track.from_route([[0, 0], [50, 0]], 4.0)
+    timer = LapTimer(route)
+    for index, x in enumerate(np.arange(0.0, 50.5, 0.5)):
+        point = np.array([x, 1.0 if index % 2 else -1.0])
+        timer.on_truth(index * 0.1, point, wheels(point))
+    summary = timer.summary()
+    assert summary["closed"] is False and summary["laps_completed"] == 0
+    assert summary["progress_m"] == pytest.approx(50.0)
+    # Finished at the first sample within 1 m of the end (x = 49 m).
+    assert summary["finished_s"] == pytest.approx(9.8)
+    assert summary["rms_lateral_offset_m"] == pytest.approx(1.0)
+    assert summary["max_lateral_offset_m"] == pytest.approx(1.0)
+    assert summary["off_track_episodes"] == 0
+
+
+def test_closed_loop_reports_no_finish():
+    timer = LapTimer(SQUARE)
+    point = np.array([5.0, 0.0])
+    timer.on_truth(0.0, point, wheels(point))
+    assert timer.summary()["finished_s"] is None
+    assert timer.summary()["closed"] is True

@@ -180,3 +180,21 @@ def test_batch_comparison_uses_tolerance_directions(tmp_path):
     calm, windy = runs[0].group, runs[2].group
     assert f"| Metric | {calm} | {windy} |" in report
     assert "| `control.tracking.position_m.rmse` | **" in report  # calm group wins
+
+
+def test_wheeled_experiments_pass_the_robot_and_its_seeds(tmp_path):
+    from robotlab.experiments.batch import load_experiment, resolved_seed_paths
+
+    experiment = dict(name="w", robot="car", drone=[], duration_s=5)
+    command = run_command(experiment, tmp_path / "o.json", tmp_path)
+    assert command[command.index("--robot") + 1] == "car"
+    assert "--control-mode" not in command
+    assert "ground_vehicle.randomization.seed" in resolved_seed_paths(experiment)
+    path = tmp_path / "e.json"
+    for bad, message in (
+        (dict(robot="boat"), "robot must be"),
+        (dict(robot="car", control_mode="velocity"), "multirotors only"),
+    ):
+        path.write_text(json.dumps(bad))
+        with pytest.raises(ValueError, match=message):
+            load_experiment(path)

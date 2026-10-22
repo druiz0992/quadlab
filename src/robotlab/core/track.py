@@ -7,14 +7,20 @@ track limits. ``project`` maps world points to the arc length s along the
 centreline (m, from point 0, increasing in point order) and the signed
 lateral offset (m, positive to the left of the driving direction). The
 start/finish line is the normal to the centreline at point 0. Units: m.
+
+A wheeled robot's reference route (``ground_vehicle.route``) is built with
+``Track.from_route`` and takes the scene track's place.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
+
+# Longest straight-leg sample spacing of a route (m).
+ROUTE_SPACING_M = 2.0
 
 
 @dataclass(frozen=True)
@@ -67,6 +73,40 @@ class Track:
             raise ValueError("track.width_m must be a number")
         points = np.asarray(track.get("centreline_m", []), float)
         return cls(tuple(map(tuple, points.tolist())), float(width), closed)
+
+    @classmethod
+    def from_route(
+        cls,
+        waypoints_m: Sequence[Sequence[float]],
+        width_m: float,
+        spacing_m: float = ROUTE_SPACING_M,
+    ) -> "Track":
+        """Route through ``[[x, y], ...]`` waypoints (m), straight legs
+        resampled at most ``spacing_m`` apart (so a two-point route is a
+        valid track and curvature estimates stay local). A last waypoint
+        equal to the first closes the loop. Raises ValueError for fewer
+        than two distinct points, repeated consecutive points, or
+        non-finite values."""
+        try:
+            points = np.asarray(waypoints_m, float)
+        except (TypeError, ValueError):
+            raise ValueError("route waypoints_m must be [[x, y], ...] numbers")
+        if points.ndim != 2 or points.shape[1] != 2 or len(points) < 2:
+            raise ValueError("route waypoints_m needs at least two [x, y] points")
+        if not np.isfinite(points).all():
+            raise ValueError("route waypoints_m must be finite")
+        legs = np.linalg.norm(np.diff(points, axis=0), axis=1)
+        if np.any(legs < 1e-6):
+            raise ValueError("route waypoints_m has repeated consecutive points")
+        closed = len(points) > 3 and bool(np.allclose(points[0], points[-1]))
+        dense = [points[0]]
+        for start, end, length in zip(points[:-1], points[1:], legs):
+            count = max(1, int(np.ceil(length / spacing_m)))
+            for k in range(1, count + 1):
+                dense.append(start + (end - start) * k / count)
+        if closed:
+            dense.pop()  # the closing vertex is implied
+        return cls(tuple((float(x), float(y)) for x, y in dense), width_m, closed)
 
     def _closed_points(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
         return np.vstack([points, points[:1]]) if self.closed else points

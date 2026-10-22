@@ -32,7 +32,8 @@ document and update the status below.
 | Race circuit world with track, lap timing, track limits; opponent cars with the track follower (kinematic obstacles or full dynamic cars) | Implemented ([8 Ground vehicles](8_ground_vehicles.md#race-circuit-and-opponents)) |
 | Farm field and off-road rover worlds; tractor implement (ASABE D497 draft) and towed trailer | Implemented ([8 Ground vehicles](8_ground_vehicles.md#tractor-implement-and-trailer)) |
 | Wheel encoders on the sensor bus (estimator input) | Implemented ([8 Ground vehicles](8_ground_vehicles.md)) |
-| Wheeled randomization, mission references for wheeled robots | Future |
+| Wheeled randomization, reference routes, wheeled batch experiments | Implemented ([8 Ground vehicles](8_ground_vehicles.md#routes-randomization-and-batch-runs)) |
+| Multirotor randomization: per-axis inertia scaling can break the triangle inequality (about 6 % of seeds at `inertia_fraction_std` 0.1 with the default inertia; Gazebo then refuses the world); wheeled robots scale second moments instead | Known issue; fixing it changes multirotor draws |
 | ApplyLinkWrench persistent wrenches accumulate (multirotor body drag and fixed-wing aerodynamics publish a delta every period, so long runs slow down quadratically); wheeled robots use one-step impulses | Known issue; fix proposed below |
 | Reversible (3D) motors with negative thrust | Future (schema change) |
 | Hexa/octocopter layouts | Implemented: general `vehicle.rotors`, hexa preset |

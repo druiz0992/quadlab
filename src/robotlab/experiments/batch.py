@@ -19,6 +19,9 @@ mission and how to vary it:
 }
 ```
 
+``robot`` (optional: ``rover``, ``car``, ``tractor``) runs a wheeled robot
+instead of the multirotor; ``control_mode`` then does not apply.
+
 Runs are the Cartesian product of ``parameters`` values times ``seeds``.
 Each run gets an override layer (``set``, then that run's parameter values,
 then seeds) written as JSON and appended after ``drone``, so overrides go
@@ -287,7 +290,11 @@ def run_command(
     """Command line for one run (a separate robotlab process)."""
     command = [sys.executable, "-m", "robotlab", "--headless"]
     command += ["--scene", experiment.get("scene", "worlds/training.json")]
-    command += ["--control-mode", experiment.get("control_mode", "rotor-thrust")]
+    robot = experiment.get("robot")
+    if robot is None:
+        command += ["--control-mode", experiment.get("control_mode", "rotor-thrust")]
+    else:
+        command += ["--robot", robot]
     for layer in experiment.get("drone", []):
         command += ["--drone", str(layer)]
     command += ["--drone", str(layer_path)]
@@ -402,6 +409,7 @@ def load_experiment(path: str | Path) -> dict[str, Any]:
     allowed = {
         "name",
         "scene",
+        "robot",
         "drone",
         "control_mode",
         "duration_s",
@@ -419,6 +427,14 @@ def load_experiment(path: str | Path) -> dict[str, Any]:
         raise ValueError(f"Unknown experiment keys: {sorted(unknown)}")
     if not isinstance(experiment.get("drone", []), list):
         raise ValueError("experiment drone must be a list of config layers")
+    robot = experiment.get("robot")
+    if robot is not None:
+        from ..simulation.wheeled.config import WHEELED_KINDS
+
+        if robot not in WHEELED_KINDS:
+            raise ValueError(f"experiment robot must be one of {WHEELED_KINDS}")
+        if "control_mode" in experiment:
+            raise ValueError("experiment control_mode applies to multirotors only")
     return experiment
 
 
@@ -427,7 +443,7 @@ def resolved_seed_paths(experiment: Mapping[str, Any]) -> list[str]:
     from ..simulation.gazebo.config import load_drone_config
 
     layers = list(experiment.get("drone", []))
-    data = deepcopy(load_drone_config(layers).data)
+    data = deepcopy(load_drone_config(layers, robot=experiment.get("robot")).data)
     return seed_keys(data)
 
 

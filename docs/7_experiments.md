@@ -428,7 +428,9 @@ robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2
 ```
 
 An experiment file (`experiments/batch.py` documents every key) names:
-- the scene, `drone` layers, control mode, and duration,
+- the scene, `drone` layers, control mode, and duration (or `robot`:
+  `rover`, `car`, or `tractor` for wheeled robots, without a control mode;
+  see [8 Ground vehicles](8_ground_vehicles.md#routes-randomization-and-batch-runs)),
 - `seeds`, and `parameters` (dotted config keys with lists of values),
 - fixed `set` overrides,
 - the `metrics` to collect (dotted paths into `metrics.json`, or

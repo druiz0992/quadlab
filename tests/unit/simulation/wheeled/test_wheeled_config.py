@@ -90,6 +90,27 @@ def test_layer_overrides_preset(tmp_path):
         ),
         ({"ground_vehicle": {"opponents": {"mode": "ghost"}}}, "mode must be"),
         (
+            {"ground_vehicle": {"randomization": {"mass_fraction_std": 0.4}}},
+            "below 1/3",
+        ),
+        (
+            {
+                "ground_vehicle": {
+                    "randomization": {"center_of_mass_std_m": [0, -0.1, 0]}
+                }
+            },
+            ">= 0",
+        ),
+        ({"ground_vehicle": {"route": {"waypoints_m": [[0, 0]]}}}, "two"),
+        (
+            {
+                "ground_vehicle": {
+                    "route": {"waypoints_m": [[0, 0], [5, 0]], "width_m": 0}
+                }
+            },
+            "width_m",
+        ),
+        (
             {"ground_vehicle": {"opponents": {"count": 1, "controller": "x:Y"}}},
             "kinematic mode",
         ),

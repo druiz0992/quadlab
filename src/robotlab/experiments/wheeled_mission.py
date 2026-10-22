@@ -28,7 +28,7 @@ then re-raises any error. Processing is deterministic in lockstep.
 
 from collections import Counter
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 from queue import Empty
@@ -105,6 +105,7 @@ class WheeledParts:
     implement: Any | None = None
     lift_publisher: Any | None = None
     trailer: Any | None = None
+    randomization_draws: dict[str, Any] = field(default_factory=dict)
 
 
 class WheeledMissionLoop:

@@ -222,6 +222,26 @@ GROUND_VEHICLE_DEFAULTS: dict[str, Any] = {
         "steer_rate_per_s": 1.5,
         "max_speed_mps": 0.0,
     },
+    # Per-run mismatch between the simulated and the nominal vehicle
+    # (algorithms keep the nominal one); see simulation/randomization.py.
+    # Fraction stds must be below 1/3 (draws truncate at 3 sigma).
+    "randomization": {
+        "enabled": False,
+        "seed": 0,
+        "mass_fraction_std": 0.0,
+        "inertia_fraction_std": 0.0,
+        "center_of_mass_std_m": [0.0, 0.0, 0.0],
+        "tyre_friction_fraction_std": 0.0,
+        "drive_torque_fraction_std": 0.0,
+    },
+    # Reference route: [[x, y], ...] (m, world) replacing the scene track
+    # as context.track, with lap timing/track limits on it (corridor
+    # width_m). Empty: no route. A route whose last point repeats the first
+    # is a closed loop.
+    "route": {
+        "waypoints_m": [],
+        "width_m": 4.0,
+    },
 }
 
 # Settings every wheeled kind shares (layered under the kind's own preset).
@@ -406,7 +426,7 @@ def _section(value: Any, template: Mapping[str, Any], name: str) -> None:
             if key not in LIST_KEYS:
                 _vector(item, path, positive=key in POSITIVE_VECTORS)
         elif isinstance(default, int) and not isinstance(default, bool):
-            minimum = 0 if key in {"spawn_index", "count"} else 1
+            minimum = 0 if key in {"spawn_index", "count", "seed"} else 1
             if type(item) is not int or item < minimum:
                 raise ValueError(f"{path} must be an integer >= {minimum}")
         elif key in SIGNED_KEYS:
@@ -418,7 +438,13 @@ def _section(value: Any, template: Mapping[str, Any], name: str) -> None:
 POSITIVE_VECTORS = {"inertia_kg_m2", "collision_size_m", "size_m"}
 # Validated by their consumers (plug-in options) or by dedicated checks.
 FREE_FORM = {"controller_options"}
-LIST_KEYS = {"wheels", "per_opponent_options"}
+LIST_KEYS = {"wheels", "per_opponent_options", "waypoints_m"}
+RANDOMIZED_FRACTIONS = (
+    "mass_fraction_std",
+    "inertia_fraction_std",
+    "tyre_friction_fraction_std",
+    "drive_torque_fraction_std",
+)
 
 
 def trailer_properties(
@@ -469,6 +495,10 @@ MAX_OPPONENTS = 7
 OPPONENT_MODES = ("kinematic", "dynamic")
 SIGNED_KEYS = {"spawn_yaw_deg", "cg_below_hitch_m"}
 ZERO_ALLOWED = {
+    "mass_fraction_std",
+    "inertia_fraction_std",
+    "tyre_friction_fraction_std",
+    "drive_torque_fraction_std",
     "rolling_resistance",
     "e",
     "max_angle_rad",
@@ -525,6 +555,8 @@ def validate_ground_vehicle(data: Mapping[str, Any]) -> None:
     _check_layout(g, layout)
     _check_opponents(g["opponents"], data["control"]["odometry_rate_hz"])
     _check_implement(g["implement"], data["robot"]["kind"])
+    _check_randomization(g["randomization"])
+    _check_route(g["route"])
     _check_trailer(g)
     for key in ("c", "e"):
         for direction in ("longitudinal", "lateral"):
@@ -593,6 +625,30 @@ def _check_opponents(opponents: Mapping[str, Any], odometry_rate_hz: float) -> N
         )
     if opponents["count"] and not opponents["controller"]:
         raise ValueError("ground_vehicle.opponents.controller must name a controller")
+
+
+def _check_randomization(randomization: Mapping[str, Any]) -> None:
+    for key in RANDOMIZED_FRACTIONS:
+        if randomization[key] >= 1 / 3:
+            raise ValueError(
+                f"ground_vehicle.randomization.{key} must be below 1/3 "
+                "(draws truncate at 3 sigma)"
+            )
+    if any(v < 0 for v in randomization["center_of_mass_std_m"]):
+        raise ValueError(
+            "ground_vehicle.randomization.center_of_mass_std_m must be >= 0"
+        )
+
+
+def _check_route(route: Mapping[str, Any]) -> None:
+    from ...core.track import Track
+
+    points = route["waypoints_m"]
+    if not isinstance(points, list):
+        raise ValueError("ground_vehicle.route.waypoints_m must be a list")
+    if points:
+        # Builds (and so validates) the densified route.
+        Track.from_route(points, route["width_m"])
 
 
 def _check_implement(implement: Mapping[str, Any], kind: str) -> None:

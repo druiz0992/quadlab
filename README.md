@@ -176,6 +176,8 @@ robotlab --headless --control-mode rotor-thrust --drone configs/missions/square.
 # runs whose health verdict failed are excluded from aggregates and fail --check
 robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch --save-baseline
 robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check
+# Wheeled: track follower on four randomized cars around an airfield route
+robotlab-batch configs/experiments/wheeled_route_randomized.json --output outputs/wheeled-batch
 
 # Kite-like quadplane: hover, transition, fixed-wing square at 40 m, return and land
 robotlab --headless --rerun --control-mode rotor-thrust --scene worlds/airfield.json \

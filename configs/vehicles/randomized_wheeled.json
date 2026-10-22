@@ -1,0 +1,13 @@
+{
+  "ground_vehicle": {
+    "randomization": {
+      "enabled": true,
+      "seed": 1,
+      "mass_fraction_std": 0.05,
+      "inertia_fraction_std": 0.1,
+      "center_of_mass_std_m": [0.05, 0.02, 0.0],
+      "tyre_friction_fraction_std": 0.05,
+      "drive_torque_fraction_std": 0.05
+    }
+  }
+}

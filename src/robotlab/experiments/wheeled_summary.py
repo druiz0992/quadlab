@@ -35,6 +35,8 @@ def build_wheeled_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
             mass_kg=vehicle.mass_kg,
             wheels=list(vehicle.wheel_names),
         ),
+        # The true (simulated) vehicle's draws; robot.mass_kg is the true mass.
+        randomization=parts.randomization_draws or None,
         control_mode="wheel-commands",
         state_source=_state_source(settings, parts.stack),
         algorithms=_algorithms_entry(settings, parts),
