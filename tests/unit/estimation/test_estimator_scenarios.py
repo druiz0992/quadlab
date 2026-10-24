@@ -81,6 +81,10 @@ CANDIDATES = {
             "constant_velocity": STEADY,
             # Yaw is weakly observable from 0.8 m/s² centripetal acceleration.
             "circle": dict(STEADY, attitude_rmse_deg=7.0),
+            "figure_eight": dict(STEADY, attitude_rmse_deg=4.0),
+            "aggressive": dict(STEADY, attitude_rmse_deg=3.0),
+            # Stationary: world yaw is unobservable without a magnetometer.
+            "tumbling": dict(STEADY, attitude_rmse_deg=20.0),
             "gps_dropout": dict(
                 STEADY,
                 position_rmse_m=0.3,
@@ -108,6 +112,11 @@ CANDIDATES = {
             "hover": dict(position_rmse_m=0.15, velocity_rmse_mps=2.0),
             "constant_velocity": dict(position_rmse_m=0.15, velocity_rmse_mps=2.0),
             "circle": dict(position_rmse_m=0.15, tilt_rmse_deg=6.0),
+            # Its tilt correction assumes the accelerometer measures gravity,
+            # which banked flight violates.
+            "figure_eight": dict(position_rmse_m=0.2, tilt_rmse_deg=8.0),
+            "aggressive": dict(position_rmse_m=0.25, tilt_rmse_deg=13.0),
+            "tumbling": dict(position_rmse_m=0.15, attitude_rmse_deg=0.3),
             # Coasts on a velocity from two noisy fixes: large outage drift.
             "gps_dropout": dict(max_position_error_m=12.0),
             "biased_imu": dict(max_position_error_m=8.0, tilt_rmse_deg=2.0),

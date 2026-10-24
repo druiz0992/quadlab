@@ -15,6 +15,7 @@ from robotlab.testing.scenarios import (
     scenario_context,
     scenario_samples,
 )
+from robotlab.testing.trajectories import circling
 from robotlab.testing.synthetic_scene import (
     BOX_RGB,
     DEFAULT_SCENE,
@@ -40,9 +41,10 @@ QUIET = {
 }
 
 
-def quiet(name, duration_s=1.0):
+def quiet(name, duration_s=1.0, **changes):
     return dataclasses.replace(
         SCENARIOS[name],
+        **changes,
         imu_noise=(0.0, 0.0),
         gps_noise_m=0.0,
         settings=QUIET,
@@ -50,8 +52,8 @@ def quiet(name, duration_s=1.0):
     )
 
 
-def first(name, kind, duration_s=1.0):
-    samples = scenario_samples(quiet(name, duration_s), (kind,))
+def first(name, kind, duration_s=1.0, **changes):
+    samples = scenario_samples(quiet(name, duration_s, **changes), (kind,))
     return next(s for k, s in samples if k == kind)
 
 
@@ -109,29 +111,36 @@ def test_camera_shows_sky_above_and_ground_below():
     assert not np.allclose(bottom, SKY_RGB, atol=5)
 
 
-def test_flow_airspeed_and_esc_on_the_circle():
-    flow = first("circle", "optical_flow").payload
+LEVEL = dict(trajectory=circling(5.0, 2.0))  # level circle, 2 m/s, from (5, 0)
+
+
+def test_flow_and_airspeed_on_a_level_circle():
+    flow = first("circle", "optical_flow", **LEVEL).payload
     assert flow.valid
     # Pitched 90°: forward 2 m/s at 0.93 m reads as -v_z_sensor / d ...
     assert abs(flow.flow_rad_s[1]) == pytest.approx(2.0 / 0.93, rel=1e-6)
-    airspeed = first("circle", "airspeed").payload
+    airspeed = first("circle", "airspeed", **LEVEL).payload
     assert airspeed.indicated_airspeed_mps == pytest.approx(
         2.0
         * math.sqrt(
             load_drone_config().data["aerodynamics"]["air_density_kg_m3"] / 1.225
         )
     )
+
+
+def test_esc_speeds_carry_the_banked_thrust():
+    """On the flown circle, thrust supplies gravity plus 0.8 m/s² inward."""
     esc = first("circle", "esc").payload.rotor_speed_rad_s
     vehicle = load_drone_config().properties
-    hover = math.sqrt(vehicle.mass * 9.81 / 4 / vehicle.thrust_coefficient)
-    np.testing.assert_allclose(esc, hover)
+    thrust = vehicle.mass * math.hypot(9.81, 0.8)
+    np.testing.assert_allclose(esc, math.sqrt(thrust / 4 / vehicle.thrust_coefficient))
 
 
 def test_battery_monitor_and_gps_heading():
     battery = first("hover", "battery_monitor").payload
     assert battery.current_a == pytest.approx(10.0)
     assert battery.voltage_v == pytest.approx(4 * 4.2 - 10 * 0.02)
-    heading = first("circle", "gps_heading").payload
+    heading = first("circle", "gps_heading", **LEVEL).payload
     # 0.1 s into the circle (yaw rate 0.4 rad/s, starting north).
     assert heading.heading_rad == pytest.approx(math.pi / 2 + 0.04)
 

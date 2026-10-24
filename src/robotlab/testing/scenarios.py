@@ -19,8 +19,11 @@ any selection of the streams in ``sensors/bus.py`` (see
 
 - IMU at 200 Hz from t = 0 and GPS at 10 Hz from 0.1 s are set by the
   scenario's own fields (``imu_noise``, biases, ``gps_noise_m``,
-  ``gps_outages_s``); IMU values are those at the sample time, held by
-  the filter until the next one (exact for the built-in trajectories).
+  ``gps_outages_s``); IMU values are those at the sample time (as Gazebo
+  reports them), held by the filter until the next one.
+- Multirotor scenarios that turn are flown (``trajectories.flown``): the
+  body banks so thrust supplies the acceleration, as a real multirotor
+  must; ``car_circle`` is level (the tyres supply the centripetal force).
 - Every other sensor follows the drone configuration (same keys and
   defaults as ``configs/``: mounts, rates, ranges, noise), with
   ``SENSOR_NOISE`` layered on so none is noise-free by default, then the
@@ -63,7 +66,18 @@ from .synthetic_sensors import (
     SynthesisInputs,
     build_synthesizer,
 )
-from .trajectories import Trajectory, TruthPoint, circling, hovering, straight
+from .trajectories import (
+    Harmonic,
+    HarmonicPath,
+    Trajectory,
+    TruthPoint,
+    circling,
+    figure_eight,
+    flown,
+    hovering,
+    straight,
+    tumbling,
+)
 
 __all__ = [
     "EstimatorScenario",
@@ -76,6 +90,8 @@ __all__ = [
     "Trajectory",
     "TruthPoint",
     "circling",
+    "figure_eight",
+    "flown",
     "hovering",
     "initial_truth",
     "run_scenario",
@@ -83,6 +99,7 @@ __all__ = [
     "scenario_samples",
     "scenario_settings",
     "straight",
+    "tumbling",
 ]
 
 SENSOR_KINDS = tuple(BUILDERS)
@@ -138,7 +155,8 @@ class ScenarioReport:
     """Scores of one run (errors after ``settle_s``; NIS over the whole run).
 
     Attitude error is the angle of ``R_true^T R_est``; tilt error is the
-    angle between the true and estimated body z axes (yaw-free). Bias
+    angle between the true and estimated world-up direction in body axes
+    (``R^T e_z``), which no world-yaw error changes, even on a tilted body. Bias
     errors are norms at the final estimate (true minus estimated bias).
     ``mean_nis_per_dof`` is None when the estimator reports no innovations.
     """
@@ -174,6 +192,12 @@ class ScenarioReport:
         return messages
 
 
+# Counter-clockwise 5 m circle at 2 m/s (0.4 rad/s), starting at (5, 0, 1).
+BANKED_CIRCLE = HarmonicPath(
+    (0.0, 0.0, 1.0),
+    harmonics=(Harmonic(0, 5.0, 0.4, np.pi / 2), Harmonic(1, 5.0, 0.4)),
+)
+
 # A car's body origin sits at tyre radius minus hub height above flat
 # ground (0.30 + 0.08 m, ignoring suspension sag); a unit test checks it.
 CAR_BODY_HEIGHT_M = 0.38
@@ -190,10 +214,31 @@ SCENARIOS: dict[str, EstimatorScenario] = {
         ),
         EstimatorScenario(
             "circle",
-            "5 m radius level circle at 2 m/s, yawing with the path",
-            circling(5.0, 2.0),
+            "5 m radius circle at 2 m/s, banked 4.7°, nose along the path",
+            flown(BANKED_CIRCLE, yaw_along_path=True),
             duration_s=30.0,
             seed=2,
+        ),
+        EstimatorScenario(
+            "figure_eight",
+            "12 m × 6 m figure eight in 16 s, climbing ±1 m, nose along the path",
+            flown(figure_eight(6.0, 16.0, climb_m=1.0), yaw_along_path=True),
+            duration_s=40.0,
+            seed=6,
+        ),
+        EstimatorScenario(
+            "aggressive",
+            "8 m × 4 m figure eight in 7 s (up to 36° tilt), yawing at 0.8 rad/s",
+            flown(figure_eight(4.0, 7.0, climb_m=0.5), yaw_rate_rad_s=0.8),
+            duration_s=30.0,
+            seed=7,
+        ),
+        EstimatorScenario(
+            "tumbling",
+            "stationary, rolling ±60°, pitching ±45°, yawing at 0.5 rad/s",
+            tumbling(),
+            duration_s=30.0,
+            seed=8,
         ),
         EstimatorScenario(
             "gps_dropout",
@@ -388,8 +433,9 @@ def _errors(estimate: Sample[EstimatedState], trajectory: Trajectory) -> list[fl
     state = estimate.payload
     true_rotation = Rotation.from_quat(truth.quaternion_xyzw)
     estimated = Rotation.from_quat(state.quaternion_xyzw)
-    up_true = true_rotation.apply([0.0, 0.0, 1.0])
-    up_estimated = estimated.apply([0.0, 0.0, 1.0])
+    # World up in body axes: a world-yaw error leaves it unchanged.
+    up_true = true_rotation.inv().apply([0.0, 0.0, 1.0])
+    up_estimated = estimated.inv().apply([0.0, 0.0, 1.0])
     return [
         float(np.linalg.norm(state.position_m - truth.position_m)),
         float(np.linalg.norm(state.velocity_mps - truth.velocity_mps)),

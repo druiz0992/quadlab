@@ -198,6 +198,14 @@ report = run_scenario(MyFilter, options, SCENARIOS["circle"],
 assert not report.violations({"position_rmse_m": 0.1})
 ```
 
+Multirotor scenarios are dynamically feasible: `trajectories.flown` derives
+attitude and body rates from the path by differential flatness (Faessler
+et al., RA-L 2018, without drag), so the body banks into every turn and the
+accelerometer reads thrust only, `(0, 0, |a − g|)`. Paths are sums of
+sinusoids (`HarmonicPath`, exact derivatives), heading fixed, constant-rate,
+or along the path. `tumbling` rotates a stationary body (a rate table);
+`circling` is level and suits ground vehicles only.
+
 A scenario is a truth trajectory (`testing/trajectories.py`), a vehicle
 (`multirotor`, or `rover`/`car`/`tractor`), a ray-cast scene, and sensor
 settings. `sensors` picks any streams of the [sensor bus](#sensor-bus-and-delivery-timing-sensor_timing)
@@ -211,7 +219,10 @@ numbers are consecutive per stream.
 | --- | --- | --- |
 | `hover` | level at (0, 0, 1) m, facing east | noise handling, NIS consistency |
 | `constant_velocity` | straight, level, (1.5, 0.5, 0) m/s | velocity tracking |
-| `circle` | 5 m radius at 2 m/s, nose along the path (30 s) | frame and sign errors: constant body-frame centripetal force and yaw rate |
+| `circle` | 5 m radius at 2 m/s, banked 4.7°, nose along the path (30 s) | frame and sign errors in a steady turn |
+| `figure_eight` | 12 m × 6 m lemniscate in 16 s, climbing ±1 m, nose along the path (40 s) | changing bank and heading |
+| `aggressive` | 8 m × 4 m lemniscate in 7 s (up to 36° tilt), yawing at 0.8 rad/s (30 s) | attitude under strong manoeuvres |
+| `tumbling` | stationary, roll ±60°, pitch ±45°, yaw 0.5 rad/s (30 s) | attitude-only (AHRS) filters; world yaw is unobservable without a magnetometer |
 | `gps_dropout` | `constant_velocity`, no GPS 8–13 s | coasting and recovery |
 | `biased_imu` | hover, accel bias (0.15, −0.1, 0.2) m/s², gyro bias (3, −2, 4) mrad/s, no GPS 30–35 s (40 s) | bias learning, seen as drift in the outage |
 | `car_circle` | car, 12 m radius at 5 m/s on the ground (30 s) | wheeled sensors (encoders, steering), ground vehicle dynamics |
@@ -255,9 +266,12 @@ candidate declares limits. Verified scores (seeded, so exact; IMU and GPS):
 
 | Scenario | `gps_imu_ekf` position RMSE / tilt RMSE / NIS | `template` position RMSE / max error |
 | --- | --- | --- |
-| hover | 4.4 cm / 0.48° / 1.00 | 8.8 cm / 0.24 m |
+| hover | 4.3 cm / 0.47° / 1.00 | 8.8 cm / 0.24 m |
 | constant_velocity | 3.4 cm / 0.37° / 0.93 | 8.4 cm / 0.27 m |
 | circle | 3.3 cm / 0.71° / 0.91 (attitude 4.7°) | 8.9 cm / 0.28 m (attitude 91°: starts facing east) |
+| figure_eight | 3.8 cm / 0.35° / 0.99 (attitude 1.8°) | 9.7 cm / 0.29 m (tilt 5.2°) |
+| aggressive | 3.7 cm / 0.58° / 1.00 (attitude 1.0°) | 16 cm / 0.46 m (tilt 8.7°) |
+| tumbling | 4.1 cm / 0.49° / 0.96 (attitude 11.5°) | 8.4 cm / 0.21 m (attitude 0.12°) |
 | gps_dropout | 8.7 cm, max 0.29 m | 2.7 m, max 8.5 m |
 | biased_imu | 10 cm, max 0.42 m, tilt 1.44° | 1.35 m, max 5.5 m |
 | car_circle | 3.6 cm / 0.35° / 0.97 (attitude 1.6°) | 10 cm / 0.25 m (tilt 9.2°) |
@@ -268,10 +282,19 @@ defects: in a hover, yaw is unobservable and horizontal accelerometer bias
 is indistinguishable from tilt (0.18 m/s² ≈ 1°); on the drone circle, yaw
 is only weakly observable from 0.8 m/s² centripetal acceleration, so the
 EKF yaw error (about 2σ of its own covariance at times) dominates attitude
-RMSE; the template's accelerometer tilt correction mistakes the car's
-2 m/s² centripetal acceleration for tilt. A flipped yaw-rate sign or
-swapped accelerometer axes fail the `circle` limits; the straight-line
-scenarios cannot detect either. The data are idealized (no latency,
+RMSE; the template's accelerometer tilt correction assumes the
+accelerometer measures gravity, which banked flight and the car's 2 m/s²
+centripetal acceleration violate. On `tumbling` the EKF's 11.5° attitude
+error is world yaw, unobservable while stationary without a magnetometer;
+its yaw covariance shrinks anyway, the known false-observability problem
+of standard EKFs (Huang, Mourikis and Roumeliotis, ISER 2010), while the
+template integrates the gyro and holds 0.12°. Instantaneous IMU samples
+held over each 5 ms interval (as Gazebo delivers them) leave noise-free
+dead reckoning about 0.3° off on `tumbling` and `aggressive`, a real
+sampling (coning) error a filter must tolerate. A flipped yaw-rate sign fails every turning scenario. Swapped
+accelerometer x/y axes fail `tumbling` and `car_circle` but not the flown
+ones, where (without drag) a multirotor's accelerometer reads almost
+nothing on x and y; the straight-line scenarios detect neither. The data are idealized (no latency,
 vibration, banking, or wind), so the suite catches frame, sign, timing,
 and sensor-fusion mistakes, not tuning.
 
