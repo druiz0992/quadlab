@@ -40,7 +40,24 @@ Plug-ins are constructed as `cls(context, options)`.
 - the **nominal** vehicle properties (`vehicle`), as designed, not the
   randomized truth,
 - one `SensorDescription` per enabled stream: frame ID, nominal rate, and
-  mount position and quaternion, as from a calibration file.
+  mount position and quaternion, as from a calibration file; for the
+  camera also `camera`, a `CameraCalibration` (`core/camera.py`): image
+  size, `fx`/`fy`/`cx`/`cy` in pixels (OpenCV convention: u right, v down,
+  pixel centres at integers, principal point at the image centre),
+  lens type, Brown–Conrady `k1 k2 k3 p1 p2` (`matrix`, `distortion` in
+  OpenCV order, and `project()` for points in the optical frame),
+  exposure time, and rolling-shutter readout. Frame latency is not
+  included. These are the exact simulated values, i.e. a perfect
+  calibration.
+
+Sensor axes follow Gazebo (a camera's x forward, y left, z up); the
+optical frame is z forward, x right, y down (`SENSOR_FROM_OPTICAL`).
+`extrinsics(source, target, source_optical=False)` gives `(R, t)` with
+`p_target = R p_source + t` between any two sensors, e.g.
+`extrinsics(context.sensors["camera"], context.sensors["imu"],
+source_optical=True)` is the camera-to-IMU transform for visual-inertial
+odometry. Wide-angle lenses report the small-angle focal length
+`width / fov`; `project()` is pinhole only.
 
 It deliberately excludes simulator truth and the configured error models.
 

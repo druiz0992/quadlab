@@ -19,6 +19,9 @@ document and update the status below.
 | Barometer sensor with seeded offset/drift/noise | Implemented ([3 Configuration](3_configuration.md#barometer-sensorsbaro)) |
 | Barometer fusion in the EKF (altitude update plus baro-offset state) | Future, with EKF robustness work |
 | Magnetometer, downward rangefinder, synthetic optical flow, multi-channel 3D lidar | Implemented ([3 Configuration](3_configuration.md#magnetometer-sensorsmagnetometer)) |
+| Camera intrinsics, optical frame, and sensor extrinsics in the algorithm context | Implemented ([7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms)) |
+| Estimator scenario suite: every sensor stream, flown multirotor trajectories, partial estimates, ATE/RPE drift metrics | Implemented ([7 Experiments](7_experiments.md#estimator-scenario-suite)) |
+| Camera calibration errors (estimator-side intrinsics differing from the simulated camera) | Future |
 | EKF fusion of magnetometer (heading), rangefinder and optical flow (GPS-denied) | Future, with EKF robustness work |
 | Magnetometer calibration (hard/soft iron, current/throttle compensation; automated procedure; calibration for filters) | Implemented ([3 Configuration](3_configuration.md#magnetometer-calibration-sensorsmagnetometercalibration)) |
 | Online (in-filter) magnetometer offset estimation to follow drift | Future, with EKF robustness work |
@@ -187,7 +190,9 @@ simulation time; never invent status, covariance, or health Gazebo lacks.
 
 - `SensorDescription` per stream: frame, payload type, nominal rate, mount
   position and quaternion, calibration (camera intrinsics plus explicit
-  sensor-to-optical rotation). Frame IDs such as `drone/imu`, `drone/body`,
+  sensor-to-optical rotation: implemented as `CameraCalibration`,
+  `SENSOR_FROM_OPTICAL`, and `extrinsics`, see
+  [7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms)). Frame IDs such as `drone/imu`, `drone/body`,
   `drone/camera_optical`, `world`.
 - Raw measurements are preserved; body/world conversions are explicit named
   helpers. An off-centre accelerometer is not made body-origin by rotation.

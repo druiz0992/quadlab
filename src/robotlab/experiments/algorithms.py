@@ -35,6 +35,7 @@ from ..core.algorithms import (
     SensorDescription,
     ignore_debug,
 )
+from ..core.camera import CameraCalibration
 from ..core.measurements import EstimatedState, GpsReading, Sample
 from ..core.vehicle import DroneProperties
 from ..core.track import Track
@@ -107,6 +108,7 @@ def build_context(
             position,
             quaternion,
             calibration if calibration and calibration.get("enabled") else None,
+            CameraCalibration.from_settings(section) if kind == "camera" else None,
         )
     return AlgorithmContext(
         gps_reference, vehicle, descriptions, log=log, wheeled=wheeled, track=track

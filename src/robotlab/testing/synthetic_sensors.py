@@ -338,15 +338,23 @@ class LidarSynthesizer:
 
 class CameraSynthesizer:
     """Pinhole RGB image of the scene (optical axis +x, image right = −y,
-    image down = −z, as Gazebo cameras), with intensity noise (0..1 scale)."""
+    image down = −z, as Gazebo cameras), with intensity noise (0..1 scale).
+    Pixel (u, v) looks through its centre, so the image matches the
+    context's ``CameraCalibration`` exactly (principal point at the
+    centre, OpenCV pixel convention)."""
 
     kind = "camera"
 
     def __init__(
         self, inputs: SynthesisInputs, section: Mapping[str, Any], rng
     ) -> None:
-        if section["lens"]["type"] != "pinhole":
-            raise ValueError("synthetic camera supports only the pinhole lens")
+        lens = section["lens"]
+        if lens["type"] != "pinhole" or any(
+            lens[k] for k in ("k1", "k2", "k3", "p1", "p2")
+        ):
+            raise ValueError(
+                "synthetic camera supports only an undistorted pinhole lens"
+            )
         self.period_ns = _period_ns(section["rate_hz"])
         self._mount = _mount(section)
         self._shape = (section["height"], section["width"])

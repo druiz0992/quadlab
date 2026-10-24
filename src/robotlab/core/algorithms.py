@@ -2,7 +2,8 @@
 
 ``AlgorithmContext`` is the only information besides sensor samples that an
 estimator or controller receives: sensor descriptions (frames, nominal
-rates, mounts, as from a calibration file), the nominal vehicle properties
+rates, mounts, camera intrinsics, as from a calibration file), the nominal
+vehicle properties
 (as designed, not randomized truth), and the local navigation origin. It
 deliberately excludes simulator truth and the configured simulator error
 models: configured noise describes the simulator, never knowledge an
@@ -14,9 +15,14 @@ from dataclasses import dataclass, field
 from typing import Any
 from types import MappingProxyType
 
+import numpy as np
+from numpy.typing import NDArray
+from scipy.spatial.transform import Rotation
+
 from .measurements import GpsReading
 from .vehicle import DroneProperties
 from .track import Track
+from .camera import SENSOR_FROM_OPTICAL, CameraCalibration
 from .wheeled_vehicle import WheeledProperties
 
 
@@ -35,6 +41,36 @@ class SensorDescription:
     # Sensor calibration as from a calibration file (e.g. the magnetometer's
     # offsets, correction, and local field), or None.
     calibration: Mapping[str, Any] | None = None
+    # Camera intrinsics and optical frame (camera streams only).
+    camera: CameraCalibration | None = None
+
+    def to_body(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Rotation (3×3, sensor axes → body) and mount position (body, m)."""
+        rotation = Rotation.from_quat(self.mount_quaternion_xyzw).as_matrix()
+        return rotation, np.array(self.mount_position_m, float)
+
+
+def extrinsics(
+    source: SensorDescription,
+    target: SensorDescription,
+    *,
+    source_optical: bool = False,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """``(R, t)`` with ``p_target = R p_source + t`` between two sensors' axes.
+
+    ``source_optical`` takes the source in its camera optical frame (z
+    forward, x right, y down; ``core/camera.py``) instead of its Gazebo
+    sensor axes: e.g. ``extrinsics(camera, imu, source_optical=True)`` is
+    the camera-to-IMU transform of visual-inertial odometry. Raises
+    ``ValueError`` if ``source_optical`` is set for a non-camera.
+    """
+    rotation_s, position_s = source.to_body()
+    if source_optical:
+        if source.camera is None:
+            raise ValueError(f"{source.kind} has no camera optical frame")
+        rotation_s = rotation_s @ SENSOR_FROM_OPTICAL
+    rotation_t, position_t = target.to_body()
+    return rotation_t.T @ rotation_s, rotation_t.T @ (position_s - position_t)
 
 
 DebugLog = Callable[[str, int, Sequence[float], Sequence[str] | None], None]
