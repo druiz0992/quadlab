@@ -453,3 +453,36 @@ def test_gazebo_environment_matches_python_models(tmp_path, monkeypatch):
     intervals_ms = set(np.diff(imu) // 1_000_000)
     assert intervals_ms == {4, 6}
     assert np.mean(np.diff(imu)) == pytest.approx(5e6, rel=0.01)
+
+
+def _ground_texture_std(image_path: Path) -> float:
+    """Median standard deviation of 8×8 grey blocks in the bottom 50 rows
+    of a camera frame (the ground below the horizon)."""
+    from matplotlib.image import imread
+
+    grey = imread(image_path)[..., :3].mean(axis=2) * 255
+    rows = grey[-48:, : grey.shape[1] // 8 * 8]
+    blocks = rows.reshape(6, 8, -1, 8).std(axis=(1, 3))
+    return float(np.median(blocks))
+
+
+def test_textured_yard_renders_its_textures(tmp_path):
+    """Verified 2026-10-24: the textured yard's first camera frame has a
+    median local ground texture of 2.9 grey levels (training world: 0.3),
+    and Gazebo loads every textured mesh without warnings."""
+    output = tmp_path / "run"
+    run(
+        GazeboConfig(
+            scene="worlds/textured_yard.json",
+            drone=tuple(layer_paths(tmp_path, [HOLD_1M])),
+            output=str(output),
+            headless=True,
+            control_mode="rotor-thrust",
+            duration=3.0,
+            render_sensors=True,
+        )
+    )
+    summary = json.loads((output / "summary.json").read_text())
+    assert summary["health"]["verdict"] == "ok"
+    assert _ground_texture_std(output / "camera-first.png") > 1.5
+    assert "Missing material" not in (output / "gazebo.log").read_text()

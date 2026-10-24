@@ -221,6 +221,8 @@ robotlab --keyboard --headless --scene worlds/farm_field.json --config configs/s
 robotlab --keyboard --headless --scene worlds/farm_field.json --config configs/scenarios/tractor_trailer.json --output outputs/trailer
 # Rover across drainage ditches (terrain "ditches")
 robotlab --robot rover --keyboard --headless --scene worlds/ditch_field.json --output outputs/ditches
+# Visual/lidar odometry testing: textured yard and a long plain corridor
+robotlab --render-sensors --drone configs/sensors/lidar_3d.json --scene worlds/textured_yard.json --output outputs/yard
 # Rover on rough off-road terrain
 robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json --output outputs/rover-terrain
 # Your wheeled controller: algorithms.controller in a config layer; start from

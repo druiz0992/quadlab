@@ -7,7 +7,14 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 
-from .sdf import element, plugin, box
+from .sdf import element, plugin, box, textured_box
+from .textures import (
+    texture_image,
+    validate_color,
+    validate_texture,
+    write_box_obj,
+    write_png,
+)
 from ..moving_obstacles import validate_moving_obstacle
 from ..terrain import Terrain, validate_terrain
 from .plugins import LOCKSTEP_FILENAME, LOCKSTEP_NAME, lockstep_barrier
@@ -57,6 +64,7 @@ def load_scene(path):
         if min(obstacle["size"]) <= 0:
             raise ValueError(f"{name}: sizes must be positive")
         _check_reflectivity(obstacle.get("reflectivity"), name)
+        _check_appearance(obstacle, name)
         moment = obstacle.get("magnetic_moment_am2")
         if moment is not None and (
             np.asarray(moment, dtype=float).shape != (3,)
@@ -64,6 +72,10 @@ def load_scene(path):
         ):
             raise ValueError(f"{name}: magnetic_moment_am2 needs three finite values")
     _check_reflectivity(scene.get("ground_reflectivity"), "ground_reflectivity")
+    if "ground_texture" in scene:
+        scene["ground_texture"] = validate_texture(
+            scene["ground_texture"], "ground_texture"
+        )
     size = scene.get("ground_size_m", 100.0)
     if (
         isinstance(size, bool)
@@ -85,6 +97,17 @@ def load_scene(path):
     validate_spawn_points(scene.get("spawn_points", []))
     Track.from_scene(scene)
     return scene
+
+
+def _check_appearance(obstacle, name):
+    """Optional ``texture``, ``color`` (RGB 0..1), and ``visual_only`` (a
+    marking without collision, e.g. a floor patch); validated in place."""
+    if "texture" in obstacle:
+        obstacle["texture"] = validate_texture(obstacle["texture"], name)
+    if "color" in obstacle:
+        obstacle["color"] = validate_color(obstacle["color"], f"{name}: color")
+    if not isinstance(obstacle.get("visual_only", False), bool):
+        raise ValueError(f"{name}: visual_only must be true or false")
 
 
 def _check_reflectivity(value, name):
@@ -155,22 +178,72 @@ def add_terrain(world, terrain, mesh_path, reflectivity=None):
 GROUND_COLOR = ".45 .5 .45 1"
 
 
-def add_ground(world: ET.Element, scene: dict) -> None:
+OBSTACLE_COLOR = ".65 .45 .3 1"
+
+
+def add_box(
+    link,
+    name,
+    size,
+    color,
+    texture,
+    texture_dir: Path,
+    pose="0 0 0 0 0 0",
+    collision=True,
+    reflectivity=None,
+) -> None:
+    """A plain box, or with ``texture`` a textured one: the tile PNG and
+    box mesh are written to ``texture_dir`` as ``<name>.png``/``.obj``."""
+    if texture is None:
+        box(link, name, size, color, pose, collision, reflectivity)
+        return
+    texture_dir.mkdir(parents=True, exist_ok=True)
+    image = (texture_dir / f"{name}.png").resolve()
+    mesh = (texture_dir / f"{name}.obj").resolve()
+    write_png(image, texture_image(texture))
+    write_box_obj(mesh, size, texture["tile_m"])
+    textured_box(link, name, size, mesh, image, pose, collision, reflectivity)
+
+
+def add_obstacle(world, obstacle, texture_dir: Path) -> None:
+    """Static box obstacle with its colour, texture, and collision setting."""
+    name = obstacle["name"]
+    model = element(world, "model", name=name)
+    element(model, "static", "true")
+    element(model, "pose", " ".join(map(str, obstacle["position"])) + " 0 0 0")
+    color = obstacle.get("color")
+    add_box(
+        element(model, "link", name="link"),
+        "box",
+        obstacle["size"],
+        OBSTACLE_COLOR if color is None else " ".join(map(str, [*color, 1])),
+        obstacle.get("texture"),
+        texture_dir / name,
+        collision=not obstacle.get("visual_only", False),
+        reflectivity=obstacle.get("reflectivity"),
+    )
+
+
+def add_ground(world: ET.Element, scene: dict, texture_dir: Path) -> None:
     """Static ground: one 0.1 m box with its top at z = 0, or, when the
     terrain has ditches (cut below z = 0), a frame of four boxes around the
-    terrain square so the terrain mesh is the only surface inside it."""
+    terrain square so the terrain mesh is the only surface inside it.
+    ``ground_texture`` textures the top (and each strip) of the ground."""
     size = scene.get("ground_size_m", 100.0)
+    texture = scene.get("ground_texture")
     model = element(world, "model", name="ground")
     element(model, "static", "true")
     link = element(model, "link", name="link")
     terrain = scene.get("terrain")
     reflectivity = scene.get("ground_reflectivity")
     if not terrain or not terrain.get("ditches"):
-        box(
+        add_box(
             link,
             "ground_collision",
             [size, size, 0.1],
             GROUND_COLOR,
+            texture,
+            texture_dir / "ground",
             "0 0 -.05 0 0 0",
             reflectivity=reflectivity,
         )
@@ -185,11 +258,13 @@ def add_ground(world: ET.Element, scene: dict) -> None:
         ("west", (-(outer + half_x) / 2, 0), (outer - half_x, 2 * half_y)),
     )
     for name, (x, y), (length_x, length_y) in strips:
-        box(
+        add_box(
             link,
             f"ground_{name}",
             [length_x, length_y, 0.1],
             GROUND_COLOR,
+            texture,
+            texture_dir / "ground",
             f"{x:.6g} {y:.6g} -.05 0 0 0",
             reflectivity=reflectivity,
         )
@@ -412,18 +487,10 @@ def build_world(
     element(light, "pose", "0 0 20 0 0 0")
     element(light, "diffuse", ".9 .9 .9 1")
     element(light, "direction", "-.3 -.4 -1")
-    add_ground(world, scene)
+    texture_dir = Path(output).parent / "textures"
+    add_ground(world, scene, texture_dir)
     for obstacle in scene["obstacles"]:
-        model = element(world, "model", name=obstacle["name"])
-        element(model, "static", "true")
-        element(model, "pose", " ".join(map(str, obstacle["position"])) + " 0 0 0")
-        box(
-            element(model, "link", name="link"),
-            "box",
-            obstacle["size"],
-            ".65 .45 .3 1",
-            reflectivity=obstacle.get("reflectivity"),
-        )
+        add_obstacle(world, obstacle, texture_dir)
 
     for entry in scene.get("moving_obstacles", []):
         add_moving_obstacle(world, entry)

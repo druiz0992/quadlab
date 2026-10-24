@@ -352,9 +352,10 @@ class GroundModel:
     def from_scene(cls, scene: Mapping[str, Any], terrain: Terrain | None):
         """Ground model of a loaded scene (``world.load_scene``)."""
         default, zones = surfaces_from_scene(scene)
+        solid = [o for o in scene["obstacles"] if not o.get("visual_only", False)]
         return cls(
             terrain,
-            scene["obstacles"],
+            solid,
             scene.get("ground_size_m", 100.0) / 2,
             default,
             zones,

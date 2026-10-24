@@ -341,6 +341,35 @@ obstacle a magnetic dipole for the magnetometer
 ([anomalies](3_configuration.md#magnetometer-sensorsmagnetometer)). Visual and collision sizes are generated
 together. `worlds/training.json` is the default scene.
 
+**Appearance (for visual estimators).** Flat colours give feature trackers
+nothing, so obstacles take an optional `color` (RGB, 0..1) or `texture`,
+the scene a `ground_texture`, and `visual_only: true` makes an obstacle a
+marking without collision (a floor patch; wheel ray casts ignore it):
+
+```json
+{"name": "wall", "position": [0, 5, 2], "size": [20, 0.4, 4],
+ "texture": {"pattern": "bricks", "seed": 2, "base": [0.62, 0.42, 0.34]}}
+```
+
+`simulation/gazebo/textures.py` generates each texture as a seamless
+square tile (PNG) in `<output>/textures/<name>/` and draws the surface with
+a box mesh whose texture coordinates are metres / `tile_m` on every face,
+so the density is uniform and only the tile repeats; collision stays a
+plain box. Patterns: `speckle` (multi-octave noise and 5–30 cm blobs,
+feature-rich at every scale), `bricks` (0.4 × 0.2 m blocks, repetitive),
+`checker` (1 m squares). Keys: `pattern`, `seed`, `tile_m` (8 m),
+`pixels_per_m` (64), `contrast` (0..1), `base` RGB. Rerun draws the boxes
+untextured. Verified in Gazebo: the first camera frame in
+`worlds/textured_yard.json` has a median 8 × 8-pixel ground texture of 2.9
+grey levels, against 0.3 in the training world.
+
+`worlds/textured_yard.json` (drone and ground vehicles) is a 40 × 30 m
+yard with textured ground, walls, crates, pillars, and a checker shelf,
+and a 110 m corridor (3 m wide, through the east wall) with plain uniform
+walls and floor: feature-poor for cameras, and from its middle a
+horizontal lidar within 50 m sees only the two parallel walls, so
+position along the corridor is unobservable to it.
+
 ### Editing and saved worlds
 
 ```bash
