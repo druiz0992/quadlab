@@ -29,24 +29,13 @@ from scipy.spatial.transform import Rotation
 from scipy.stats import chi2
 
 from ..core.measurements import EstimatedState
+from .statistics import error_statistics
+from .trajectory import trajectory_summary
 from .truth import TruthHistory
 
+__all__ = ["EstimationMetrics", "chi2_consistency", "error_statistics"]
+
 BiasSource = Callable[[], tuple[NDArray[np.float64], NDArray[np.float64]]]
-
-
-def error_statistics(values: list[float] | NDArray[np.float64]) -> dict[str, Any]:
-    """RMS, mean, 95th percentile, maximum, and final value of error magnitudes."""
-    array = np.asarray(values, float)
-    if array.size == 0:
-        return dict(count=0)
-    return dict(
-        count=int(array.size),
-        rmse=float(np.sqrt(np.mean(array**2))),
-        mean=float(np.mean(array)),
-        p95=float(np.percentile(array, 95)),
-        max=float(np.max(array)),
-        final=float(array[-1]),
-    )
 
 
 def chi2_consistency(values: list[float], dof: int) -> dict[str, Any]:
@@ -91,6 +80,8 @@ class EstimationMetrics:
         rate_hz: float = 50.0,
         start_s: float = 0.0,
         true_biases: BiasSource | None = None,
+        rpe_segments_s: tuple[float, ...] = (1.0, 10.0),
+        rpe_segments_m: tuple[float, ...] = (1.0, 10.0),
     ) -> None:
         self._truth = truth
         self._period_ns = round(1e9 / rate_hz)
@@ -118,6 +109,10 @@ class EstimationMetrics:
         # NEES samples by degrees of freedom (the blocks scored can change,
         # e.g. attitude-only before a position fix).
         self._nees: dict[int, list[float]] = {}
+        # Matched (time, estimated, true) poses of estimates with a position,
+        # for ATE and RPE (``evaluation/trajectory.py``).
+        self._rpe_segments = (rpe_segments_s, rpe_segments_m)
+        self._track: list[tuple[float, Any, Any, Any, Any]] = []
         self._nis: dict[str, list[float]] = {}
         self._nis_dof: dict[str, int] = {}
 
@@ -154,6 +149,15 @@ class EstimationMetrics:
         errors: dict[str, NDArray[np.float64]] = {}
         values: dict[str, float] = {}
         if state.position_m is not None:
+            self._track.append(
+                (
+                    stamp * 1e-9,
+                    state.position_m,
+                    state.quaternion_xyzw,
+                    truth.position_m,
+                    truth.quaternion_xyzw,
+                )
+            )
             dp = truth.position_m - state.position_m
             errors["position_m"] = dp
             self._axis_sq += dp**2
@@ -222,11 +226,28 @@ class EstimationMetrics:
                 np.sqrt(self._axis_sq / positions).tolist() if positions else None
             ),
             nees=self._nees_summary(),
+            trajectory=self._trajectory_summary(),
             nis={
                 name: chi2_consistency(v, self._nis_dof[name])
                 for name, v in self._nis.items()
             },
             unscored_at_close=len(self._pending),
+        )
+
+    def _trajectory_summary(self) -> dict[str, Any]:
+        """ATE and RPE over the scored estimates that have a position (RPE
+        only if every one of them also has an attitude)."""
+        if not self._track:
+            return {}
+        times, est_p, est_q, true_p, true_q = zip(*self._track)
+        with_attitude = all(q is not None for q in est_q)
+        return trajectory_summary(
+            times,
+            np.array(est_p),
+            np.array(est_q) if with_attitude else None,
+            np.array(true_p),
+            np.array(true_q),
+            *self._rpe_segments,
         )
 
     def _nees_summary(self) -> dict[str, Any]:

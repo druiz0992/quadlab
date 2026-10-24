@@ -272,7 +272,10 @@ so select it only when needed.
 position, velocity, attitude and tilt RMSE, maximum and final position
 error, final bias-error norms, and mean NIS per dof (None without
 innovations). `report.violations(limits)` lists metrics above their
-limits. The estimator never sees the truth; `initial_truth(scenario)` is
+limits. Drift metrics: `aligned_position_rmse_m` (ATE after yaw and
+translation alignment) and `relative_translation_rmse_m` /
+`relative_rotation_rmse_deg` over `rpe_segment_s` (5 s); RPE is
+expressed in the estimate's body frame, so heading errors show up in it. The estimator never sees the truth; `initial_truth(scenario)` is
 the explicit start state a test may declare as priors.
 
 `tests/unit/estimation/test_estimator_scenarios.py` runs every scenario for
@@ -404,9 +407,22 @@ before comparing:
   1 s. It covers every error source that does not average out (offsets,
   drift, temperature, scale and mount errors at the current motion), and it
   stays correct whether or not a calibration is applied.
-- **NEES consistency:** NEES = eᵀP⁻¹e over the 15 states, with mean and
+- **NEES consistency:** NEES = eᵀP⁻¹e over the states the estimate holds
+  (15 for the full state; see partial estimates above), with mean and
   fraction inside the two-sided 95 % χ² interval. A consistent filter has a
   mean equal to the degrees of freedom and about 95 % inside.
+- **Drift** (`evaluation/trajectory.py`, under `trajectory`): absolute
+  trajectory error after no alignment (`ate.none`) and after the best
+  yaw-and-translation alignment (`ate.yaw`, the standard for visual- or
+  lidar-inertial odometry, whose global position and yaw are
+  unobservable), each with position and, given attitudes, rotation
+  statistics and the fitted transform; and relative pose error over 1 s,
+  10 s, 1 m, and 10 m of true travel (`rpe.1s` … `rpe.10m`): translation
+  and rotation error of the relative motion, in the start pose's body
+  frame, plus drift in percent of the distance for the metre segments
+  (Sturm et al. 2012; Zhang & Scaramuzza 2018). RPE needs attitudes;
+  segments longer than the run have `count` 0. `align()` also offers
+  `se3` and `sim3` (Umeyama) for offline analysis.
 - **NIS:** the same statistics for each estimator-reported innovation
   (GPS for the built-in EKF).
 
@@ -526,7 +542,8 @@ robotlab-replay outputs/rec --output outputs/rec-tuned --set 'ekf.gps_std_m=[1,1
 
 Repeat `--estimator` to compare several on the same recording: each
 replays into `<output>/<class name>`, and `comparison.md` lists their
-estimation errors (lowest marked) and NEES. `--set` applies to all of
+estimation errors, yaw-aligned ATE, 10 m drift, and 10 s relative
+rotation error (lowest marked), and NEES. `--set` applies to all of
 them, so give estimator-specific options only when comparing one at a
 time.
 
@@ -562,7 +579,9 @@ An experiment file (`experiments/batch.py` documents every key) names:
 - `seeds`, and `parameters` (dotted config keys with lists of values),
 - fixed `set` overrides,
 - the `metrics` to collect (dotted paths into `metrics.json`, or
-  `summary.<path>`),
+  `summary.<path>`; default: tracking RMSE and maximum, mean
+  thrust-to-weight, estimation position and attitude RMSE, NEES,
+  yaw-aligned ATE, 10 m drift, and completion),
 - the `baseline` file and `tolerances`.
 
 How runs are built and executed:

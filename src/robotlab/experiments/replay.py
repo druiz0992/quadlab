@@ -176,6 +176,9 @@ COMPARISON_METRICS = (
     "errors.attitude_deg.rmse",
     "errors.yaw_deg.rmse",
     "nees.mean",
+    "trajectory.ate.yaw.position_m.rmse",
+    "trajectory.rpe.10m.drift_pct.mean",
+    "trajectory.rpe.10s.rotation_deg.rmse",
 )
 
 
@@ -215,7 +218,11 @@ def compare_estimators(
         metrics = json.loads((output / label / "metrics.json").read_text())
         estimation = metrics["estimation"] or {}
         columns[label] = {m: stats([lookup(estimation, m)]) for m in COMPARISON_METRICS}
-    directions = {m: "increase" for m in COMPARISON_METRICS if m.startswith("errors.")}
+    directions = {
+        m: "increase"
+        for m in COMPARISON_METRICS
+        if m.startswith(("errors.", "trajectory."))
+    }
     table = comparison_markdown(columns, COMPARISON_METRICS, directions)
     (output / "comparison.md").write_text(table)
     return table

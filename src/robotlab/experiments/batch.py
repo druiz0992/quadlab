@@ -74,6 +74,8 @@ DEFAULT_METRICS = (
     "estimation.errors.position_m.rmse",
     "estimation.errors.attitude_deg.rmse",
     "estimation.nees.mean",
+    "estimation.trajectory.ate.yaw.position_m.rmse",
+    "estimation.trajectory.rpe.10m.drift_pct.mean",
     "summary.completed",
 )
 SEED_MODULUS = 2**31

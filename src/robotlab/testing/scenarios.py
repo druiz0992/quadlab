@@ -146,6 +146,7 @@ class EstimatorScenario:
     gps_noise_m: float = 0.05  # per axis, per fix
     gps_outages_s: tuple[tuple[float, float], ...] = ()
     battery_current_a: float = 10.0
+    rpe_segment_s: float = 5.0  # relative pose error segment (drift)
     settings: Mapping[str, Any] = field(default_factory=dict)
     seed: int = 0  # each built-in scenario has its own
 
@@ -161,6 +162,11 @@ class ScenarioReport:
     A metric is None when the estimates lack its block (a partial
     ``EstimatedState``), and ``mean_nis_per_dof`` when the estimator
     reports no innovations; a limit on a None metric is a violation.
+
+    Drift (``evaluation/trajectory.py``): ``aligned_position_rmse_m`` is
+    the ATE after the best yaw-and-translation alignment (what odometry
+    is judged by); ``relative_*`` are RMS relative pose errors over
+    ``rpe_segment_s`` (they need positions and attitudes).
     """
 
     scenario: str
@@ -175,6 +181,9 @@ class ScenarioReport:
     final_accel_bias_error_mps2: float | None
     final_gyro_bias_error_rad_s: float | None
     mean_nis_per_dof: float | None
+    aligned_position_rmse_m: float | None = None
+    relative_translation_rmse_m: float | None = None
+    relative_rotation_rmse_deg: float | None = None
     summary: dict[str, Any] = field(default_factory=dict)
 
     def violations(self, limits: Mapping[str, float]) -> list[str]:
@@ -427,7 +436,8 @@ def run_scenario(
         _bias_error(scenario.accel_bias_mps2, final.accel_bias_mps2),
         _bias_error(scenario.gyro_bias_rad_s, final.gyro_bias_rad_s),
         float(np.mean(nis)) if nis else None,
-        run.summary,
+        *_drift(scored, scenario),
+        summary=run.summary,
     )
 
 
@@ -452,6 +462,40 @@ def _errors(
         up_estimated = estimated.inv().apply([0.0, 0.0, 1.0])
         tilt = float(np.degrees(np.arccos(np.clip(up_true @ up_estimated, -1.0, 1.0))))
     return [position, velocity, attitude, tilt]
+
+
+def _drift(
+    scored: list[Sample[EstimatedState]], scenario: EstimatorScenario
+) -> tuple[float | None, float | None, float | None]:
+    """Aligned ATE RMSE and RPE RMSEs (see ``ScenarioReport``)."""
+    from ..evaluation.trajectory import (
+        absolute_trajectory_error,
+        relative_pose_error,
+    )
+
+    # The newest estimate per timestamp (a filter may publish after the
+    # prediction and again after a measurement update at the same time).
+    newest = {s.sim_time_ns: s for s in scored if s.payload.position_m is not None}
+    posed = list(newest.values())
+    if len(posed) < 2:
+        return None, None, None
+    truths = [scenario.trajectory(s.sim_time_ns * 1e-9) for s in posed]
+    est = np.array([s.payload.position_m for s in posed])
+    true = np.array([t.position_m for t in truths])
+    ate = absolute_trajectory_error(est, true, "yaw")["position_m"]["rmse"]
+    if any(s.payload.quaternion_xyzw is None for s in posed):
+        return ate, None, None
+    rpe = relative_pose_error(
+        [s.sim_time_ns * 1e-9 for s in posed],
+        est,
+        np.array([s.payload.quaternion_xyzw for s in posed]),
+        true,
+        np.array([t.quaternion_xyzw for t in truths]),
+        segment_s=scenario.rpe_segment_s,
+    )
+    if not rpe["count"]:
+        return ate, None, None
+    return ate, rpe["translation_m"]["rmse"], rpe["rotation_deg"]["rmse"]
 
 
 def _present(values: list[float | None]) -> NDArray[np.float64] | None:
