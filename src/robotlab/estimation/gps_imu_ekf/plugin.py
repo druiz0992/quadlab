@@ -129,11 +129,11 @@ class GpsImuEkfEstimator:
             )
         if accepted:
             self._latest = self._estimates.next(timeout_wall_s=0)
-            state = self._latest.payload
+            ekf = self.node.ekf  # full state: biases are always estimated
             self._log(
                 "ekf/bias",
                 sample.sim_time_ns,
-                [*state.accel_bias_mps2, *state.gyro_bias_rad_s],
+                [*ekf.accel_bias, *ekf.gyro_bias],
                 ["accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z"],
             )
 

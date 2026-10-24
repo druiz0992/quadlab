@@ -13,7 +13,9 @@ thread, in delivery order. ``EstimateStateSource`` turns the latest estimate
 into the controller's state when ``control_state_source`` is "estimate":
 position, velocity, and attitude from the estimate; body rates from the
 latest delivered gyro sample (rotated by the declared IMU mount) minus the
-estimated gyro bias. If the estimate is older than ``max_estimate_age_s`` at
+estimated gyro bias (raw rates when the estimator has none). A partial
+estimate without position, velocity, or attitude cannot drive control
+(``ValueError``). If the estimate is older than ``max_estimate_age_s`` at
 a control tick, ``StaleEstimate`` is raised and the mission stops thrust.
 """
 
@@ -211,12 +213,19 @@ class EstimateStateSource:
                 f"(limit {self._max_age_ns * 1e-6:.1f} ms)"
             )
         x = estimate.payload
+        if x.position_m is None or x.velocity_mps is None or x.quaternion_xyzw is None:
+            raise ValueError(
+                "control_state_source estimate needs position, velocity, and "
+                f"attitude estimates; the estimator provides {list(x.blocks)}"
+            )
+        # Without a gyro-bias estimate the controller gets the raw rates.
+        bias = 0.0 if x.gyro_bias_rad_s is None else x.gyro_bias_rad_s
         return ControlState(
             now_ns,
             np.array(x.position_m),
             np.array(x.velocity_mps),
             np.array(x.quaternion_xyzw),
-            self._gyro_body - x.gyro_bias_rad_s,
+            self._gyro_body - bias,
             source="estimate",
             airspeed_mps=self._airspeed,
         )

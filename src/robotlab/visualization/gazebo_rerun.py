@@ -591,39 +591,54 @@ class GazeboRerunRecorder:
         self.log_vector(f"algorithms/{name}", values, labels)
 
     def log_estimate(self, sample):
-        """Observer only: truth is used for matched-time error plots, never filtering."""
-        rr = self.rr
+        """Observer only: truth is used for matched-time error plots, never
+        filtering. Partial estimates show what they contain: the body at
+        the estimated position (identity attitude without one) or, for an
+        attitude-only estimate, at the true position."""
         state = sample.payload
         self._set_time(sample.sim_time_ns * 1e-9)
+        truth = self.truth_positions.get(sample.sim_time_ns)
+        anchor = state.position_m if state.position_m is not None else truth
+        if anchor is not None:
+            self._log_estimate_body(anchor, state.quaternion_xyzw)
+        if state.position_m is not None:
+            self._log_estimate_position(state.position_m, truth)
+        if state.velocity_mps is not None:
+            self._scalar("estimation/speed_mps", np.linalg.norm(state.velocity_mps))
+
+    def _log_estimate_body(self, position, quaternion_xyzw):
+        rr = self.rr
         rr.log(
             "world/ekf",
             rr.Transform3D(
-                translation=state.position_m, quaternion=state.quaternion_xyzw
+                translation=position,
+                quaternion=(
+                    quaternion_xyzw if quaternion_xyzw is not None else [0, 0, 0, 1]
+                ),
             ),
         )
         rr.log(
             "world/ekf/body",
             rr.Boxes3D(half_sizes=[[0.20, 0.20, 0.05]], colors=[230, 80, 180, 160]),
         )
-        self.estimate_positions.append(state.position_m.copy())
+
+    def _log_estimate_position(self, position, truth):
+        self.estimate_positions.append(position.copy())
         if len(self.estimate_positions) % 5 == 0:
-            rr.log(
+            self.rr.log(
                 "world/ekf_path",
-                rr.LineStrips3D(
+                self.rr.LineStrips3D(
                     [_display_path(self.estimate_positions)], colors=[230, 80, 180]
                 ),
             )
-        truth = self.truth_positions.get(sample.sim_time_ns)
         for index, axis in enumerate("xyz"):
-            self._scalar(f"estimation/position/{axis}", state.position_m[index])
+            self._scalar(f"estimation/position/{axis}", position[index])
             if truth is not None:
                 self._scalar(f"estimation/truth_position/{axis}", truth[index])
         if truth is not None:
             self._scalar(
-                "estimation/position_error_m",
-                np.linalg.norm(state.position_m - truth),
+                "estimation/position_error_m", np.linalg.norm(position - truth)
             )
-        self._scalar("estimation/speed_mps", np.linalg.norm(state.velocity_mps))
 
     def close(self):
         self._scalars.flush()

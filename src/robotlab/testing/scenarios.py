@@ -158,20 +158,22 @@ class ScenarioReport:
     angle between the true and estimated world-up direction in body axes
     (``R^T e_z``), which no world-yaw error changes, even on a tilted body. Bias
     errors are norms at the final estimate (true minus estimated bias).
-    ``mean_nis_per_dof`` is None when the estimator reports no innovations.
+    A metric is None when the estimates lack its block (a partial
+    ``EstimatedState``), and ``mean_nis_per_dof`` when the estimator
+    reports no innovations; a limit on a None metric is a violation.
     """
 
     scenario: str
     estimates: int
     scored_estimates: int
-    position_rmse_m: float
-    max_position_error_m: float
-    final_position_error_m: float
-    velocity_rmse_mps: float
-    attitude_rmse_deg: float
-    tilt_rmse_deg: float
-    final_accel_bias_error_mps2: float
-    final_gyro_bias_error_rad_s: float
+    position_rmse_m: float | None
+    max_position_error_m: float | None
+    final_position_error_m: float | None
+    velocity_rmse_mps: float | None
+    attitude_rmse_deg: float | None
+    tilt_rmse_deg: float | None
+    final_accel_bias_error_mps2: float | None
+    final_gyro_bias_error_rad_s: float | None
     mean_nis_per_dof: float | None
     summary: dict[str, Any] = field(default_factory=dict)
 
@@ -406,8 +408,10 @@ def run_scenario(
         raise ValueError(
             f"{scenario.name}: no estimate after the {scenario.settle_s} s settle time"
         )
-    errors = np.array([_errors(s, scenario.trajectory) for s in scored])
-    position, velocity, attitude, tilt = errors.T
+    errors = [_errors(s, scenario.trajectory) for s in scored]
+    position, velocity, attitude, tilt = (
+        _present([e[i] for e in errors]) for i in range(4)
+    )
     final = scored[-1].payload
     nis = [i.nis / i.dof for i in run.innovations]
     return ScenarioReport(
@@ -415,38 +419,52 @@ def run_scenario(
         len(run.states),
         len(scored),
         _rms(position),
-        float(position.max()),
-        float(position[-1]),
+        None if position is None else float(position.max()),
+        None if position is None else float(position[-1]),
         _rms(velocity),
         _rms(attitude),
         _rms(tilt),
-        _norm_difference(scenario.accel_bias_mps2, final.accel_bias_mps2),
-        _norm_difference(scenario.gyro_bias_rad_s, final.gyro_bias_rad_s),
+        _bias_error(scenario.accel_bias_mps2, final.accel_bias_mps2),
+        _bias_error(scenario.gyro_bias_rad_s, final.gyro_bias_rad_s),
         float(np.mean(nis)) if nis else None,
         run.summary,
     )
 
 
-def _errors(estimate: Sample[EstimatedState], trajectory: Trajectory) -> list[float]:
-    """Position (m), velocity (m/s), attitude and tilt (deg) error norms."""
+def _errors(
+    estimate: Sample[EstimatedState], trajectory: Trajectory
+) -> list[float | None]:
+    """Position (m), velocity (m/s), attitude and tilt (deg) error norms;
+    None for blocks the estimate lacks."""
     truth = trajectory(estimate.sim_time_ns * 1e-9)
     state = estimate.payload
-    true_rotation = Rotation.from_quat(truth.quaternion_xyzw)
-    estimated = Rotation.from_quat(state.quaternion_xyzw)
-    # World up in body axes: a world-yaw error leaves it unchanged.
-    up_true = true_rotation.inv().apply([0.0, 0.0, 1.0])
-    up_estimated = estimated.inv().apply([0.0, 0.0, 1.0])
-    return [
-        float(np.linalg.norm(state.position_m - truth.position_m)),
-        float(np.linalg.norm(state.velocity_mps - truth.velocity_mps)),
-        float(np.degrees((true_rotation.inv() * estimated).magnitude())),
-        float(np.degrees(np.arccos(np.clip(up_true @ up_estimated, -1.0, 1.0)))),
-    ]
+    position = velocity = attitude = tilt = None
+    if state.position_m is not None:
+        position = float(np.linalg.norm(state.position_m - truth.position_m))
+    if state.velocity_mps is not None:
+        velocity = float(np.linalg.norm(state.velocity_mps - truth.velocity_mps))
+    if state.quaternion_xyzw is not None:
+        true_rotation = Rotation.from_quat(truth.quaternion_xyzw)
+        estimated = Rotation.from_quat(state.quaternion_xyzw)
+        attitude = float(np.degrees((true_rotation.inv() * estimated).magnitude()))
+        # World up in body axes: a world-yaw error leaves it unchanged.
+        up_true = true_rotation.inv().apply([0.0, 0.0, 1.0])
+        up_estimated = estimated.inv().apply([0.0, 0.0, 1.0])
+        tilt = float(np.degrees(np.arccos(np.clip(up_true @ up_estimated, -1.0, 1.0))))
+    return [position, velocity, attitude, tilt]
 
 
-def _norm_difference(true: Any, estimated: Any) -> float:
+def _present(values: list[float | None]) -> NDArray[np.float64] | None:
+    """Values of estimates that have the block (None if none have it)."""
+    kept = [v for v in values if v is not None]
+    return np.array(kept) if kept else None
+
+
+def _bias_error(true: Any, estimated: Any) -> float | None:
+    if estimated is None:
+        return None
     return float(np.linalg.norm(np.subtract(true, estimated)))
 
 
-def _rms(values: NDArray[np.float64]) -> float:
-    return float(np.sqrt(np.mean(values**2)))
+def _rms(values: NDArray[np.float64] | None) -> float | None:
+    return None if values is None else float(np.sqrt(np.mean(values**2)))

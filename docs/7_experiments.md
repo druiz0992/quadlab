@@ -73,10 +73,27 @@ class MyEstimator:
 Samples arrive serially on the mission thread, which is deterministic in
 lockstep. One stream is always in time order; different streams can
 interleave out of time order when their latencies differ (see the sensor
-bus below). `EstimatedState` holds position, velocity, attitude, both
-biases, and a 15×15 covariance in the error order position, velocity,
-attitude (right, body), accelerometer bias, gyro bias. Metrics use
-covariance blocks in that order.
+bus below). `EstimatedState` holds any subset of position, velocity,
+attitude, accelerometer bias, and gyro bias (absent blocks are None; at
+least position or attitude), and optionally a covariance over exactly the
+present blocks, in that order, 3 error states each (attitude as a right,
+body-axis error), so a full state is 15×15. An attitude-only filter
+publishes `EstimatedState(quaternion_xyzw=q, covariance=P3)`; a full one
+passes all six arguments as before.
+
+Partial estimates are scored on what they contain: metrics, scenario
+reports, and Rerun skip missing blocks; NEES is computed over the present
+blocks with known truth, only when a covariance is reported (per degrees
+of freedom under `nees.by_dof` if the blocks change during a run).
+`estimates.jsonl` writes `null` for absent blocks and covariance.
+`control_state_source: estimate` needs position, velocity, and attitude
+(else `ValueError`); without a gyro-bias estimate the controller gets raw
+gyro rates.
+
+*Migration (2026-10-24):* full-state estimators and existing
+`estimates.jsonl` files are unchanged. Code reading estimates must now
+allow None blocks, a null covariance, and a covariance smaller than
+15×15; the GPS/IMU EKF always publishes the full state.
 
 **Controller** (`control/interface.py`, `RotorController`):
 

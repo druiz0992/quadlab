@@ -430,12 +430,16 @@ class RunHealth:
     def on_estimate(
         self,
         sim_time_ns: int,
-        position_m: ArrayLike,
-        velocity_mps: ArrayLike,
-        quaternion_xyzw: ArrayLike,
+        position_m: ArrayLike | None,
+        velocity_mps: ArrayLike | None,
+        quaternion_xyzw: ArrayLike | None,
     ) -> None:
-        """One estimator output; only checked for non-finite values."""
-        if not _finite(position_m, velocity_mps, quaternion_xyzw):
+        """One estimator output; only checked for non-finite values (absent
+        blocks of a partial estimate are skipped)."""
+        present = [
+            v for v in (position_m, velocity_mps, quaternion_xyzw) if v is not None
+        ]
+        if not _finite(*present):
             t = self._time_s(sim_time_ns)
             self._report(
                 "non_finite", FAILED, t, "non-finite estimate", subject="estimate"

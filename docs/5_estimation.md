@@ -201,7 +201,9 @@ The `ekf` section of the drone JSON (all defaults listed in
 
 `estimates.jsonl` records integer simulation time, sequence/epoch, ENU frame,
 position, velocity, attitude, biases, full 15×15 covariance, and input
-ancestry; it grows quickly at high IMU rates. `summary.json` adds EKF input
+ancestry; it grows quickly at high IMU rates. (Plug-in estimators may
+publish partial estimates, with `null` for absent blocks; see
+[7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms).) `summary.json` adds EKF input
 and dispatch counts, GPS corrections and outliers, timing rejections,
 `gps_modeled_drops`, queue high-water mark, pending samples, and
 initialization/control-feedback provenance. In Rerun, the magenta vehicle and

@@ -94,31 +94,60 @@ class GpsReading:
             raise ValueError("Invalid geodetic GPS fix")
 
 
+# Error-state blocks of an estimate, in covariance order, with their sizes.
+ESTIMATE_BLOCKS: tuple[tuple[str, int], ...] = (
+    ("position_m", 3),
+    ("velocity_mps", 3),
+    ("quaternion_xyzw", 4),  # 3 attitude error states (rotation vector)
+    ("accel_bias_mps2", 3),
+    ("gyro_bias_rad_s", 3),
+)
+
+
 @dataclass(frozen=True)
 class EstimatedState:
-    position_m: np.ndarray
-    velocity_mps: np.ndarray
-    quaternion_xyzw: np.ndarray
-    accel_bias_mps2: np.ndarray
-    gyro_bias_rad_s: np.ndarray
-    covariance: (
-        np.ndarray
-    )  # error order: position, velocity, attitude, accel bias, gyro bias
+    """A pose estimate: any subset of the blocks in ``ESTIMATE_BLOCKS``.
+
+    World ENU position (m) and velocity (m/s), body-to-world quaternion
+    (xyzw), and body-axis accelerometer (m/s²) and gyro (rad/s) biases.
+    A block an estimator does not estimate is None; at least position or
+    attitude must be present. ``covariance`` covers exactly the present
+    blocks, in that order, with 3 error states each (attitude as a right
+    rotation-vector error, truth = estimate ⊕ error), so the full state is
+    15×15; None means the estimator reports no uncertainty (no NEES).
+    """
+
+    position_m: np.ndarray | None = None
+    velocity_mps: np.ndarray | None = None
+    quaternion_xyzw: np.ndarray | None = None
+    accel_bias_mps2: np.ndarray | None = None
+    gyro_bias_rad_s: np.ndarray | None = None
+    covariance: np.ndarray | None = None
 
     def __post_init__(self):
-        for name in (
-            "position_m",
-            "velocity_mps",
-            "accel_bias_mps2",
-            "gyro_bias_rad_s",
-        ):
-            object.__setattr__(self, name, readonly_array(getattr(self, name), (3,)))
-        object.__setattr__(
-            self, "quaternion_xyzw", readonly_array(self.quaternion_xyzw, (4,))
-        )
-        object.__setattr__(
-            self, "covariance", readonly_array(self.covariance, (15, 15))
-        )
+        for name, size in ESTIMATE_BLOCKS:
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(self, name, readonly_array(value, (size,)))
+        if self.position_m is None and self.quaternion_xyzw is None:
+            raise ValueError("An estimate needs a position or an attitude")
+        if self.covariance is not None:
+            size = 3 * len(self.blocks)
+            object.__setattr__(
+                self, "covariance", readonly_array(self.covariance, (size, size))
+            )
+
+    @property
+    def blocks(self) -> tuple[str, ...]:
+        """Names of the present blocks, in covariance order."""
+        return tuple(n for n, _ in ESTIMATE_BLOCKS if getattr(self, n) is not None)
+
+    def covariance_block(self, name: str) -> np.ndarray | None:
+        """3×3 covariance of one present block, or None if unknown."""
+        if self.covariance is None or name not in self.blocks:
+            return None
+        start = 3 * self.blocks.index(name)
+        return self.covariance[start : start + 3, start : start + 3]
 
 
 @dataclass(frozen=True)

@@ -36,7 +36,11 @@ HEAVY_STREAMS = frozenset({"camera", "lidar"})
 
 
 def estimate_record(sample: Sample[EstimatedState]) -> dict[str, Any]:
-    """One ``estimates.jsonl`` line (shared by live runs and replay)."""
+    """One ``estimates.jsonl`` line (shared by live runs and replay).
+
+    Blocks the estimator does not estimate, and an unreported covariance,
+    are JSON null; the covariance covers the present blocks in order.
+    """
     state = sample.payload
     return dict(
         sim_time_ns=sample.sim_time_ns,
@@ -44,14 +48,18 @@ def estimate_record(sample: Sample[EstimatedState]) -> dict[str, Any]:
         stream_id=sample.stream_id,
         epoch=sample.epoch,
         frame_id=sample.frame_id,
-        position_m=state.position_m.tolist(),
-        velocity_mps=state.velocity_mps.tolist(),
-        quaternion_xyzw=state.quaternion_xyzw.tolist(),
-        accel_bias_mps2=state.accel_bias_mps2.tolist(),
-        gyro_bias_rad_s=state.gyro_bias_rad_s.tolist(),
-        covariance=state.covariance.tolist(),
+        position_m=_listed(state.position_m),
+        velocity_mps=_listed(state.velocity_mps),
+        quaternion_xyzw=_listed(state.quaternion_xyzw),
+        accel_bias_mps2=_listed(state.accel_bias_mps2),
+        gyro_bias_rad_s=_listed(state.gyro_bias_rad_s),
+        covariance=_listed(state.covariance),
         parents=sample.parents,
     )
+
+
+def _listed(value: Any) -> Any:
+    return None if value is None else value.tolist()
 
 
 class ReplayRecorder:

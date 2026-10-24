@@ -15,8 +15,9 @@ noise) and checks the ``StateEstimator`` contract (estimation/interface.py):
 - ``inputs`` names known sensor streams;
 - ``latest()`` is None or a ``Sample[EstimatedState]`` whose time never
   decreases and never runs ahead of the newest delivered sample;
-- estimates are finite, with a symmetric positive semi-definite 15×15
-  covariance;
+- estimates (any subset of blocks, see ``EstimatedState``; values are
+  finite by construction) have a unit quaternion and, when reported, a
+  symmetric positive semi-definite covariance over the present blocks;
 - innovations have finite, non-negative NIS and positive degrees of freedom;
 - ``summary()`` is a JSON-serializable dict;
 - ``context.log`` entries are valid (see experiments/algorithm_debug.py);
@@ -317,22 +318,14 @@ def _check_estimate(latest: Any, previous: Any, newest_ns: int) -> None:
         previous is None or latest.sim_time_ns >= previous.sim_time_ns,
         "estimate times must not decrease",
     )
-    values = np.concatenate(
-        [
-            state.position_m,
-            state.velocity_mps,
-            state.quaternion_xyzw,
-            state.accel_bias_mps2,
-            state.gyro_bias_rad_s,
-            state.covariance.ravel(),
-        ]
-    )
-    _fail(bool(np.all(np.isfinite(values))), "estimate contains NaN or infinity")
     _fail(
-        abs(np.linalg.norm(state.quaternion_xyzw) - 1) < 1e-6,
+        state.quaternion_xyzw is None
+        or abs(np.linalg.norm(state.quaternion_xyzw) - 1) < 1e-6,
         "estimate quaternion must be unit length",
     )
     covariance = state.covariance
+    if covariance is None:
+        return
     _fail(
         np.allclose(
             covariance, covariance.T, atol=1e-9 * max(1.0, np.abs(covariance).max())
@@ -362,7 +355,7 @@ def _same_state(a: Sample, b: Sample) -> bool:
         return False
     x, y = a.payload, b.payload
     return all(
-        np.array_equal(getattr(x, name), getattr(y, name))
+        _same_array(getattr(x, name), getattr(y, name))
         for name in (
             "position_m",
             "velocity_mps",
@@ -372,6 +365,12 @@ def _same_state(a: Sample, b: Sample) -> bool:
             "covariance",
         )
     )
+
+
+def _same_array(a: Any, b: Any) -> bool:
+    if a is None or b is None:
+        return a is None and b is None
+    return bool(np.array_equal(a, b))
 
 
 # Controllers ----------------------------------------------------------------------
