@@ -2,6 +2,7 @@
 
 from collections import Counter
 from collections.abc import Callable
+from pathlib import Path
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -11,6 +12,7 @@ from ..simulation.gazebo.messages import vector
 from ..sensors.barometer import pressure_to_altitude
 from ..sensors.gazebo import lidar_points, rangefinder_distance, rgb_image
 from ..core.vehicle import DEFAULT_DRONE
+from .obj_mesh import read_obj, textured_faces
 
 
 def _display_path(positions, max_vertices=2000):
@@ -274,23 +276,36 @@ class GazeboRerunRecorder:
         )
 
     def _log_obj_mesh(self, path, uri):
-        """Show a generated OBJ mesh (e.g. terrain) from its file:// URI."""
+        """Show a generated OBJ mesh from its file:// URI: textured box
+        meshes face by face with their tiled texture, others (terrain) in
+        a plain colour (``visualization/obj_mesh.py``)."""
         from urllib.parse import unquote, urlparse
 
-        vertices, faces = [], []
-        for line in open(unquote(urlparse(uri).path)):
-            kind, *values = line.split()
-            if kind == "v":
-                vertices.append(list(map(float, values)))
-            elif kind == "f":
-                # Accept "v", "v/vt", and "v//vn" face entries.
-                faces.append([int(v.split("/")[0]) - 1 for v in values])
+        mesh = read_obj(Path(unquote(urlparse(uri).path)))
+        if mesh.texture is not None and mesh.texture.is_file() and len(mesh.texcoords):
+            from matplotlib.image import imread
+
+            tile = imread(mesh.texture)[..., :3]
+            if tile.dtype != np.uint8:  # PNGs read as floats in [0, 1]
+                tile = np.rint(tile * 255).astype(np.uint8)
+            for index, face in enumerate(textured_faces(mesh, tile)):
+                self.rr.log(
+                    f"{path}/face{index}",
+                    self.rr.Mesh3D(
+                        vertex_positions=face.positions,
+                        triangle_indices=face.triangles,
+                        vertex_texcoords=face.texcoords,
+                        albedo_texture=face.image,
+                    ),
+                    static=True,
+                )
+            return
         self.rr.log(
             path,
             self.rr.Mesh3D(
-                vertex_positions=vertices,
-                triangle_indices=faces,
-                vertex_colors=[[105, 125, 90]] * len(vertices),
+                vertex_positions=mesh.positions,
+                triangle_indices=mesh.corners[:, :, 0],
+                vertex_colors=[[105, 125, 90]] * len(mesh.positions),
             ),
             static=True,
         )

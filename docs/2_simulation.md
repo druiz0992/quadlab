@@ -358,8 +358,11 @@ so the density is uniform and only the tile repeats; collision stays a
 plain box. Patterns: `speckle` (multi-octave noise and 5–30 cm blobs,
 feature-rich at every scale), `bricks` (0.4 × 0.2 m blocks, repetitive),
 `checker` (1 m squares). Keys: `pattern`, `seed`, `tile_m` (8 m),
-`pixels_per_m` (64), `contrast` (0..1), `base` RGB. Rerun draws the boxes
-untextured. Verified in Gazebo: the first camera frame in
+`pixels_per_m` (64), `contrast` (0..1), `base` RGB. Rerun shows the
+textured obstacles too (`visualization/obj_mesh.py`: each face as its own
+mesh with the tile pre-repeated over it, so it does not depend on the
+viewer repeating textures); the ground stays the view's line grid, as for
+every scene. Verified in Gazebo: the first camera frame in
 `worlds/textured_yard.json` has a median 8 × 8-pixel ground texture of 2.9
 grey levels, against 0.3 in the training world.
 
