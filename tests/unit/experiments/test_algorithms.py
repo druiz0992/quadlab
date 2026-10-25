@@ -94,8 +94,10 @@ def test_builtin_ekf_estimator_runs_on_bus_samples_and_reports_nis():
     assert [n.name for n in innovations] == ["gps"] * 3
     assert all(n.dof == 3 and n.accepted for n in innovations)
     assert len(estimates) >= 100  # one per IMU sample plus GPS updates
-    assert estimator.summary()["gps_updates"] == 3
-    assert estimator.summary()["position_initialized_from_gps_s"] == 0.1
+    summary = estimator.summary()
+    assert summary["filter"] == "GpsImuEkf" and summary["updates"] == {"gps": 3}
+    assert summary["initialized_s"] == {"gps": 0.1}
+    assert summary["filter_summary"]["position_initialized"]
     np.testing.assert_allclose(
         runner.latest_estimate.payload.position_m, [0, 0, 1], atol=0.05
     )

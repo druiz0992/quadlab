@@ -587,7 +587,7 @@ on a 20 s circle:
   with heading delivered alongside all 201 fixes.
 - **Latency:** all 199 delayed fixes arrived after newer IMU samples (up to
   182 ms). The built-in EKF, which cannot apply past measurements, rejected
-  every one (`rejected_gps_timing`) and dead-reckoned to 1.1 m error, which
+  every one (`rejected_timing.gps`) and dead-reckoned to 1.1 m error, which
   is a known EKF limitation.
 
 ## Fault injection

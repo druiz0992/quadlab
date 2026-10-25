@@ -17,8 +17,9 @@ from typing import Any
 import pytest
 from scipy.spatial.transform import Rotation
 
-from robotlab.estimation.gps_imu_ekf.plugin import GpsImuEkfEstimator
+from robotlab.estimation.inertial.estimator import InertialEstimator
 from robotlab.estimation.template import TemplateEstimator
+from robotlab.experiments.harness.algorithms import gps_imu_ekf_options
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.testing.scenarios import (
     SCENARIOS,
@@ -53,16 +54,19 @@ class Candidate:
 
 def ekf_options(scenario: EstimatorScenario) -> dict[str, Any]:
     """Default ``ekf`` section with the start pose and the scenario's GPS
-    noise declared (the IMU noise assumptions stay the configured ones)."""
+    noise declared (the IMU noise assumptions stay the configured ones), as
+    ``inertial`` estimator options (what ``gps_imu_ekf`` runs)."""
     start = initial_truth(scenario)
-    return dict(
-        load_drone_config().data["ekf"],
-        initial_position_m=list(start.position_m),
-        initial_velocity_mps=list(start.velocity_mps),
-        initial_rotation_deg=list(
-            Rotation.from_quat(start.quaternion_xyzw).as_euler("xyz", degrees=True)
-        ),
-        gps_std_m=[scenario.gps_noise_m] * 3,
+    return gps_imu_ekf_options(
+        dict(
+            load_drone_config().data["ekf"],
+            initial_position_m=list(start.position_m),
+            initial_velocity_mps=list(start.velocity_mps),
+            initial_rotation_deg=list(
+                Rotation.from_quat(start.quaternion_xyzw).as_euler("xyz", degrees=True)
+            ),
+            gps_std_m=[scenario.gps_noise_m] * 3,
+        )
     )
 
 
@@ -74,7 +78,7 @@ def template_options(scenario: EstimatorScenario) -> dict[str, Any]:
 STEADY = dict(position_rmse_m=0.07, velocity_rmse_mps=0.1, tilt_rmse_deg=1.0)
 CANDIDATES = {
     "gps_imu_ekf": Candidate(
-        GpsImuEkfEstimator,
+        InertialEstimator,
         ekf_options,
         {
             "hover": STEADY,

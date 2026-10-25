@@ -144,17 +144,22 @@ def test_static_calibration_world_and_gravity(tmp_path):
 
 
 def test_calibration_priors_override_ekf_defaults_only_when_enabled():
-    from robotlab.estimation.gps_imu_ekf.plugin import with_calibrated_priors
+    from robotlab.experiments.harness.algorithms import gps_imu_ekf_options
+
+    def priors(calibration):
+        return gps_imu_ekf_options(ekf, calibration)["filter_options"]
 
     ekf = load_drone_config().data["ekf"]
     calibration = dict(filter_accel_bias_std_mps2=0.05, filter_gyro_bias_std_rad_s=4e-4)
-    tightened = with_calibrated_priors(ekf, calibration)
+    tightened = priors(calibration)
     assert tightened["initial_accel_bias_std_mps2"] == 0.05
     assert tightened["initial_gyro_bias_std_rad_s"] == 4e-4
     assert ekf["initial_accel_bias_std_mps2"] == 0.2  # input untouched
-    assert with_calibrated_priors(ekf, None) == ekf  # bypassed: defaults
-    partial = with_calibrated_priors(
-        ekf, dict(filter_accel_bias_std_mps2=None, filter_gyro_bias_std_rad_s=1e-3)
+    bypassed = priors(None)  # defaults
+    assert bypassed["initial_accel_bias_std_mps2"] == 0.2
+    assert bypassed["initial_gyro_bias_std_rad_s"] == 0.02
+    partial = priors(
+        dict(filter_accel_bias_std_mps2=None, filter_gyro_bias_std_rad_s=1e-3)
     )
     assert partial["initial_accel_bias_std_mps2"] == 0.2
 

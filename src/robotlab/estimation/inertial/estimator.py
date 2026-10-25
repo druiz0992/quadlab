@@ -7,7 +7,8 @@ Select a filter class with::
                                          "filter_options": {...},
                                          "gps_std_m": [0.5, 0.5, 0.8]}}
 
-The filter is built as ``cls(filter_options)`` and must implement
+The filter is built as ``cls(filter_options)`` (``filter`` may also name a
+factory such as ``"pkg.mod:Class.from_options"``) and must implement
 ``InertialFilter`` (filter.py). The estimator subscribes to ``imu`` plus
 every **enabled** stream the filter has an ``update_<kind>`` for (listed in
 ``summary()["inputs"]``); it raises ValueError without the IMU or without
@@ -35,30 +36,12 @@ ESTIMATOR_KEYS = {"filter", "filter_options", "name"}
 
 
 class InertialEstimator:
-    """Bus plug-in around ``InertialNode`` (see module docs).
+    """Bus plug-in around ``InertialNode`` (see module docs)."""
 
-    Subclasses (e.g. the GPS/IMU EKF) pass a ready ``filter_`` and their
-    converter options instead of ``filter``/``filter_options``.
-    """
-
-    def __init__(
-        self,
-        context: AlgorithmContext,
-        options: Mapping[str, Any],
-        filter_: Any | None = None,
-        *,
-        name: str | None = None,
-        log_prefix: str | None = None,
-    ) -> None:
-        if filter_ is None:
-            filter_ = _build_filter(options)
-            converter_options = _converter_options(options)
-        else:
-            converter_options = {
-                k: options[k] for k in CONVERTER_DEFAULTS if k in options
-            }
-        self.name = name or str(options.get("name", "inertial"))
-        self.log_prefix = log_prefix or self.name
+    def __init__(self, context: AlgorithmContext, options: Mapping[str, Any]) -> None:
+        filter_ = _build_filter(options)
+        converter_options = _converter_options(options)
+        self.name = str(options.get("name", "inertial"))
         supported = update_kinds(filter_)
         kinds = tuple(kind for kind in supported if kind in context.sensors)
         if "imu" not in context.sensors:
@@ -80,6 +63,9 @@ class InertialEstimator:
         self._log = context.log
         self.updates = {kind: 0 for kind in kinds}
         self.outliers = {kind: 0 for kind in kinds}
+        # Simulation time (s) of each stream's initialization (an accepted
+        # measurement without innovation), e.g. position from the first fix.
+        self.initialized_s: dict[str, float] = {}
 
     @property
     def filter(self) -> Any:
@@ -95,11 +81,13 @@ class InertialEstimator:
     def _record(self, kind: str, sim_time_ns: int, outcome: MeasurementOutcome) -> None:
         """Innovations, counters, debug series, and the newest estimate."""
         innovation = outcome.innovation
+        if outcome.accepted and innovation is None:
+            self.initialized_s.setdefault(kind, sim_time_ns * 1e-9)
         if innovation is not None:
             self._innovations.append(innovation)
             (self.updates if innovation.accepted else self.outliers)[kind] += 1
             self._log(
-                f"{self.log_prefix}/{innovation.name}",
+                f"{self.name}/{innovation.name}",
                 sim_time_ns,
                 [innovation.nis, float(innovation.accepted)],
                 ["nis", "accepted"],
@@ -110,7 +98,7 @@ class InertialEstimator:
         state = outcome.estimate.payload
         if state.accel_bias_mps2 is not None and state.gyro_bias_rad_s is not None:
             self._log(
-                f"{self.log_prefix}/bias",
+                f"{self.name}/bias",
                 sim_time_ns,
                 [*state.accel_bias_mps2, *state.gyro_bias_rad_s],
                 ["accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z"],
@@ -131,6 +119,7 @@ class InertialEstimator:
             updates=self.updates,
             outliers=self.outliers,
             rejected_timing={k: self.node.rejected_timing[k] for k in self.inputs[1:]},
+            initialized_s=self.initialized_s,
             receiver_covariance_fixes=self.node.converter.receiver_covariance_fixes,
             filter_summary=filter_summary() if callable(filter_summary) else None,
             initialization="declared filter options; no simulator truth",
@@ -159,8 +148,9 @@ def _build_filter(options: Mapping[str, Any]) -> Any:
     return filter_
 
 
-def _load_class(spec: str) -> type:
-    """Import ``package.module:Class``; raises ValueError with the reason."""
+def _load_class(spec: str) -> Any:
+    """Import ``package.module:Class`` (or ``Class.factory``); raises
+    ValueError with the reason."""
     import importlib
 
     module_name, _, class_name = spec.partition(":")
@@ -172,10 +162,13 @@ def _load_class(spec: str) -> type:
         raise ValueError(
             f"Cannot import filter module {module_name!r}: {error}"
         ) from error
+    target: Any = module
     try:
-        return getattr(module, class_name)
+        for attribute in class_name.split("."):
+            target = getattr(target, attribute)
     except AttributeError:
         raise ValueError(f"{module_name} has no class {class_name!r}") from None
+    return target
 
 
 def _converter_options(options: Mapping[str, Any]) -> dict[str, Any]:

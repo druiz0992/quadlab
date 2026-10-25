@@ -8,7 +8,8 @@ measurement's time, measurement conversion (measurements.py), and estimate
 publication. ``InertialEstimator`` (estimator.py) is the ``StateEstimator``
 plug-in around it, selected as ``algorithms.estimator: inertial`` with
 ``estimator_options.filter: "package.module:Class"``. The built-in
-GPS/IMU EKF (estimation/gps_imu_ekf/) uses the same pieces.
+GPS/IMU EKF (estimation/gps_imu_ekf/) is just such a filter;
+``algorithms.estimator: gps_imu_ekf`` is this estimator running it.
 """
 
 from .filter import InertialFilter

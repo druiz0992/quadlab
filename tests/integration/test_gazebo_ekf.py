@@ -59,8 +59,8 @@ def test_ekf_tracks_moving_drone_with_unaligned_sensor_rates(tmp_path, noisy):
     ]
     assert summary["completed"]
     ekf = summary["algorithms"]["estimator_summary"]
-    assert ekf["gps_updates"] > 20
-    assert ekf["rejected_gps_timing"] <= 1  # GPS may precede first IMU
+    assert ekf["updates"]["gps"] > 20
+    assert ekf["rejected_timing"]["gps"] <= 1  # GPS may precede first IMU
     assert not summary["dropped"]
     assert len(estimates) > 400
     assert estimates[0]["position_m"] == [0, 0, 0]  # declared prior, not spawn truth
@@ -140,7 +140,7 @@ def test_native_wind_and_modeled_gps_outage_recovery(tmp_path):
     ]
     during = [e for e in estimates if 1.2e9 < e["sim_time_ns"] < 2.8e9]
     assert len(during) > 100
-    assert summary["algorithms"]["estimator_summary"]["gps_updates"] > 10
+    assert summary["algorithms"]["estimator_summary"]["updates"]["gps"] > 10
     telemetry = [
         json.loads(line)
         for line in (output / "telemetry.jsonl").read_text().splitlines()

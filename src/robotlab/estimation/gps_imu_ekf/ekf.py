@@ -4,7 +4,15 @@ Nominal state: body-origin position/velocity in local ENU, body-to-world
 rotation, body-axis accelerometer/gyro biases. Right attitude error, 15x15
 covariance. IMU values are held at interval starts. Bias random walks are
 injected at interval ends. This is not a calibrated navigation system.
+
+It is an ``InertialFilter`` (estimation/inertial/filter.py): the reusable
+inertial estimator does the sample timing, mounts, GPS conversion, and
+publication. ``algorithms.estimator: gps_imu_ekf`` runs it there, built by
+``GpsImuEkf.from_options`` from the ``ekf`` configuration section.
 """
+
+from collections.abc import Mapping
+from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -43,7 +51,72 @@ def covariance(value: ArrayLike, size: int) -> NDArray[np.float64]:
     return result
 
 
+# ``ekf`` section keys the filter reads (the rest configure the converter).
+OPTION_KEYS = (
+    "initial_position_m",
+    "initial_velocity_mps",
+    "initial_rotation_deg",
+    "initial_accel_bias_mps2",
+    "initial_gyro_bias_rad_s",
+    "initial_position_std_m",
+    "initial_velocity_std_mps",
+    "initial_attitude_std_deg",
+    "initial_accel_bias_std_mps2",
+    "initial_gyro_bias_std_rad_s",
+    "accel_std_mps2",
+    "gyro_std_rad_s",
+    "accel_bias_walk",
+    "gyro_bias_walk",
+    "gps_gate_squared",
+    "initialize_position_from_gps",
+)
+
+
 class GpsImuEkf:
+    """15-state error-state EKF (module docs); build it explicitly with
+    keyword arguments or from configuration with ``from_options``."""
+
+    @classmethod
+    def from_options(cls, options: Mapping[str, Any]) -> "GpsImuEkf":
+        """The filter from declared priors (``OPTION_KEYS``, never simulator
+        truth): diagonal initial covariance from the ``initial_*_std``
+        values, attitude from roll/pitch/yaw degrees. Raises ValueError for
+        missing or unknown keys."""
+        missing = set(OPTION_KEYS) - set(options)
+        unknown = set(options) - set(OPTION_KEYS)
+        if missing or unknown:
+            raise ValueError(
+                f"GpsImuEkf options: missing {sorted(missing)}, "
+                f"unknown {sorted(unknown)}"
+            )
+        e = options
+        std = np.repeat(
+            [
+                e["initial_position_std_m"],
+                e["initial_velocity_std_mps"],
+                np.deg2rad(e["initial_attitude_std_deg"]),
+                e["initial_accel_bias_std_mps2"],
+                e["initial_gyro_bias_std_rad_s"],
+            ],
+            3,
+        )
+        return cls(
+            position_m=e["initial_position_m"],
+            velocity_mps=e["initial_velocity_mps"],
+            quaternion_xyzw=Rotation.from_euler(
+                "xyz", e["initial_rotation_deg"], degrees=True
+            ).as_quat(),
+            initial_covariance=np.diag(std**2),
+            accel_bias_mps2=e["initial_accel_bias_mps2"],
+            gyro_bias_rad_s=e["initial_gyro_bias_rad_s"],
+            accel_std_mps2=e["accel_std_mps2"],
+            gyro_std_rad_s=e["gyro_std_rad_s"],
+            accel_bias_walk=e["accel_bias_walk"],
+            gyro_bias_walk=e["gyro_bias_walk"],
+            gps_gate_squared=e["gps_gate_squared"],
+            initialize_position_from_gps=e["initialize_position_from_gps"],
+        )
+
     def __init__(
         self,
         *,
@@ -78,6 +151,11 @@ class GpsImuEkf:
         if not np.isfinite(gps_gate_squared) or gps_gate_squared <= 0:
             raise ValueError("GPS gate must be finite and positive")
         self.gps_gate_squared = gps_gate_squared
+        # Initial bias standard deviations, reported by summary().
+        self.bias_priors = dict(
+            accel_bias_std_mps2=float(np.sqrt(self.P[9, 9])),
+            gyro_bias_std_rad_s=float(np.sqrt(self.P[12, 12])),
+        )
         self.accepted_gps = self.rejected_gps = 0
         # Normalized innovation squared of the latest GPS update (3 dof),
         # gated or not, for consistency checks (NIS).
@@ -207,4 +285,18 @@ class GpsImuEkf:
             self.accel_bias,
             self.gyro_bias,
             self.P,
+        )
+
+    def summary(self) -> dict[str, Any]:
+        """Initialization and bias priors for ``summary.json``
+        (``estimator_summary.filter_summary``); counts are the estimator's."""
+        return dict(
+            initialization=(
+                "position from the first GPS fix; other states from declared "
+                "ekf priors; no simulator truth"
+                if self.initialize_position_from_gps
+                else "declared ekf priors; no simulator truth"
+            ),
+            position_initialized=self.position_initialized,
+            priors=self.bias_priors,
         )

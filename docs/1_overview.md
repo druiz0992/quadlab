@@ -39,6 +39,19 @@ has an `ekf` entry (the plug-in's is `algorithms.estimator_summary`), the
 `sensor_watchdog_wall_s` are gone (old recordings still replay), and
 `reference_from_world` moved to `simulation/gazebo/world.py`.
 
+*Migration (2026-10-25, EKF on the inertial estimator):*
+`estimation/gps_imu_ekf/plugin.py` (`GpsImuEkfEstimator`) was removed;
+`gps_imu_ekf` is now the `inertial` estimator running
+`GpsImuEkf.from_options` (`gps_imu_ekf_options` in
+`experiments/harness/algorithms.py`). Estimates are unchanged. Its
+`estimator_summary` has the generic layout: `gps_updates` → `updates.gps`,
+`gps_outliers` → `outliers.gps`, `rejected_gps_timing` →
+`rejected_timing.gps`, `position_initialized_from_gps_s` →
+`initialized_s.gps`; `initialization` and `priors` moved under
+`filter_summary` (`priors.calibrated_imu` dropped: the settings record the
+calibration). Debug channels `ekf/gps` and `ekf/bias` are now
+`gps_imu_ekf/gps` and `gps_imu_ekf/bias`.
+
 ## Status
 
 | Area | Implemented today |
@@ -97,8 +110,7 @@ src/robotlab/
 │   │                       #   held IMU), measurement conversion, the `inertial`
 │   │                       #   plug-in, template.py (copy to start a filter)
 │   └── gps_imu_ekf/
-│       ├── ekf.py          # Numerical prediction and correction (an InertialFilter)
-│       └── plugin.py       # The EKF as an estimator plug-in (on estimation/inertial/)
+│       └── ekf.py          # The EKF: only an InertialFilter (run by inertial/)
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,
 │                           #   truth interpolation, effective IMU bias, run health
 │                           #   verdict (health.py; bipeds: biped_health.py)

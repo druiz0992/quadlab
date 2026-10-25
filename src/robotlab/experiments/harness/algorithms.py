@@ -2,8 +2,9 @@
 
 ``algorithms.estimator`` and ``algorithms.controller`` name a class as
 ``"package.module:Class"`` or a built-in alias (``BUILTIN_ESTIMATORS``,
-``BUILTIN_CONTROLLERS``); "" means no estimator and the built-in manual
-controller. Plug-ins are constructed as ``cls(context, options)`` (see
+``BUILTIN_CONTROLLERS``, plus ``gps_imu_ekf``: the ``inertial`` estimator
+running ``GpsImuEkf``, see ``gps_imu_ekf_options``); "" means no estimator
+and the built-in manual controller. Plug-ins are constructed as ``cls(context, options)`` (see
 estimation/interface.py and control/interface.py). Built-ins receive their
 existing configuration sections as options (``ekf``, ``controller``) unless
 options are given.
@@ -44,10 +45,13 @@ from ...estimation.interface import Innovation, StateEstimator
 from ...sensors.bus import STREAMS, SensorBus
 
 BUILTIN_ESTIMATORS = {
-    "gps_imu_ekf": "robotlab.estimation.gps_imu_ekf.plugin:GpsImuEkfEstimator",
     # Any InertialFilter: estimator_options.filter = "package.module:Class".
     "inertial": "robotlab.estimation.inertial.estimator:InertialEstimator",
 }
+# ``gps_imu_ekf`` is ``inertial`` with this filter (gps_imu_ekf_options).
+GPS_IMU_EKF_FILTER = "robotlab.estimation.gps_imu_ekf.ekf:GpsImuEkf.from_options"
+# ``ekf`` section keys for the measurement converter, not the filter.
+GPS_IMU_EKF_CONVERTER_KEYS = ("gps_std_m", "use_receiver_gps_accuracy")
 BUILTIN_CONTROLLERS = {
     "manual": "robotlab.control.manual:ManualRotorController",
 }
@@ -125,8 +129,11 @@ def build_estimator(
     if not spec:
         return None
     options = algorithms["estimator_options"]
-    if spec == "gps_imu_ekf" and not options:
-        options = settings["ekf"]
+    if spec == "gps_imu_ekf":
+        imu = context.sensors.get("imu")
+        calibration = None if imu is None else imu.calibration
+        options = gps_imu_ekf_options(options or settings["ekf"], calibration)
+        spec = "inertial"
     estimator = load_class(spec, BUILTIN_ESTIMATORS)(context, options)
     if not isinstance(estimator, StateEstimator):
         raise ValueError(f"{spec} does not implement StateEstimator")
@@ -134,6 +141,34 @@ def build_estimator(
     if missing:
         raise ValueError(f"{spec} needs disabled sensors: {sorted(missing)}")
     return estimator
+
+
+def gps_imu_ekf_options(
+    ekf: Mapping[str, Any], imu_calibration: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """``inertial`` estimator options running ``GpsImuEkf`` from an ``ekf``
+    section: converter keys stay top-level, the rest are filter options.
+
+    An enabled IMU calibration (``imu_calibration``) declares the remaining
+    bias uncertainty (``filter_*_bias_std``), which replaces the section's
+    initial bias standard deviations; without one the section is used as is.
+    """
+    filter_options = {
+        k: v for k, v in ekf.items() if k not in GPS_IMU_EKF_CONVERTER_KEYS
+    }
+    for source, target in (
+        ("filter_accel_bias_std_mps2", "initial_accel_bias_std_mps2"),
+        ("filter_gyro_bias_std_rad_s", "initial_gyro_bias_std_rad_s"),
+    ):
+        if imu_calibration and imu_calibration.get(source) is not None:
+            filter_options[target] = imu_calibration[source]
+    converter = {k: ekf[k] for k in GPS_IMU_EKF_CONVERTER_KEYS if k in ekf}
+    return dict(
+        filter=GPS_IMU_EKF_FILTER,
+        filter_options=filter_options,
+        name="gps_imu_ekf",
+        **converter,
+    )
 
 
 def build_controller(

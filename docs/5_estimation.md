@@ -17,8 +17,8 @@ sensor bus samples (imu, gps)
 
 | Module | Responsibility |
 | --- | --- |
-| `estimation/gps_imu_ekf/ekf.py` | Numerical prediction and correction (`GpsImuEkf`) |
-| `estimation/gps_imu_ekf/plugin.py` | Builds the filter from the `ekf` section; the `gps_imu_ekf` plug-in |
+| `estimation/gps_imu_ekf/ekf.py` | The filter only (`GpsImuEkf`, an `InertialFilter`); `from_options` builds it from the `ekf` section |
+| `experiments/harness/algorithms.py` | `gps_imu_ekf`: the `inertial` plug-in running `GpsImuEkf` (`gps_imu_ekf_options`, calibrated bias priors) |
 | `estimation/inertial/` | Reusable for any inertial filter: `InertialNode` (sample checks, mounts, held IMU, timing, publication), measurement conversion, the `inertial` plug-in, a template filter ([Writing your own](#writing-your-own-inertial-filter)) |
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
 | `sensors/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
@@ -54,8 +54,8 @@ None of the numerical modules depend on Gazebo transport or Rerun.
   (`initialize_position_from_gps`) the first time-aligned GPS fix then
   replaces the position prior: position = antenna fix minus the lever arm,
   position covariance = that fix's covariance, cross-covariances cleared.
-  It counts as an initialization, not a correction (`gps_updates` and the
-  innovations start with the second fix).
+  It counts as an initialization, not a correction (`updates.gps` and the
+  innovations start with the second fix; its time is `initialized_s.gps`).
 - **GPS covariance:** by default (`use_receiver_gps_accuracy`) each fix uses
   the receiver's own 1-σ estimates from its `GpsStatus` (horizontal for
   east/north, vertical for up, uncorrelated); fixes without valid ones fall
@@ -102,7 +102,8 @@ inertial filter; for the EKF:
 ## Writing your own inertial filter
 
 Write only the mathematics; `estimation/inertial/` does the rest. A filter
-is a class built as `cls(filter_options)` with:
+is a class built as `cls(filter_options)` (or a factory named as
+`"pkg.mod:Class.from_options"`, as the built-in EKF does) with:
 
 | Method | Called with |
 | --- | --- |
@@ -114,7 +115,9 @@ is a class built as `cls(filter_options)` with:
 
 Implement any subset of the `update_*` methods: each returns an
 `Innovation` (or None for an initialization), and the estimator fuses every
-enabled stream its filter has a method for. Select it with:
+enabled stream its filter has a method for. An optional `summary()`
+returning a dict appears as `filter_summary` in `summary.json`. Select it
+with:
 
 ```json
 {"algorithms": {"estimator": "inertial",
@@ -149,7 +152,7 @@ propagate with the held reading to the GPS time, correct, then continue to
 the next IMU sample. Process noise is applied per segment, without modelling
 correlated held-sample noise across the split; an educational approximation.
 A fix older than the filter time (e.g. after GPS latency) is counted in
-`rejected_gps_timing`, since there is no rewind; spatial outliers are gated
+`rejected_timing.gps`, since there is no rewind; spatial outliers are gated
 separately. Lost fixes (dropouts, outages) never reach the bus, so IMU
 prediction simply continues and corrections resume on recovery.
 
@@ -240,7 +243,9 @@ position, velocity, attitude, biases, full 15×15 covariance, and input
 ancestry; it grows quickly at high IMU rates. (Plug-in estimators may
 publish partial estimates, with `null` for absent blocks; see
 [7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms).) `summary.json` adds EKF input
-and dispatch counts, GPS corrections and outliers, timing rejections,
+and dispatch counts, GPS corrections and outliers (`updates`, `outliers`),
+timing rejections (`rejected_timing`), the filter's initialization and bias
+priors (`filter_summary`),
 `gps_modeled_drops`, queue high-water mark, pending samples, and
 initialization/control-feedback provenance. In Rerun, the magenta vehicle and
 path are the estimate and the **EKF vs truth** tab compares positions only at

@@ -24,7 +24,7 @@ controller only receives it when `control_state_source` is `truth`.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `estimator` | "" | "" (none), `gps_imu_ekf` (built-in), or `package.module:Class` |
+| `estimator` | "" | "" (none), `gps_imu_ekf` or `inertial` (built-in), or `package.module:Class` |
 | `estimator_options` | {} | Passed to the estimator; built-in default: the `ekf` section |
 | `controller` | "" | "" or `manual` (built-in), or `package.module:Class` |
 | `controller_options` | {} | Passed to the controller; built-in default: the `controller` section |
@@ -69,7 +69,7 @@ and to the replay output offline. Stamp each entry with the sample time it
 describes. Names use letters, digits, `_ . / -`; values must be finite;
 invalid entries raise `ValueError` at the call. The file is only created
 when something is logged; `summary.json.algorithm_debug_entries` counts
-entries. The built-in EKF logs `ekf/gps` (NIS, accepted) and `ekf/bias`
+entries. The built-in EKF logs `gps_imu_ekf/gps` (NIS, accepted) and `gps_imu_ekf/bias`
 (accelerometer and gyro bias estimates) at each GPS update.
 Option objects are passed through without validation, so plug-ins must
 check them.
@@ -147,7 +147,7 @@ class MyController:
   must only read state; the contract kit checks that. The quadplane
   autopilot is the example (cross-track error to its current path segment).
 
-The built-ins (`ManualRotorController`, `GpsImuEkfEstimator`) follow
+The built-ins (`ManualRotorController`, `InertialEstimator` running `GpsImuEkf`) follow
 exactly these contracts and are the reference examples.
 
 **Estimate-driven control.** With `control_state_source: estimate`, the
