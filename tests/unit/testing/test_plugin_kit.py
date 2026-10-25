@@ -6,7 +6,7 @@ import pytest
 from robotlab.control.manual import ManualRotorController
 from robotlab.control.template import TemplateController
 from robotlab.core.measurements import EstimatedState, Sample
-from robotlab.estimation.inertial.estimator import InertialEstimator
+from robotlab.estimation.filter.estimator import FilterEstimator
 from robotlab.estimation.template import TemplateEstimator
 from robotlab.experiments.harness.algorithms import gps_imu_ekf_options
 from robotlab.simulation.gazebo.config import load_drone_config
@@ -26,7 +26,7 @@ def test_templates_and_builtins_pass():
     assert template.estimates == 2000 and template.final_position_error_m < 0.1
     assert template.debug_entries == 100  # one gps_error entry per fix
     ekf_options = dict(load_drone_config().data["ekf"], initial_position_m=[0, 0, 1])
-    ekf = check_estimator(InertialEstimator, gps_imu_ekf_options(ekf_options))
+    ekf = check_estimator(FilterEstimator, gps_imu_ekf_options(ekf_options))
     # 100 fixes: the first initializes the position, 99 correct.
     assert ekf.innovations == 99 and ekf.final_position_error_m < 0.1
     for factory in (TemplateController, ManualRotorController):

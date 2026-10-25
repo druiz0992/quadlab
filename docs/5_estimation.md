@@ -6,20 +6,20 @@ as an observer (`configs/algorithms/ekf_observer.json`, control flies on
 truth) or in the loop (`ekf_in_the_loop.json`). It is initialized from
 declared priors and never receives simulator truth, true biases, wind, or
 fault-model information. Your own filters run the same way
-([Writing your own](#writing-your-own-inertial-filter)).
+([Writing your own](#writing-your-own-filter)).
 
 ```text
 sensor bus samples (imu, gps)
-      → InertialNode (timing, mounts, GPS → ENU) → GpsImuEkf.predict / update_gps
+      → FilterNode (timing, mounts, GPS → ENU) → GpsImuEkf.predict_imu / update_gps
                                                         ↓
                                               state channel → Rerun / estimates.jsonl
 ```
 
 | Module | Responsibility |
 | --- | --- |
-| `estimation/gps_imu_ekf/ekf.py` | The filter only (`GpsImuEkf`, an `InertialFilter`); `from_options` builds it from the `ekf` section |
-| `experiments/harness/algorithms.py` | `gps_imu_ekf`: the `inertial` plug-in running `GpsImuEkf` (`gps_imu_ekf_options`, calibrated bias priors) |
-| `estimation/inertial/` | Reusable for any inertial filter: `InertialNode` (sample checks, mounts, held IMU, timing, publication), measurement conversion, the `inertial` plug-in, a template filter ([Writing your own](#writing-your-own-inertial-filter)) |
+| `estimation/gps_imu_ekf/ekf.py` | The filter only (`GpsImuEkf`, an IMU-driven `RecursiveFilter`); `from_options` builds it from the `ekf` section |
+| `experiments/harness/algorithms.py` | `gps_imu_ekf`: the `filter` plug-in running `GpsImuEkf` (`gps_imu_ekf_options`, calibrated bias priors) |
+| `estimation/filter/` | Reusable for any recursive filter: `FilterNode` (sample checks, held driving readings, timing, publication), measurement conversion (mounts, ENU, wheel geometry), the `filter` plug-in, IMU and wheel-odometry templates ([Writing your own](#writing-your-own-filter)) |
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
 | `sensors/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
 | `sensors/geodesy.py` | WGS84 ↔ ECEF ↔ local ENU conversion |
@@ -77,8 +77,8 @@ repropagation are not implemented.
 
 ## Node and frames
 
-The node is `InertialNode` (`estimation/inertial/node.py`), shared by every
-inertial filter; for the EKF:
+The node is `FilterNode` (`estimation/filter/node.py`), shared by every
+filter; for the EKF (driven by the IMU):
 
 - GPS latitude/longitude/altitude convert through WGS84 ECEF to local ENU.
   The reference origin and altitude datum are explicit; altitude 650 m is not
@@ -89,7 +89,7 @@ inertial filter; for the EKF:
   position only; the shared node also converts GPS velocity, magnetometer,
   and barometer measurements for filters that fuse them.
 - The first IMU sample sets the prior's time. IMU intervals must be positive
-  and at most 0.1 s. The node validates frames, epochs, stream identity, and
+  and at most `max_driver_interval_s` (0.1 s). The node validates frames, epochs, stream identity, and
   sequence continuity, serializes handlers, and starts no threads.
 - Output: `node.outputs["state"]`, also `node.estimates`, a read-only
   channel of `Sample[EstimatedState]`.
@@ -99,42 +99,59 @@ inertial filter; for the EKF:
   Prediction and correction outputs may share timestamps with distinct
   sequence numbers.
 
-## Writing your own inertial filter
+## Writing your own filter
 
-Write only the mathematics; `estimation/inertial/` does the rest. A filter
+Write only the mathematics; `estimation/filter/` does the rest. A filter
 is a class built as `cls(filter_options)` (or a factory named as
-`"pkg.mod:Class.from_options"`, as the built-in EKF does) with:
+`"pkg.mod:Class.from_options"`, as the built-in EKF does) with exactly
+one `predict_<kind>`, the stream that **drives** it, plus any `update_<kind>`
+methods and `state()`:
 
 | Method | Called with |
 | --- | --- |
-| `predict(specific_force_mps2, angular_rate_rad_s, dt_s)` | one IMU reading in body axes, held over `dt_s` |
+| `predict_imu(ImuInput, dt_s)` | one IMU reading (specific force, angular rate) in body axes, held over `dt_s` |
+| `predict_wheel_encoders(WheelMotion, dt_s)` | per wheel: hub position and rolling direction in body x/y, rolling speed (m/s), held over `dt_s` |
 | `update_gps(GpsFix)` | ENU antenna position, 3×3 covariance, lever arm, optional ENU velocity and variance |
 | `update_magnetometer(MagneticField)` | field in body axes (µT) and covariance |
 | `update_baro(BaroAltitude)` | altitude above the GPS reference (m) and variance |
+| `update_wheel_encoders(WheelMotion)` | as above, as a correction (e.g. an IMU-driven ground-vehicle filter) |
+| `predict_<kind>` / `update_<kind>` for any other bus stream | its bus payload, unchanged |
 | `state()` | returns `EstimatedState` (covariance with RobotLab's right attitude error) |
 
-Implement any subset of the `update_*` methods: each returns an
-`Innovation` (or None for an initialization), and the estimator fuses every
-enabled stream its filter has a method for. An optional `summary()`
-returning a dict appears as `filter_summary` in `summary.json`. Select it
-with:
+Each `update_*` returns an `Innovation` (or None for an initialization),
+and the estimator fuses every enabled stream its filter has a method for;
+the driving stream must be enabled and cannot also be an update. Between
+driving samples the node predicts up to each measurement's time, so the
+streams may run at any rates; driving samples more than
+`max_driver_interval_s` apart (option, default 0.1 s) are rejected. With
+an IMU and wheel encoders, let the IMU drive and fuse the wheels as an
+update: prediction needs one continuous input, everything else is
+information to correct it with. An optional `summary()` returning a dict
+appears as `filter_summary` in `summary.json`. Select it with:
 
 ```json
-{"algorithms": {"estimator": "inertial",
+{"algorithms": {"estimator": "filter",
                 "estimator_options": {"filter": "mypkg.my_ekf:MyEkf",
                                       "filter_options": {"gyro_std_rad_s": 0.003},
                                       "gps_std_m": [0.5, 0.5, 0.8],
                                       "magnetometer_std_ut": 1.0, "baro_std_m": 0.5}}}
 ```
 
-Start from `estimation/inertial/template.py` (6-state position/velocity
-Kalman filter, gyro-integrated attitude, GPS and barometer updates) and
-check it with `check_estimator(InertialEstimator, options)`, the scenario
-suite, and `robotlab-replay ... --estimator inertial --set
+Optional starting points: `estimation/filter/template.py` (IMU-driven:
+6-state position/velocity Kalman filter, gyro-integrated attitude, GPS and
+barometer updates) and `estimation/filter/wheel_odometry.py` (driven by
+wheel encoders: least-squares planar body velocity from the wheels'
+rolling speeds, position and yaw corrected by GPS). Check a filter with
+`check_estimator(FilterEstimator, options)`, the scenario suite, and
+`robotlab-replay ... --estimator filter --set
 'algorithms.estimator_options={...}'` (one estimator per replay when it
 needs its own options). On the 10 s lockstep square with sensor errors the
 template replayed with 2.0 m position and 0.85° attitude RMSE (EKF: 1.6 m,
-1.3°); it estimates no biases, so it drifts on longer runs.
+1.3°); it estimates no biases, so it drifts on longer runs. On the
+`car_circle` scenario the wheel-odometry template scored 2 cm position
+and 0.09° heading RMSE with mean NIS 0.96 per degree of freedom; its
+sideways speed is observable only through the steering angle, so quantized
+encoder speeds make its velocity noisy (0.6 m/s RMS).
 
 ## Running it
 

@@ -456,7 +456,7 @@ When enabled, the autopilot side applies it like a driver:
   `calibrated_specific_force_mps2`, `calibrated_angular_rate_rad_s`, and
   `temperature_c` next to the raw values. `best_specific_force_mps2` and
   `best_angular_rate_rad_s` return the calibrated values when present.
-- **Consumers:** every inertial estimator (estimation/inertial/) and
+- **Consumers:** every IMU-driven filter (estimation/filter/) and
   estimate-driven body rates use the calibrated values.
 - **EKF priors:** the EKF's bias states then track only the residual, so
   its initial bias uncertainty is taken from `filter_*_bias_std` instead of

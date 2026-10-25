@@ -192,9 +192,10 @@ robotlab-replay outputs/rec --output outputs/rec-ekf
 robotlab-replay outputs/rec --output outputs/rec-mine --estimator mypkg.filters:MyFilter
 robotlab-replay outputs/rec --output outputs/rec-cmp --estimator gps_imu_ekf \
   --estimator mypkg.filters:MyFilter            # side by side: comparison.md
-# Inertial filters: write only the maths (predict, update_gps/_magnetometer/_baro,
-# state) starting from estimation/inertial/template.py; select it with
-# algorithms.estimator "inertial" + estimator_options.filter (docs/5_estimation.md)
+# Filters: write only the maths (one predict_<kind>, e.g. predict_imu or
+# predict_wheel_encoders, update_gps/_magnetometer/_baro, state), e.g. from
+# estimation/filter/template.py or wheel_odometry.py; select it with
+# algorithms.estimator "filter" + estimator_options.filter (docs/5_estimation.md)
 # Start new algorithms from estimation/template.py or control/template.py and
 # test them with robotlab.testing.plugins.check_estimator / check_controller;
 # score estimators on shared scenarios: tests/unit/estimation/test_estimator_scenarios.py

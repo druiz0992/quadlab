@@ -5,9 +5,9 @@ rotation, body-axis accelerometer/gyro biases. Right attitude error, 15x15
 covariance. IMU values are held at interval starts. Bias random walks are
 injected at interval ends. This is not a calibrated navigation system.
 
-It is an ``InertialFilter`` (estimation/inertial/filter.py): the reusable
-inertial estimator does the sample timing, mounts, GPS conversion, and
-publication. ``algorithms.estimator: gps_imu_ekf`` runs it there, built by
+It is a ``RecursiveFilter`` (estimation/filter/protocol.py) driven by the
+IMU: the reusable filter estimator does the sample timing, mounts, GPS
+conversion, and publication. ``algorithms.estimator: gps_imu_ekf`` runs it there, built by
 ``GpsImuEkf.from_options`` from the ``ekf`` configuration section.
 """
 
@@ -20,7 +20,7 @@ from scipy.spatial.transform import Rotation
 
 from ...core.frames import GRAVITY
 from ...core.measurements import EstimatedState, readonly_array
-from ..inertial.measurements import GpsFix
+from ..filter.measurements import GpsFix, ImuInput
 from ..interface import Innovation
 
 
@@ -200,6 +200,11 @@ class GpsImuEkf:
         self.P = F @ self.P @ F.T + Q
         self.P = (self.P + self.P.T) / 2
 
+    def predict_imu(self, imu: ImuInput, dt_s: float) -> None:
+        """``RecursiveFilter`` prediction: ``predict`` with one held IMU
+        reading in body axes."""
+        self.predict(imu.specific_force_mps2, imu.angular_rate_rad_s, dt_s)
+
     def initialize_position(
         self,
         position_enu_m: ArrayLike,
@@ -261,7 +266,7 @@ class GpsImuEkf:
         return True
 
     def update_gps(self, fix: GpsFix) -> Innovation | None:
-        """``InertialFilter`` GPS update: the first fix initializes the
+        """``RecursiveFilter`` GPS update: the first fix initializes the
         position when configured (no innovation, returns None), every other
         fix corrects (``correct_gps``) and returns its 3-dof innovation."""
         lever = fix.lever_arm_body_m

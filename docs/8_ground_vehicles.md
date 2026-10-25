@@ -154,7 +154,12 @@ the latest reading in `WheeledControlState`. When the sensor bus exists
 sample (`EncoderReading`, frame `vehicle/wheels`, timing
 `sensor_timing.wheel_encoders`), so an estimator can declare it as an
 input. Disabled encoders pass truth to the controller and never enter
-the bus.
+the bus. A filter on the shared filter estimator receives each reading as a
+`WheelMotion` (hub positions, rolling directions, rolling speeds from the
+nominal wheel geometry), either driving it (`predict_wheel_encoders`; see
+`estimation/filter/wheel_odometry.py`) or correcting an IMU-driven filter
+(`update_wheel_encoders`); see
+[5 Estimation](5_estimation.md#writing-your-own-filter).
 
 Scene keys for wheeled robots (ignored by multirotors):
 

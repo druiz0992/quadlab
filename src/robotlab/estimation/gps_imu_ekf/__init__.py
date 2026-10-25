@@ -1,7 +1,7 @@
 """GPS/IMU error-state EKF: only the filter (ekf.py).
 
 Sample timing, mounts, GPS conversion, and publication are the reusable
-inertial estimator's (estimation/inertial/); ``algorithms.estimator:
+filter estimator's (estimation/filter/); ``algorithms.estimator:
 gps_imu_ekf`` selects it with this filter (experiments/harness/algorithms.py).
 """
 

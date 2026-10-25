@@ -1,16 +1,16 @@
-"""Template inertial filter: copy this file to start your own.
+"""Template IMU-driven filter: an example to start your own from.
 
 Select it with::
 
-    "algorithms": {"estimator": "inertial",
+    "algorithms": {"estimator": "filter",
                    "estimator_options": {
-                       "filter": "robotlab.estimation.inertial.template:TemplateInertialFilter",
+                       "filter": "robotlab.estimation.filter.template:TemplateInertialFilter",
                        "filter_options": {"accel_std_mps2": 0.2}}}
 
-and test it with ``robotlab.testing.plugins.check_estimator(InertialEstimator,
+and test it with ``robotlab.testing.plugins.check_estimator(FilterEstimator,
 options)``. The node (node.py) does all timing, frames, and conversion: this
 class only holds the mathematics, deliberately simple so the structure of
-an ``InertialFilter`` (filter.py) stays visible:
+a ``RecursiveFilter`` (protocol.py) stays visible:
 
 - attitude R: integrated from the gyro, R ← R · Exp(ω dt), never corrected
   (a real filter estimates attitude error and gyro bias);
@@ -31,13 +31,13 @@ from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
 from ...core.frames import GRAVITY
 from ...core.measurements import EstimatedState
 from ..interface import Innovation
-from .measurements import BaroAltitude, GpsFix
+from .measurements import BaroAltitude, GpsFix, ImuInput
 
 DEFAULTS: dict[str, Any] = dict(
     initial_position_m=[0.0, 0.0, 0.0],
@@ -71,17 +71,16 @@ class TemplateInertialFilter:
             gps=float(o["gps_gate_squared"]), baro=float(o["baro_gate_squared"])
         )
 
-    def predict(
-        self, specific_force_mps2: ArrayLike, angular_rate_rad_s: ArrayLike, dt_s: float
-    ) -> None:
-        accel = self.rotation.apply(np.asarray(specific_force_mps2, float)) + GRAVITY
+    def predict_imu(self, imu: ImuInput, dt_s: float) -> None:
+        """Propagate ``dt_s`` seconds with one held IMU reading (body axes)."""
+        accel = self.rotation.apply(imu.specific_force_mps2) + GRAVITY
         F = np.eye(6)
         F[:3, 3:] = np.eye(3) * dt_s
         G = np.vstack([np.eye(3) * dt_s**2 / 2, np.eye(3) * dt_s])
         self.x = F @ self.x + G @ accel
         self.P = F @ self.P @ F.T + G @ G.T * self.accel_std**2
         self.rotation = self.rotation * Rotation.from_rotvec(
-            np.asarray(angular_rate_rad_s, float) * dt_s
+            imu.angular_rate_rad_s * dt_s
         )
 
     def update_gps(self, fix: GpsFix) -> Innovation:

@@ -4,7 +4,9 @@ To test your own filter, add a ``Candidate`` with its options builder, the
 sensors it should get (any streams of ``sensors/bus.py``; the context holds
 exactly these), and limits for each scenario in
 ``robotlab.testing.scenarios.SCENARIOS``; a new scenario without limits
-fails until every candidate declares them. Limits are about 1.5-2x the
+fails until every candidate declares them. Scenarios a candidate's sensors
+cannot run on (wheel encoders without wheels, ESC telemetry without
+rotors) are skipped. Limits are about 1.5-2x the
 verified scores, so they catch regressions (frames, signs, timing, bias
 handling), not small tuning changes.
 """
@@ -17,12 +19,13 @@ from typing import Any
 import pytest
 from scipy.spatial.transform import Rotation
 
-from robotlab.estimation.inertial.estimator import InertialEstimator
+from robotlab.estimation.filter.estimator import FilterEstimator
 from robotlab.estimation.template import TemplateEstimator
 from robotlab.experiments.harness.algorithms import gps_imu_ekf_options
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.testing.scenarios import (
     SCENARIOS,
+    WHEELED_KINDS,
     EstimatorScenario,
     ScenarioReport,
     initial_truth,
@@ -55,7 +58,7 @@ class Candidate:
 def ekf_options(scenario: EstimatorScenario) -> dict[str, Any]:
     """Default ``ekf`` section with the start pose and the scenario's GPS
     noise declared (the IMU noise assumptions stay the configured ones), as
-    ``inertial`` estimator options (what ``gps_imu_ekf`` runs)."""
+    ``filter`` estimator options (what ``gps_imu_ekf`` runs)."""
     start = initial_truth(scenario)
     return gps_imu_ekf_options(
         dict(
@@ -70,6 +73,19 @@ def ekf_options(scenario: EstimatorScenario) -> dict[str, Any]:
     )
 
 
+def wheel_odometry_options(scenario: EstimatorScenario) -> dict[str, Any]:
+    """Wheel-odometry template with the start position and yaw declared."""
+    start = initial_truth(scenario)
+    yaw_deg = Rotation.from_quat(start.quaternion_xyzw).as_euler("xyz", degrees=True)[2]
+    return dict(
+        filter="robotlab.estimation.filter.wheel_odometry:TemplateWheelOdometry",
+        filter_options=dict(
+            initial_position_m=list(start.position_m), initial_yaw_deg=float(yaw_deg)
+        ),
+        gps_std_m=[scenario.gps_noise_m] * 3,
+    )
+
+
 def template_options(scenario: EstimatorScenario) -> dict[str, Any]:
     """The template only takes a start position (it starts level, facing east)."""
     return dict(initial_position_m=list(initial_truth(scenario).position_m))
@@ -78,7 +94,7 @@ def template_options(scenario: EstimatorScenario) -> dict[str, Any]:
 STEADY = dict(position_rmse_m=0.07, velocity_rmse_mps=0.1, tilt_rmse_deg=1.0)
 CANDIDATES = {
     "gps_imu_ekf": Candidate(
-        InertialEstimator,
+        FilterEstimator,
         ekf_options,
         {
             "hover": STEADY,
@@ -129,7 +145,32 @@ CANDIDATES = {
             "car_circle": dict(position_rmse_m=0.2, tilt_rmse_deg=15.0),
         },
     ),
+    # Driven by wheel encoders, corrected by GPS. Its sideways speed is
+    # observable only through the steering angle, so quantized encoder
+    # speeds make the velocity noisy (about 0.6 m/s RMS).
+    "wheel_odometry": Candidate(
+        FilterEstimator,
+        wheel_odometry_options,
+        {
+            "car_circle": dict(
+                position_rmse_m=0.04,
+                max_position_error_m=0.1,
+                velocity_rmse_mps=1.0,
+                attitude_rmse_deg=0.2,
+            ),
+        },
+        sensors=("wheel_encoders", "gps"),
+        consistent=True,
+    ),
 }
+
+
+def runs_on(candidate: Candidate, scenario: EstimatorScenario) -> bool:
+    """Whether the scenario's vehicle has the candidate's sensors."""
+    wheeled = scenario.vehicle in WHEELED_KINDS
+    if "wheel_encoders" in candidate.sensors and not wheeled:
+        return False
+    return not ("esc" in candidate.sensors and wheeled)
 
 
 @cache
@@ -147,6 +188,8 @@ def report_for(candidate_name: str, scenario_name: str) -> ScenarioReport:
 def test_estimator_meets_its_scenario_limits(candidate_name, scenario_name):
     candidate = CANDIDATES[candidate_name]
     scenario = SCENARIOS[scenario_name]
+    if not runs_on(candidate, scenario):
+        pytest.skip(f"{candidate_name} needs sensors {scenario.vehicle} lacks")
     assert (
         scenario_name in candidate.limits
     ), f"{candidate_name} declares no limits for scenario {scenario_name!r}"

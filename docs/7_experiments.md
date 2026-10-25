@@ -24,7 +24,7 @@ controller only receives it when `control_state_source` is `truth`.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `estimator` | "" | "" (none), `gps_imu_ekf` or `inertial` (built-in), or `package.module:Class` |
+| `estimator` | "" | "" (none), `gps_imu_ekf` or `filter` (built-in), or `package.module:Class` |
 | `estimator_options` | {} | Passed to the estimator; built-in default: the `ekf` section |
 | `controller` | "" | "" or `manual` (built-in), or `package.module:Class` |
 | `controller_options` | {} | Passed to the controller; built-in default: the `controller` section |
@@ -147,7 +147,7 @@ class MyController:
   must only read state; the contract kit checks that. The quadplane
   autopilot is the example (cross-track error to its current path segment).
 
-The built-ins (`ManualRotorController`, `InertialEstimator` running `GpsImuEkf`) follow
+The built-ins (`ManualRotorController`, `FilterEstimator` running `GpsImuEkf`) follow
 exactly these contracts and are the reference examples.
 
 **Estimate-driven control.** With `control_state_source: estimate`, the
@@ -172,14 +172,15 @@ on the sensor bus, scored and replayable.
 
 ### Writing a plug-in: templates and the contract test kit
 
-Start from a template; they are short and commented, and pass the kit. An
-IMU-driven estimator needs only an `InertialFilter` class (the second
-row); nothing has to be copied:
+Start from a template; they are short and commented, and pass the kit. A
+predict/update estimator needs only a `RecursiveFilter` class (the filter
+rows); nothing has to be copied:
 
 | Template | Selects with | What it does |
 | --- | --- | --- |
 | `estimation/template.py` | `robotlab.estimation.template:TemplateEstimator` | Complementary filter: gyro-integrated attitude pulled towards the accelerometer's gravity direction, GPS-blended position and velocity; fixed reported covariance (NEES not meaningful); logs `template/gps_error` |
-| `estimation/inertial/template.py` | `inertial` with `estimator_options.filter: robotlab.estimation.inertial.template:TemplateInertialFilter` | An `InertialFilter`: only the mathematics (position/velocity Kalman filter, gyro-integrated attitude, GPS and barometer updates); the shared node does timing, mounts, and conversion ([5 Estimation](5_estimation.md#writing-your-own-inertial-filter)) |
+| `estimation/filter/template.py` | `filter` with `estimator_options.filter: robotlab.estimation.filter.template:TemplateInertialFilter` | An IMU-driven `RecursiveFilter`: only the mathematics (position/velocity Kalman filter, gyro-integrated attitude, GPS and barometer updates); the shared node does timing, mounts, and conversion ([5 Estimation](5_estimation.md#writing-your-own-filter)) |
+| `estimation/filter/wheel_odometry.py` | `filter` with `estimator_options.filter: robotlab.estimation.filter.wheel_odometry:TemplateWheelOdometry` | A `RecursiveFilter` driven by wheel encoders: least-squares planar body velocity from the wheels, position and yaw corrected by GPS (wheeled robots) |
 | `control/template.py` | `robotlab.control.template:TemplateController` | Cascaded PD: position → tilt-limited acceleration → desired attitude (geometric attitude error, Lee et al. 2010) → torque → pseudo-inverse allocation over the lift rotors |
 
 Wheeled robots have their own controller contract, template

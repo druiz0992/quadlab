@@ -1,9 +1,21 @@
-"""Measurements converted for inertial filters: frames, units, covariance.
+"""Measurements converted for recursive filters: frames, units, covariance.
 
 Bus samples carry raw sensor payloads in sensor axes or geodetic
-coordinates. ``MeasurementConverter`` turns each into the form a filter
-update needs, so every filter receives the same conventions:
+coordinates. ``MeasurementConverter`` turns each into the form a filter's
+``predict_<kind>``/``update_<kind>`` needs, so every filter receives the
+same conventions:
 
+- ``ImuInput`` (stream ``imu``): specific force (m/s²) and angular rate
+  (rad/s) in **body** axes, the driver-calibrated values when present,
+  rotated by the IMU mount. The IMU must sit at the body origin (no
+  lever-arm compensation; ValueError at construction otherwise).
+- ``WheelMotion`` (``wheel_encoders``): per wheel (wheel order), the hub
+  position in body x/y (m, nominal geometry from the context), the rolling
+  direction in body x/y (unit vector at the reported steering angle,
+  positive about +z), and the rolling speed (encoder rad/s × nominal tyre
+  radius, m/s). The encoder speed averages the interval ending at the
+  sample time (sensors/wheel_encoders.py). Needs the context's wheeled
+  vehicle (ValueError at construction otherwise).
 - ``GpsFix`` (stream ``gps``): antenna position in local ENU (m) around the
   context's WGS84 reference, its 3×3 covariance (m²), the antenna lever arm
   in body axes (m), and, when the receiver reports it, ENU velocity (m/s)
@@ -20,11 +32,13 @@ update needs, so every filter receives the same conventions:
   ``baro_std_m²``. Datum and drift errors remain in the value: a filter
   that needs them estimates a baro offset itself.
 
-Units are SI except the magnetic field (µT, as the bus carries it).
-Invalid options raise ValueError when the converter is built.
+Any other stream reaches the filter as its bus payload, unchanged (sensor
+frame, as documented in core/measurements.py). Units are SI except the
+magnetic field (µT, as the bus carries it). Invalid options raise
+ValueError when the converter is built.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,8 +47,16 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.spatial.transform import Rotation
 
 from ...core.algorithms import SensorDescription
-from ...core.measurements import BaroReading, GpsReading, MagnetometerReading
+from ...core.measurements import (
+    BaroReading,
+    GpsReading,
+    ImuReading,
+    MagnetometerReading,
+    readonly_array,
+)
+from ...core.wheeled_vehicle import WheeledProperties
 from ...sensors.geodesy import gps_to_enu
+from ...sensors.wheel_encoders import EncoderReading
 
 CONVERTER_DEFAULTS: dict[str, Any] = dict(
     gps_std_m=[0.5, 0.5, 0.8],
@@ -42,6 +64,25 @@ CONVERTER_DEFAULTS: dict[str, Any] = dict(
     magnetometer_std_ut=1.0,
     baro_std_m=0.5,
 )
+
+
+@dataclass(frozen=True)
+class ImuInput:
+    """One IMU reading in body axes: specific force (m/s²), rate (rad/s)."""
+
+    specific_force_mps2: NDArray[np.float64]
+    angular_rate_rad_s: NDArray[np.float64]
+
+
+@dataclass(frozen=True)
+class WheelMotion:
+    """Wheel rolling in body x/y (see module docs); arrays in wheel order:
+    ``hub_positions_body_m`` and ``rolling_direction_body`` are n×2,
+    ``rolling_speed_mps`` has n entries."""
+
+    hub_positions_body_m: NDArray[np.float64]
+    rolling_direction_body: NDArray[np.float64]
+    rolling_speed_mps: NDArray[np.float64]
 
 
 @dataclass(frozen=True)
@@ -77,7 +118,10 @@ class MeasurementConverter:
     ``sensors`` are the context's sensor descriptions (mounts),
     ``reference`` the local ENU origin, ``options`` any of
     ``CONVERTER_DEFAULTS`` (unknown keys are ignored here; the estimator
-    validates its own options).
+    validates its own options). ``kinds`` are the streams that will be
+    converted, checked now: a body-origin IMU, a wheeled vehicle for wheel
+    encoders. ``wheeled`` is the context's nominal wheeled vehicle;
+    ``imu_quaternion_body_xyzw`` overrides the IMU mount rotation.
     """
 
     def __init__(
@@ -85,6 +129,10 @@ class MeasurementConverter:
         sensors: Mapping[str, SensorDescription],
         reference: GpsReading,
         options: Mapping[str, Any],
+        *,
+        kinds: tuple[str, ...] = (),
+        wheeled: WheeledProperties | None = None,
+        imu_quaternion_body_xyzw: ArrayLike | None = None,
     ) -> None:
         settings = {**CONVERTER_DEFAULTS, **options}
         gps_std = np.asarray(settings["gps_std_m"], dtype=float)
@@ -101,17 +149,51 @@ class MeasurementConverter:
         self.baro_std_m = float(settings["baro_std_m"])
         self._mounts = sensors
         self.receiver_covariance_fixes = 0
+        self.imu_rotation = (
+            _imu_rotation(sensors.get("imu"), imu_quaternion_body_xyzw)
+            if "imu" in kinds
+            else Rotation.identity()
+        )
+        if "wheel_encoders" in kinds and wheeled is None:
+            raise ValueError("wheel_encoders need the context's wheeled vehicle")
+        self._wheeled = wheeled
 
     def convert(self, kind: str, payload: Any) -> Any:
-        """The measurement for ``kind``'s payload; raises KeyError for a kind
-        without a converter."""
-        if kind == "gps":
-            return self.gps(payload)
-        if kind == "magnetometer":
-            return self.magnetometer(payload)
-        if kind == "baro":
-            return self.baro(payload)
-        raise KeyError(f"No measurement converter for {kind!r}")
+        """The measurement for ``kind``'s payload (module docs); the payload
+        itself for a kind without a converter."""
+        converters: dict[str, Callable[[Any], Any]] = {
+            "imu": self.imu,
+            "wheel_encoders": self.wheel_encoders,
+            "gps": self.gps,
+            "magnetometer": self.magnetometer,
+            "baro": self.baro,
+        }
+        converter = converters.get(kind)
+        return payload if converter is None else converter(payload)
+
+    def imu(self, reading: ImuReading) -> ImuInput:
+        return ImuInput(
+            specific_force_mps2=self.imu_rotation.apply(
+                reading.best_specific_force_mps2
+            ),
+            angular_rate_rad_s=self.imu_rotation.apply(reading.best_angular_rate_rad_s),
+        )
+
+    def wheel_encoders(self, reading: EncoderReading) -> WheelMotion:
+        wheeled = self._wheeled
+        if wheeled is None:
+            raise ValueError("wheel_encoders need the context's wheeled vehicle")
+        steer = np.asarray(reading.steer_angle_rad, float)
+        speed = np.asarray(reading.wheel_speed_rad_s, float)
+        if steer.shape != speed.shape or speed.shape != (wheeled.wheel_count,):
+            raise ValueError(
+                f"wheel_encoders reading needs {wheeled.wheel_count} wheels"
+            )
+        return WheelMotion(
+            hub_positions_body_m=wheeled.hub_positions_m()[:, :2],
+            rolling_direction_body=np.column_stack([np.cos(steer), np.sin(steer)]),
+            rolling_speed_mps=speed * wheeled.tyre.radius_m,
+        )
 
     def gps(self, fix: GpsReading) -> GpsFix:
         status = fix.status
@@ -170,3 +252,22 @@ class MeasurementConverter:
             if sensor is None
             else Rotation.from_quat(sensor.mount_quaternion_xyzw)
         )
+
+
+def _imu_rotation(
+    sensor: SensorDescription | None, quaternion: ArrayLike | None
+) -> Rotation:
+    """Sensor-to-body rotation of the IMU: the explicit ``quaternion``, else
+    the sensor description's mount; raises ValueError for a mount position
+    off the body origin or an unnormalized quaternion."""
+    if sensor is not None and any(sensor.mount_position_m):
+        raise ValueError(
+            "IMU-driven filters require a body-origin IMU; lever-arm "
+            "acceleration correction is not implemented"
+        )
+    if quaternion is None:
+        quaternion = (0, 0, 0, 1) if sensor is None else sensor.mount_quaternion_xyzw
+    q = readonly_array(quaternion, (4,))
+    if not np.isfinite(q).all() or not np.isclose(np.linalg.norm(q), 1):
+        raise ValueError("IMU mount quaternion must be normalized")
+    return Rotation.from_quat(q)

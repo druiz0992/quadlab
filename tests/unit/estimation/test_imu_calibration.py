@@ -164,9 +164,9 @@ def test_calibration_priors_override_ekf_defaults_only_when_enabled():
     assert partial["initial_accel_bias_std_mps2"] == 0.2
 
 
-def test_inertial_node_predicts_with_calibrated_imu_values():
+def test_filter_node_predicts_with_calibrated_imu_values():
     from robotlab.core.measurements import GpsReading, ImuReading
-    from robotlab.estimation.inertial import InertialNode
+    from robotlab.estimation.filter import FilterNode
     from robotlab.sensors.streams import Publisher
 
     class Recorder:
@@ -175,8 +175,8 @@ def test_inertial_node_predicts_with_calibrated_imu_values():
         def __init__(self) -> None:
             self.forces: list[list[float]] = []
 
-        def predict(self, force, rate, dt_s):
-            self.forces.append(list(force))
+        def predict_imu(self, imu, dt_s):
+            self.forces.append(list(imu.specific_force_mps2))
 
         def update_gps(self, fix):
             return None
@@ -187,7 +187,7 @@ def test_inertial_node_predicts_with_calibrated_imu_values():
             return EstimatedState(position_m=[0.0, 0.0, 0.0])
 
     recorder = Recorder()
-    node = InertialNode(recorder, name="test", gps_reference=GpsReading(40, -3, 650))
+    node = FilterNode(recorder, name="test", gps_reference=GpsReading(40, -3, 650))
     imu = Publisher("sensors/imu", ImuReading, frame_id="drone/imu")
     for t_ns in (0, 5_000_000):
         reading = ImuReading(
@@ -196,6 +196,6 @@ def test_inertial_node_predicts_with_calibrated_imu_values():
             calibrated_specific_force_mps2=[0.0, 0.0, 9.81],
             calibrated_angular_rate_rad_s=[0.0, 0.0, 0.0],
         )
-        node.on_imu(imu.publish(reading, sim_time_ns=t_ns))
+        node.on_driver(imu.publish(reading, sim_time_ns=t_ns))
     # The held first reading predicts over the interval: its calibrated values.
     assert recorder.forces == [[0.0, 0.0, 9.81]]

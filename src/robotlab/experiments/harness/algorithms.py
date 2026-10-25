@@ -2,7 +2,7 @@
 
 ``algorithms.estimator`` and ``algorithms.controller`` name a class as
 ``"package.module:Class"`` or a built-in alias (``BUILTIN_ESTIMATORS``,
-``BUILTIN_CONTROLLERS``, plus ``gps_imu_ekf``: the ``inertial`` estimator
+``BUILTIN_CONTROLLERS``, plus ``gps_imu_ekf``: the ``filter`` estimator
 running ``GpsImuEkf``, see ``gps_imu_ekf_options``); "" means no estimator
 and the built-in manual controller. Plug-ins are constructed as ``cls(context, options)`` (see
 estimation/interface.py and control/interface.py). Built-ins receive their
@@ -45,10 +45,10 @@ from ...estimation.interface import Innovation, StateEstimator
 from ...sensors.bus import STREAMS, SensorBus
 
 BUILTIN_ESTIMATORS = {
-    # Any InertialFilter: estimator_options.filter = "package.module:Class".
-    "inertial": "robotlab.estimation.inertial.estimator:InertialEstimator",
+    # Any RecursiveFilter: estimator_options.filter = "package.module:Class".
+    "filter": "robotlab.estimation.filter.estimator:FilterEstimator",
 }
-# ``gps_imu_ekf`` is ``inertial`` with this filter (gps_imu_ekf_options).
+# ``gps_imu_ekf`` is ``filter`` with this filter (gps_imu_ekf_options).
 GPS_IMU_EKF_FILTER = "robotlab.estimation.gps_imu_ekf.ekf:GpsImuEkf.from_options"
 # ``ekf`` section keys for the measurement converter, not the filter.
 GPS_IMU_EKF_CONVERTER_KEYS = ("gps_std_m", "use_receiver_gps_accuracy")
@@ -133,7 +133,7 @@ def build_estimator(
         imu = context.sensors.get("imu")
         calibration = None if imu is None else imu.calibration
         options = gps_imu_ekf_options(options or settings["ekf"], calibration)
-        spec = "inertial"
+        spec = "filter"
     estimator = load_class(spec, BUILTIN_ESTIMATORS)(context, options)
     if not isinstance(estimator, StateEstimator):
         raise ValueError(f"{spec} does not implement StateEstimator")
@@ -146,7 +146,7 @@ def build_estimator(
 def gps_imu_ekf_options(
     ekf: Mapping[str, Any], imu_calibration: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
-    """``inertial`` estimator options running ``GpsImuEkf`` from an ``ekf``
+    """``filter`` estimator options running ``GpsImuEkf`` from an ``ekf``
     section: converter keys stay top-level, the rest are filter options.
 
     An enabled IMU calibration (``imu_calibration``) declares the remaining

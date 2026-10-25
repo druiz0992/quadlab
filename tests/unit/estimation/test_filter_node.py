@@ -2,12 +2,12 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-"""InertialNode timing and GPS handling, driven with the GPS/IMU EKF."""
+"""FilterNode timing and GPS handling, driven with the GPS/IMU EKF."""
 
 from robotlab.core.algorithms import SensorDescription
 from robotlab.core.measurements import EstimatedState, GpsReading, ImuReading
 from robotlab.estimation.gps_imu_ekf import GpsImuEkf
-from robotlab.estimation.inertial import InertialNode
+from robotlab.estimation.filter import FilterNode
 from robotlab.sensors.streams import Publisher
 from robotlab.sensors.geodesy import gps_to_enu
 
@@ -20,7 +20,7 @@ def test_rotated_imu_output_fanout_and_explicit_gps_timing():
         quaternion_xyzw=[0, 0, 0, 1],
         initial_covariance=np.eye(15),
     )
-    node = InertialNode(
+    node = FilterNode(
         ekf,
         name="gps_imu_ekf",
         gps_reference=reference,
@@ -33,10 +33,10 @@ def test_rotated_imu_output_fanout_and_explicit_gps_timing():
     imu = Publisher("imu", ImuReading, frame_id="drone/imu")
     gps = Publisher("gps", GpsReading, frame_id="wgs84")
     try:
-        first = node.on_imu(
+        first = node.on_driver(
             imu.publish(ImuReading([0, 0, -9.81], [0, 0, 0]), sim_time_ns=0)
         )
-        node.on_imu(
+        node.on_driver(
             imu.publish(ImuReading([0, 0, -9.81], [0, 0, 0]), sim_time_ns=10_000_000)
         )
         assert node.on_measurement(
@@ -57,7 +57,7 @@ def test_rotated_imu_output_fanout_and_explicit_gps_timing():
             first.payload.covariance[0, 0] = 123
         node.close()
         with pytest.raises(RuntimeError, match="closed"):
-            node.on_imu(
+            node.on_driver(
                 imu.publish(
                     ImuReading([0, 0, -9.81], [0, 0, 0]), sim_time_ns=30_000_000
                 )
@@ -87,7 +87,7 @@ def _node(initialize_from_gps=False, use_receiver_accuracy=False):
         initialize_position_from_gps=initialize_from_gps,
     )
     reference = GpsReading(40, -3, 650)
-    node = InertialNode(
+    node = FilterNode(
         ekf,
         name="gps_imu_ekf",
         gps_reference=reference,
@@ -98,7 +98,7 @@ def _node(initialize_from_gps=False, use_receiver_accuracy=False):
     )
     imu = Publisher("imu", ImuReading, frame_id="drone/imu")
     gps = Publisher("gps", GpsReading, frame_id="wgs84")
-    node.on_imu(imu.publish(ImuReading([0, 0, 9.81], [0, 0, 0]), sim_time_ns=0))
+    node.on_driver(imu.publish(ImuReading([0, 0, 9.81], [0, 0, 0]), sim_time_ns=0))
     return node, reference, imu, gps
 
 
@@ -127,7 +127,7 @@ def test_first_fix_initializes_position_and_its_covariance():
         assert ekf.accepted_gps == 0  # an initialization, not a correction
         assert node.converter.receiver_covariance_fixes == 1
         # Later fixes correct normally.
-        node.on_imu(
+        node.on_driver(
             imu.publish(ImuReading([0, 0, 9.81], [0, 0, 0]), sim_time_ns=100_000_000)
         )
         second = node.on_measurement("gps", gps.publish(fix, sim_time_ns=100_000_000))

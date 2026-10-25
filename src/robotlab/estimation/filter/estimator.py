@@ -1,21 +1,23 @@
-"""``StateEstimator`` plug-in for any ``InertialFilter`` (``inertial``).
+"""``StateEstimator`` plug-in for any ``RecursiveFilter`` (``filter``).
 
 Select a filter class with::
 
-    "algorithms": {"estimator": "inertial",
+    "algorithms": {"estimator": "filter",
                    "estimator_options": {"filter": "mypkg.my_ekf:MyEkf",
                                          "filter_options": {...},
                                          "gps_std_m": [0.5, 0.5, 0.8]}}
 
 The filter is built as ``cls(filter_options)`` (``filter`` may also name a
 factory such as ``"pkg.mod:Class.from_options"``) and must implement
-``InertialFilter`` (filter.py). The estimator subscribes to ``imu`` plus
-every **enabled** stream the filter has an ``update_<kind>`` for (listed in
-``summary()["inputs"]``); it raises ValueError without the IMU or without
-any enabled stream to correct with. Mounts and the ENU origin come from the context. The remaining
-options are the measurement converter's (``CONVERTER_DEFAULTS``,
-measurements.py) and ``name`` (output stream and debug prefix, default
-``inertial``).
+``RecursiveFilter`` (protocol.py). The estimator subscribes to the filter's
+driving stream (its ``predict_<kind>``) plus every **enabled** stream it has
+an ``update_<kind>`` for (listed in ``summary()["inputs"]``); it raises
+ValueError when the driving stream is disabled or no enabled stream can
+correct it. Mounts, wheel geometry, and the ENU origin come from the
+context. The remaining options are the measurement converter's
+(``CONVERTER_DEFAULTS``, measurements.py), ``max_driver_interval_s``
+(longest gap between driving samples, default 0.1 s), and ``name`` (output
+stream and debug prefix, default ``filter``).
 
 Debug channel (``context.log``): ``<name>/<kind>`` = NIS and accepted (1/0)
 for every innovation, and ``<name>/bias`` = accelerometer (m/s²) and gyro
@@ -28,35 +30,40 @@ from typing import Any
 from ...core.algorithms import AlgorithmContext
 from ...core.measurements import EstimatedState, Sample
 from ..interface import Innovation
-from .filter import InertialFilter, update_kinds
 from .measurements import CONVERTER_DEFAULTS
-from .node import InertialNode, MeasurementOutcome
+from .node import DEFAULT_MAX_DRIVER_INTERVAL_S, FilterNode, MeasurementOutcome
+from .protocol import RecursiveFilter, predict_kind, update_kinds
 
-ESTIMATOR_KEYS = {"filter", "filter_options", "name"}
+ESTIMATOR_KEYS = {"filter", "filter_options", "name", "max_driver_interval_s"}
 
 
-class InertialEstimator:
-    """Bus plug-in around ``InertialNode`` (see module docs)."""
+class FilterEstimator:
+    """Bus plug-in around ``FilterNode`` (see module docs)."""
 
     def __init__(self, context: AlgorithmContext, options: Mapping[str, Any]) -> None:
         filter_ = _build_filter(options)
-        converter_options = _converter_options(options)
-        self.name = str(options.get("name", "inertial"))
+        self.name = str(options.get("name", "filter"))
+        driver = predict_kind(filter_)
         supported = update_kinds(filter_)
         kinds = tuple(kind for kind in supported if kind in context.sensors)
-        if "imu" not in context.sensors:
-            raise ValueError(f"{self.name} needs the imu sensor enabled")
+        if driver not in context.sensors:
+            raise ValueError(f"{self.name} needs the {driver} sensor enabled")
         if not kinds:
             raise ValueError(
                 f"{self.name} needs one of the {', '.join(supported)} sensors enabled"
             )
-        self.inputs: tuple[str, ...] = ("imu", *kinds)
-        self.node = InertialNode(
+        self.inputs: tuple[str, ...] = (driver, *kinds)
+        self.node = FilterNode(
             filter_,
             name=self.name,
             gps_reference=context.gps_reference,
             sensors=context.sensors,
-            converter_options=converter_options,
+            wheeled=context.wheeled,
+            converter_options=_converter_options(options),
+            max_driver_interval_s=float(
+                options.get("max_driver_interval_s", DEFAULT_MAX_DRIVER_INTERVAL_S)
+            ),
+            updates=kinds,
         )
         self._latest: Sample[EstimatedState] | None = None
         self._innovations: list[Innovation] = []
@@ -72,8 +79,8 @@ class InertialEstimator:
         return self.node.filter
 
     def on_sample(self, kind: str, sample: Sample[Any]) -> None:
-        if kind == "imu":
-            self._latest = self.node.on_imu(sample)
+        if kind == self.node.driver:
+            self._latest = self.node.on_driver(sample)
             return
         outcome = self.node.on_measurement(kind, sample)
         self._record(kind, sample.sim_time_ns, outcome)
@@ -131,18 +138,19 @@ def _build_filter(options: Mapping[str, Any]) -> Any:
     for a missing or invalid class."""
     unknown = set(options) - ESTIMATOR_KEYS - set(CONVERTER_DEFAULTS)
     if unknown:
-        raise ValueError(f"inertial estimator: unknown options {sorted(unknown)}")
+        raise ValueError(f"filter estimator: unknown options {sorted(unknown)}")
     spec = options.get("filter")
     if not spec:
         raise ValueError(
-            'inertial estimator needs option "filter": "package.module:Class"'
+            'filter estimator needs option "filter": "package.module:Class"'
         )
     filter_options = options.get("filter_options", {})
     if not isinstance(filter_options, Mapping):
         raise ValueError("filter_options must be an object")
     filter_ = _load_class(str(spec))(dict(filter_options))
-    if not isinstance(filter_, InertialFilter):
-        raise ValueError(f"{spec} does not implement InertialFilter (predict, state)")
+    if not isinstance(filter_, RecursiveFilter):
+        raise ValueError(f"{spec} does not implement RecursiveFilter (state)")
+    predict_kind(filter_)  # exactly one driving stream, or ValueError
     if not update_kinds(filter_):
         raise ValueError(f"{spec} has no update_<kind> method: nothing corrects it")
     return filter_

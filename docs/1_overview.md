@@ -20,7 +20,7 @@ organization, and shared conventions. Following documents:
 | Sensor errors | Gazebo native bias/noise (IMU, GPS, barometer, camera, lidar); seeded IMU noise density, bias random walk, turn-on bias, bias instability, scale/misalignment, g-sensitivity, saturation, sample loss and jitter; time-correlated GPS position and velocity error, receiver status, RTK, dual-antenna heading; magnetometer interference, drift, and structure anomalies; ESC telemetry; lidar weather, reflectivity, beam spread, and multiple returns |
 | Vehicle physics | Gazebo motor lag/limits; ESC update rate and resolution; Python battery voltage sag and depletion, rotor ground effect; still-air body drag; centre-of-mass offset, per-rotor spread, per-run randomization of the true vehicle |
 | Disturbances and faults | GPS dropouts/outages/blockout zones, GPS multipath jumps, scheduled IMU faults (bias step, stuck, spikes, scale, noise), native wind with Dryden-style turbulence, accelerometer vibration/clipping |
-| Estimation | GPS/IMU error-state EKF as an estimator plug-in (observer or in the loop); reusable inertial estimator for your own filters (write only predict/update/state) |
+| Estimation | GPS/IMU error-state EKF as an estimator plug-in (observer or in the loop); reusable filter estimator for your own filters, driven by the IMU or wheel encoders (write only predict/update/state) |
 | Algorithm harness | Estimator/controller plug-ins on a typed sensor bus with modelled delivery delay and clock offsets; control on truth or on the estimate; reference missions (step, waypoints/laps, circle, figure-eight, chirp, doublet); estimation and control metrics; truth-based run health verdict (crash, flip, impact, contact, no lift-off); offline estimator replay of recorded runs; plug-in debug channel; batch sweeps with regression baselines ([7 Experiments](7_experiments.md)) |
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
 | Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse; surface friction zones and spawn points for wheeled robots |
@@ -64,11 +64,11 @@ src/robotlab/
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
 │   ├── imu_calibration.py  # Static IMU fit and calibration driver
 │   ├── dead_reckoning.py   # Retained IMU dead-reckoning baseline
-│   ├── inertial/           # Reusable for any inertial filter: node (timing, mounts,
-│   │                       #   held IMU), measurement conversion, the `inertial`
-│   │                       #   plug-in, template.py (example filter)
+│   ├── filter/             # Reusable for any predict/update filter: node (timing, held
+│   │                       #   driving readings), measurement conversion, the `filter`
+│   │                       #   plug-in, example filters (template.py, wheel_odometry.py)
 │   └── gps_imu_ekf/
-│       └── ekf.py          # The EKF: only an InertialFilter (run by inertial/)
+│       └── ekf.py          # The EKF: only a RecursiveFilter (run by filter/)
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,
 │                           #   truth interpolation, effective IMU bias, run health
 │                           #   verdict (health.py; bipeds: biped_health.py)
@@ -199,15 +199,18 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
 
 ## Adding an algorithm
 
-- **IMU-driven estimator:** write only the filter, a class with `predict`,
-  `state`, and one `update_<kind>` per fused sensor
-  ([5 Estimation](5_estimation.md#writing-your-own-inertial-filter));
-  `estimation/inertial/template.py` is an optional starting point. Select
-  it with `algorithms.estimator: inertial` and
+- **Predict/update estimator** (driven by the IMU, wheel encoders, or any
+  other stream): write only the filter, a class with one `predict_<kind>`,
+  one `update_<kind>` per fused sensor, and `state`
+  ([5 Estimation](5_estimation.md#writing-your-own-filter));
+  `estimation/filter/template.py` (IMU) and `wheel_odometry.py` (wheel
+  encoders) are optional starting points. Select it with
+  `algorithms.estimator: filter` and
   `estimator_options.filter: "package.module:Class"`; the built-in
   `gps_imu_ekf` works this way.
-- **Other estimators** (no IMU propagation) and **controllers:** write a
-  full plug-in following the contracts in
+- **Other estimators** (e.g. batch or learned, or needing several IMUs or
+  rewinding for late measurements) and **controllers:** write a full
+  plug-in following the contracts in
   [7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms), starting
   from `estimation/template.py` or `control/template.py`, and select it
   with `algorithms.estimator`/`algorithms.controller` as
@@ -215,7 +218,7 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
 
 Put the code in `estimation/` or `control/` (or any importable package)
 with tests in `tests/unit/<package>/` that call
-`robotlab.testing.plugins.check_estimator` (with `InertialEstimator` and
+`robotlab.testing.plugins.check_estimator` (with `FilterEstimator` and
 its options for a filter) or `check_controller`, and add estimators to the
 [scenario suite](7_experiments.md#estimator-scenario-suite). Develop estimators against recorded runs with
 `robotlab-replay` (several at once for a comparison table), then confirm
