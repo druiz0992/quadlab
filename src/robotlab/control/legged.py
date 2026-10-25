@@ -16,7 +16,7 @@ onboard attitude filter. With ``sensors`` the controller gets measurements
 only. ``request`` is the operator's walking command, or None when nobody
 commands. A controller must not use simulator truth itself.
 
-Write your own by copying ``control/legged_template.py`` and check it with
+Write your own (e.g. starting from ``control/examples/pose_hold_legged_controller.py``) and check it with
 ``robotlab.testing.plugins.check_legged_controller``.
 """
 

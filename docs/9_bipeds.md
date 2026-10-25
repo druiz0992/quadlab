@@ -89,7 +89,7 @@ non-finite target fails the run.
 | `algorithms.controller` | Behaviour |
 | --- | --- |
 | empty or `hold` | hold the start keyframe's targets |
-| `template` (`control/legged_template.py`) | hold plus forward-lean feedback on the joints in `lean_gains` (rad/rad; not a balance controller) |
+| `example` (`control/examples/pose_hold_legged_controller.py`) | hold plus forward-lean feedback on the joints in `lean_gains` (rad/rad; not a balance controller) |
 | `onnx_policy` | an exported RL policy (see below) |
 | `package.module:Class` | your controller; test it with `robotlab.testing.plugins.check_legged_controller` |
 

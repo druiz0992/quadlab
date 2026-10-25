@@ -170,29 +170,29 @@ filter's prior.
 `--drone configs/algorithms/ekf_observer.json`, which runs the same filter
 on the sensor bus, scored and replayable.
 
-### Writing a plug-in: templates and the contract test kit
+### Writing a plug-in: examples and the contract test kit
 
-Start from a template; they are short and commented, and pass the kit. A
+Start from an example; they are short and commented, and pass the kit. A
 predict/update estimator needs only a `RecursiveFilter` class (the filter
 rows); nothing has to be copied:
 
-| Template | Selects with | What it does |
+| Example | Selects with | What it does |
 | --- | --- | --- |
-| `estimation/template.py` | `robotlab.estimation.template:TemplateEstimator` | Complementary filter: gyro-integrated attitude pulled towards the accelerometer's gravity direction, GPS-blended position and velocity; fixed reported covariance (NEES not meaningful); logs `template/gps_error` |
-| `estimation/filter/template.py` | `filter` with `estimator_options.filter: robotlab.estimation.filter.template:TemplateInertialFilter` | An IMU-driven `RecursiveFilter`: only the mathematics (position/velocity Kalman filter, gyro-integrated attitude, GPS and barometer updates); the shared node does timing, mounts, and conversion ([5 Estimation](5_estimation.md#writing-your-own-filter)) |
-| `estimation/filter/wheel_odometry.py` | `filter` with `estimator_options.filter: robotlab.estimation.filter.wheel_odometry:TemplateWheelOdometry` | A `RecursiveFilter` driven by wheel encoders: least-squares planar body velocity from the wheels, position and yaw corrected by GPS (wheeled robots) |
-| `control/template.py` | `robotlab.control.template:TemplateController` | Cascaded PD: position → tilt-limited acceleration → desired attitude (geometric attitude error, Lee et al. 2010) → torque → pseudo-inverse allocation over the lift rotors |
+| `estimation/examples/complementary_estimator.py` | `robotlab.estimation.examples.complementary_estimator:ComplementaryEstimator` | A full plug-in (for estimators that are not predict/update filters), a complementary filter: gyro-integrated attitude pulled towards the accelerometer's gravity direction, GPS-blended position and velocity; fixed reported covariance (NEES not meaningful); logs `complementary/gps_error` |
+| `estimation/examples/imu_gps_filter.py` | `filter` with `estimator_options.filter: robotlab.estimation.examples.imu_gps_filter:ImuGpsFilter` | An IMU-driven `RecursiveFilter`: only the mathematics (position/velocity Kalman filter, gyro-integrated attitude, GPS and barometer updates); the shared node does timing, mounts, and conversion ([5 Estimation](5_estimation.md#writing-your-own-filter)) |
+| `estimation/examples/wheel_odometry_filter.py` | `filter` with `estimator_options.filter: robotlab.estimation.examples.wheel_odometry_filter:WheelOdometryFilter` | A `RecursiveFilter` driven by wheel encoders: least-squares planar body velocity from the wheels, position and yaw corrected by GPS (wheeled robots) |
+| `control/examples/cascaded_pd_rotor_controller.py` | `robotlab.control.examples.cascaded_pd_rotor_controller:CascadedPdRotorController` | Cascaded PD: position → tilt-limited acceleration → desired attitude (geometric attitude error, Lee et al. 2010) → torque → pseudo-inverse allocation over the lift rotors |
 
-Wheeled robots have their own controller contract, template
-(`control/wheeled_template.py`), and kit check (`check_wheeled_controller`);
+Wheeled robots have their own controller contract, example
+(`control/examples/speed_yaw_wheeled_controller.py`), and kit check (`check_wheeled_controller`);
 estimator plug-ins are shared ([8 Ground vehicles](8_ground_vehicles.md#controllers)).
-MuJoCo bipeds have a joint-level contract, template
-(`control/legged_template.py`), and kit check (`check_legged_controller`)
+MuJoCo bipeds have a joint-level contract, example
+(`control/examples/pose_hold_legged_controller.py`), and kit check (`check_legged_controller`)
 ([9 Bipeds](9_bipeds.md#controllers)).
 
 Both reject unknown option keys. Verified in lockstep on the training
-square (two laps, 45 s): the template controller tracked with 0.148 m
-RMSE (built-in 0.101 m), peak tilt 8.7°, health `ok`; the template
+square (two laps, 45 s): the example controller tracked with 0.148 m
+RMSE (built-in 0.101 m), peak tilt 8.7°, health `ok`; the example
 estimator, as observer on the same flight, had 1.4 cm position and 1.4°
 attitude RMSE.
 
@@ -309,7 +309,7 @@ per-scenario limits, its `sensors`, and optionally an NIS band of 0.7–1.3.
 To add your filter, add a `Candidate`; a new scenario fails until every
 candidate declares limits. Verified scores (seeded, so exact; IMU and GPS):
 
-| Scenario | `gps_imu_ekf` position RMSE / tilt RMSE / NIS | `template` position RMSE / max error |
+| Scenario | `gps_imu_ekf` position RMSE / tilt RMSE / NIS | `complementary` position RMSE / max error |
 | --- | --- | --- |
 | hover | 4.3 cm / 0.47° / 1.00 | 8.8 cm / 0.24 m |
 | constant_velocity | 3.4 cm / 0.37° / 0.93 | 8.4 cm / 0.27 m |
@@ -327,13 +327,13 @@ defects: in a hover, yaw is unobservable and horizontal accelerometer bias
 is indistinguishable from tilt (0.18 m/s² ≈ 1°); on the drone circle, yaw
 is only weakly observable from 0.8 m/s² centripetal acceleration, so the
 EKF yaw error (about 2σ of its own covariance at times) dominates attitude
-RMSE; the template's accelerometer tilt correction assumes the
+RMSE; the complementary estimator's accelerometer tilt correction assumes the
 accelerometer measures gravity, which banked flight and the car's 2 m/s²
 centripetal acceleration violate. On `tumbling` the EKF's 11.5° attitude
 error is world yaw, unobservable while stationary without a magnetometer;
 its yaw covariance shrinks anyway, the known false-observability problem
 of standard EKFs (Huang, Mourikis and Roumeliotis, ISER 2010), while the
-template integrates the gyro and holds 0.12°. Instantaneous IMU samples
+complementary estimator integrates the gyro and holds 0.12°. Instantaneous IMU samples
 held over each 5 ms interval (as Gazebo delivers them) leave noise-free
 dead reckoning about 0.3° off on `tumbling` and `aggressive`, a real
 sampling (coning) error a filter must tolerate. A flipped yaw-rate sign fails every turning scenario. Swapped
@@ -634,9 +634,9 @@ tolerance `direction` is `increase` (lowest best) or `decrease` (highest
 best; ties are not marked), and listing excluded runs. Sweeping
 `algorithms.estimator` or `algorithms.controller` as a parameter therefore
 compares algorithms: `configs/experiments/controllers_square.json` flies
-the built-in and template controllers on three randomized vehicles each
+the built-in and example controllers on three randomized vehicles each
 (52 s wall). Result: tracking RMSE 0.67 ± 0.08 m (built-in) against
-1.30 ± 0.20 m (template), peak tilt 8.5° against 9.8°, while the template
+1.30 ± 0.20 m (example), peak tilt 8.5° against 9.8°, while the example
 commands smoother thrust (rotor slew 0.56 against 0.86 N/s).
 
 `batch-results.json` holds every run, with its health verdict and

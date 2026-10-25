@@ -14,7 +14,7 @@ steering-angle sensors. ``request`` is the driver's input (``DriverCommand``
 from the keyboard) or None when nobody drives. A controller must not use
 simulator truth itself.
 
-Write your own by copying ``control/wheeled_template.py`` and check it with
+Write your own (e.g. starting from ``control/examples/speed_yaw_wheeled_controller.py``) and check it with
 ``robotlab.testing.plugins.check_wheeled_controller``; the built-in keyboard
 driver is ``control/wheeled_keyboard.py``.
 """

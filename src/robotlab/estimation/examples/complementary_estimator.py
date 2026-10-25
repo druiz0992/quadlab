@@ -1,6 +1,7 @@
-"""Template estimator plug-in: copy this file to start your own.
+"""Example estimator plug-in: a complete ``StateEstimator`` that handles its own
+samples (for estimators that are not predict/update filters).
 
-Select it with ``algorithms.estimator: robotlab.estimation.template:TemplateEstimator``
+Select it with ``algorithms.estimator: robotlab.estimation.examples.complementary_estimator:ComplementaryEstimator``
 (or your copy's ``package.module:Class``), and test it with
 ``robotlab.testing.plugins.check_estimator`` and ``robotlab-replay``.
 
@@ -35,10 +36,10 @@ from typing import Any
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from ..core.algorithms import AlgorithmContext
-from ..core.measurements import EstimatedState, Sample
-from ..sensors.geodesy import gps_to_enu
-from .interface import Innovation
+from ...core.algorithms import AlgorithmContext
+from ...core.measurements import EstimatedState, Sample
+from ...sensors.geodesy import gps_to_enu
+from ..interface import Innovation
 
 DEFAULTS = dict(
     tilt_gain=0.5,  # 1/s: how fast the tilt follows the accelerometer
@@ -50,7 +51,7 @@ DEFAULTS = dict(
 )
 
 
-class TemplateEstimator:
+class ComplementaryEstimator:
     """Complementary IMU/GPS filter following the ``StateEstimator`` contract."""
 
     inputs = ("imu", "gps")
@@ -58,11 +59,13 @@ class TemplateEstimator:
     def __init__(self, context: AlgorithmContext, options: Mapping[str, Any]) -> None:
         unknown = set(options) - set(DEFAULTS)
         if unknown:
-            raise ValueError(f"TemplateEstimator: unknown options {sorted(unknown)}")
+            raise ValueError(
+                f"ComplementaryEstimator: unknown options {sorted(unknown)}"
+            )
         self.options = {**DEFAULTS, **options}
         for kind in self.inputs:
             if kind not in context.sensors:
-                raise ValueError(f"TemplateEstimator needs the {kind} sensor")
+                raise ValueError(f"ComplementaryEstimator needs the {kind} sensor")
         self._context = context
         self._mount = Rotation.from_quat(context.sensors["imu"].mount_quaternion_xyzw)
         self._attitude = Rotation.identity()  # body → world
@@ -116,7 +119,7 @@ class TemplateEstimator:
         self._position = self._position + self.options["gps_gain"] * error
         self._gps_fixes += 1
         self._context.log(
-            "template/gps_error",
+            "complementary/gps_error",
             sample.sim_time_ns,
             list(error),
             ["east", "north", "up"],
@@ -147,7 +150,7 @@ class TemplateEstimator:
             self._covariance,
         )
         self._latest = Sample(
-            "estimates/template", self._sequence, 0, sim_time_ns, 0, "world", state
+            "estimates/complementary", self._sequence, 0, sim_time_ns, 0, "world", state
         )
 
     def latest(self) -> Sample[EstimatedState] | None:

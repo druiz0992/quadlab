@@ -34,7 +34,7 @@ from .biped_loop import BipedLoop, BipedParts
 
 BUILTIN_CONTROLLERS = {
     "hold": "robotlab.control.legged_hold:HoldPose",
-    "template": "robotlab.control.legged_template:TemplateLeggedController",
+    "example": "robotlab.control.examples.pose_hold_legged_controller:PoseHoldLeggedController",
     "onnx_policy": "robotlab.control.onnx_policy:OnnxPolicyController",
 }
 # The generated Gazebo worlds' origin (simulation/gazebo/world.py), so GPS

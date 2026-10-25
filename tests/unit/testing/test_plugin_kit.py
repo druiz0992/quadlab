@@ -1,13 +1,15 @@
-"""Contract test kit: templates and built-ins pass, broken plug-ins fail."""
+"""Contract test kit: examples and built-ins pass, broken plug-ins fail."""
 
 import numpy as np
 import pytest
 
 from robotlab.control.manual import ManualRotorController
-from robotlab.control.template import TemplateController
+from robotlab.control.examples.cascaded_pd_rotor_controller import (
+    CascadedPdRotorController,
+)
 from robotlab.core.measurements import EstimatedState, Sample
 from robotlab.estimation.filter.estimator import FilterEstimator
-from robotlab.estimation.template import TemplateEstimator
+from robotlab.estimation.examples.complementary_estimator import ComplementaryEstimator
 from robotlab.experiments.harness.algorithms import gps_imu_ekf_options
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.testing.plugins import (
@@ -21,15 +23,15 @@ from robotlab.sensors.geodesy import gps_to_enu
 from robotlab.testing.plugins import REFERENCE
 
 
-def test_templates_and_builtins_pass():
-    template = check_estimator(TemplateEstimator, {"initial_position_m": [0, 0, 1]})
-    assert template.estimates == 2000 and template.final_position_error_m < 0.1
-    assert template.debug_entries == 100  # one gps_error entry per fix
+def test_examples_and_builtins_pass():
+    example = check_estimator(ComplementaryEstimator, {"initial_position_m": [0, 0, 1]})
+    assert example.estimates == 2000 and example.final_position_error_m < 0.1
+    assert example.debug_entries == 100  # one gps_error entry per fix
     ekf_options = dict(load_drone_config().data["ekf"], initial_position_m=[0, 0, 1])
     ekf = check_estimator(FilterEstimator, gps_imu_ekf_options(ekf_options))
     # 100 fixes: the first initializes the position, 99 correct.
     assert ekf.innovations == 99 and ekf.final_position_error_m < 0.1
-    for factory in (TemplateController, ManualRotorController):
+    for factory in (CascadedPdRotorController, ManualRotorController):
         report = check_controller(factory)
         assert report.total_thrust_n == pytest.approx(report.weight_n, rel=0.01)
 
@@ -40,11 +42,11 @@ def test_synthetic_gps_is_at_the_requested_offset():
     )
 
 
-def test_templates_reject_unknown_options():
+def test_examples_reject_unknown_options():
     with pytest.raises(ValueError, match="unknown options"):
-        check_estimator(TemplateEstimator, {"gian": 1})
+        check_estimator(ComplementaryEstimator, {"gian": 1})
     with pytest.raises(ValueError, match="unknown options"):
-        check_controller(TemplateController, {"gian": 1})
+        check_controller(CascadedPdRotorController, {"gian": 1})
 
 
 class GoodEstimator:
@@ -119,7 +121,7 @@ def test_unknown_inputs_are_caught():
         check_estimator(BadInputs, {}, duration_s=1)
 
 
-class BrokenController(TemplateController):
+class BrokenController(CascadedPdRotorController):
     def __init__(self, context, options):
         self.bad = options.pop("bad")
         super().__init__(context, options)
@@ -161,7 +163,7 @@ def test_plugin_errors_propagate_unchanged():
         check_estimator(GoodEstimator, {"bad": "nan"}, duration_s=1)
 
 
-class RouteController(TemplateController):
+class RouteController(CascadedPdRotorController):
     """Template plus a tracking_reference hook (good or broken)."""
 
     def __init__(self, context, options):

@@ -1,10 +1,10 @@
-"""Template IMU-driven filter: an example to start your own from.
+"""Example IMU-driven filter (``RecursiveFilter``) with GPS and barometer updates.
 
 Select it with::
 
     "algorithms": {"estimator": "filter",
                    "estimator_options": {
-                       "filter": "robotlab.estimation.filter.template:TemplateInertialFilter",
+                       "filter": "robotlab.estimation.examples.imu_gps_filter:ImuGpsFilter",
                        "filter_options": {"accel_std_mps2": 0.2}}}
 
 and test it with ``robotlab.testing.plugins.check_estimator(FilterEstimator,
@@ -37,7 +37,7 @@ from scipy.spatial.transform import Rotation
 from ...core.frames import GRAVITY
 from ...core.measurements import EstimatedState
 from ..interface import Innovation
-from .measurements import BaroAltitude, GpsFix, ImuInput
+from ..filter.measurements import BaroAltitude, GpsFix, ImuInput
 
 DEFAULTS: dict[str, Any] = dict(
     initial_position_m=[0.0, 0.0, 0.0],
@@ -49,15 +49,13 @@ DEFAULTS: dict[str, Any] = dict(
 )
 
 
-class TemplateInertialFilter:
+class ImuGpsFilter:
     """Position/velocity KF with gyro-integrated attitude (module docs)."""
 
     def __init__(self, options: Mapping[str, Any]) -> None:
         unknown = set(options) - set(DEFAULTS)
         if unknown:
-            raise ValueError(
-                f"TemplateInertialFilter: unknown options {sorted(unknown)}"
-            )
+            raise ValueError(f"ImuGpsFilter: unknown options {sorted(unknown)}")
         o = {**DEFAULTS, **options}
         self.x = np.zeros(6)  # [p (3), v (3)], ENU
         self.x[:3] = np.asarray(o["initial_position_m"], dtype=float)

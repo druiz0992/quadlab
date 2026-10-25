@@ -10,7 +10,7 @@
   "duration_s": 45,
   "seeds": [1, 2, 3],
   "parameters": {
-    "algorithms.controller": ["", "robotlab.control.template:TemplateController"]
+    "algorithms.controller": ["", "robotlab.control.examples.cascaded_pd_rotor_controller:CascadedPdRotorController"]
   },
   "metrics": [
     "control.tracking.position_m.rmse",

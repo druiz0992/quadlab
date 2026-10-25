@@ -419,7 +419,7 @@ frame of four boxes around the terrain square (without them the world is
 unchanged). Use a `resolution_m` of about w/10 so Gazebo's mesh follows
 the profile. `worlds/ditch_field.json` has three ditches, 0.25–0.5 m deep
 with walls up to 28°. Verified in lockstep (2026-10-22): the rover (on
-the template controller with `speed_gain_per_s` 10) and the tractor cross
+the example controller with `speed_gain_per_s` 10) and the tractor cross
 both x-axis ditches on their wheels. Limitation: a much steeper ditch
 (0.6 m deep and 2 m wide, 54° walls) made the rover nose-dive at 2.3 m/s,
 and Gazebo's box-on-mesh contact then threw it 2 m into the air instead

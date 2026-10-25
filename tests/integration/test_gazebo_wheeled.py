@@ -15,7 +15,9 @@ import numpy as np
 import pytest
 
 from robotlab.control.wheeled import WheeledControlState
-from robotlab.control.wheeled_template import TemplateWheeledController
+from robotlab.control.examples.speed_yaw_wheeled_controller import (
+    SpeedYawWheeledController,
+)
 from robotlab.experiments.run import GazeboConfig, run
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.simulation.gazebo.world import load_scene
@@ -34,7 +36,7 @@ FAST = {"simulation": {"real_time_factor": 0}}
 CRUISE = {
     **FAST,
     "algorithms": {
-        "controller": "template",
+        "controller": "example",
         "controller_options": {"cruise_speed_mps": 10.0},
     },
 }
@@ -75,7 +77,7 @@ def offline_cruise(layer_path: Path, periods: int) -> np.ndarray:
     pose = spawn_pose(vehicle, ground, 0.0, 0.0, 0.0)
     body = RigidBody.at_rest(vehicle.mass_kg, vehicle.inertia_kg_m2, pose.position_m)
     model = WheeledVehicleModel(vehicle, ground)
-    controller = TemplateWheeledController(
+    controller = SpeedYawWheeledController(
         synthetic_context(wheeled=vehicle), {"cruise_speed_mps": 10.0}
     )
     for period in range(periods):
@@ -103,7 +105,7 @@ def test_car_cruise_matches_python_reference(tmp_path):
     assert summary["health"]["verdict"] == "ok"
     assert summary["lockstep"]["steps_per_burst"] == 2
     final = np.array(rows[-1]["position"])
-    # Verified 2026-10-22: 48.59 m at 6.004 s (template controller, 10 m/s;
+    # Verified 2026-10-22: 48.59 m at 6.004 s (example controller, 10 m/s;
     # 48.531 m at 6.002 s with the earlier 500 Hz / 1 ms preset).
     assert final[0] == pytest.approx(48.589, abs=0.05)
     assert abs(final[1]) < 1e-6 and final[2] == pytest.approx(0.358, abs=0.002)
@@ -127,7 +129,7 @@ def test_wheeled_lockstep_is_deterministic(tmp_path):
     layer = {
         **FAST,
         "algorithms": {
-            "controller": "template",
+            "controller": "example",
             "controller_options": {"cruise_speed_mps": 0.8},
         },
     }
@@ -409,7 +411,7 @@ def test_rover_crosses_the_ditch_field(tmp_path):
     layer = {
         **FAST,
         "algorithms": {
-            "controller": "template",
+            "controller": "example",
             "controller_options": {"cruise_speed_mps": 2.0, "speed_gain_per_s": 10.0},
         },
     }

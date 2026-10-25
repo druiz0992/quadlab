@@ -194,9 +194,9 @@ robotlab-replay outputs/rec --output outputs/rec-cmp --estimator gps_imu_ekf \
   --estimator mypkg.filters:MyFilter            # side by side: comparison.md
 # Filters: write only the maths (one predict_<kind>, e.g. predict_imu or
 # predict_wheel_encoders, update_gps/_magnetometer/_baro, state), e.g. from
-# estimation/filter/template.py or wheel_odometry.py; select it with
+# estimation/examples/imu_gps_filter.py or wheel_odometry_filter.py; select it with
 # algorithms.estimator "filter" + estimator_options.filter (docs/5_estimation.md)
-# Start new algorithms from estimation/template.py or control/template.py and
+# Start new algorithms from estimation/examples/complementary_estimator.py or control/examples/cascaded_pd_rotor_controller.py and
 # test them with robotlab.testing.plugins.check_estimator / check_controller;
 # score estimators on shared scenarios: tests/unit/estimation/test_estimator_scenarios.py
 
@@ -230,7 +230,7 @@ robotlab --render-sensors --drone configs/sensors/lidar_3d.json --scene worlds/t
 # Rover on rough off-road terrain
 robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json --output outputs/rover-terrain
 # Your wheeled controller: algorithms.controller in a config layer; start from
-# control/wheeled_template.py and check it with check_wheeled_controller
+# control/examples/speed_yaw_wheeled_controller.py and check it with check_wheeled_controller
 
 # Bipeds in MuJoCo (no Gazebo): built-in test biped, or the Microduck from a
 # microduck_rl checkout beside this repository (docs/9_bipeds.md)
@@ -238,7 +238,7 @@ robotlab --robot biped --duration 10 --output outputs/biped
 robotlab --config configs/bipeds/microduck.json --duration 10 --output outputs/duck
 # Walk the Microduck with Pollen's velstand policy and the keyboard (download in docs/9_bipeds.md)
 robotlab --config configs/bipeds/microduck_walk.json --keyboard --output outputs/duck-walk
-# Your biped controller: start from control/legged_template.py, check it with
+# Your biped controller: start from control/examples/pose_hold_legged_controller.py, check it with
 # check_legged_controller, select it with algorithms.controller
 
 # Worlds: generate only, edit paused in Gazebo, fly a saved world

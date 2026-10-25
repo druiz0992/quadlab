@@ -19,7 +19,7 @@ sensor bus samples (imu, gps)
 | --- | --- |
 | `estimation/gps_imu_ekf/ekf.py` | The filter only (`GpsImuEkf`, an IMU-driven `RecursiveFilter`); `from_options` builds it from the `ekf` section |
 | `experiments/harness/algorithms.py` | `gps_imu_ekf`: the `filter` plug-in running `GpsImuEkf` (`gps_imu_ekf_options`, calibrated bias priors) |
-| `estimation/filter/` | Reusable for any recursive filter: `FilterNode` (sample checks, held driving readings, timing, publication), measurement conversion (mounts, ENU, wheel geometry), the `filter` plug-in, IMU and wheel-odometry templates ([Writing your own](#writing-your-own-filter)) |
+| `estimation/filter/` | Reusable for any recursive filter: `FilterNode` (sample checks, held driving readings, timing, publication), measurement conversion (mounts, ENU, wheel geometry), the `filter` plug-in, IMU and wheel-odometry examples ([Writing your own](#writing-your-own-filter)) |
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
 | `sensors/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
 | `sensors/geodesy.py` | WGS84 ↔ ECEF ↔ local ENU conversion |
@@ -136,18 +136,18 @@ appears as `filter_summary` in `summary.json`. Select it with:
                                       "magnetometer_std_ut": 1.0, "baro_std_m": 0.5}}}
 ```
 
-Optional starting points: `estimation/filter/template.py` (IMU-driven:
+Optional starting points: `estimation/examples/imu_gps_filter.py` (IMU-driven:
 6-state position/velocity Kalman filter, gyro-integrated attitude, GPS and
-barometer updates) and `estimation/filter/wheel_odometry.py` (driven by
+barometer updates) and `estimation/examples/wheel_odometry_filter.py` (driven by
 wheel encoders: least-squares planar body velocity from the wheels'
 rolling speeds, position and yaw corrected by GPS). Check a filter with
 `check_estimator(FilterEstimator, options)`, the scenario suite, and
 `robotlab-replay ... --estimator filter --set
 'algorithms.estimator_options={...}'` (one estimator per replay when it
 needs its own options). On the 10 s lockstep square with sensor errors the
-template replayed with 2.0 m position and 0.85° attitude RMSE (EKF: 1.6 m,
+IMU example replayed with 2.0 m position and 0.85° attitude RMSE (EKF: 1.6 m,
 1.3°); it estimates no biases, so it drifts on longer runs. On the
-`car_circle` scenario the wheel-odometry template scored 2 cm position
+`car_circle` scenario the wheel-odometry example scored 2 cm position
 and 0.09° heading RMSE with mean NIS 0.96 per degree of freedom; its
 sideways speed is observable only through the steering angle, so quantized
 encoder speeds make its velocity noisy (0.6 m/s RMS).
@@ -272,7 +272,7 @@ matching timestamps. Truth is used there for evaluation, never by the EKF.
 Unit tests cover hover, yaw integration, GPS drift reduction, lever arms,
 outlier gates, covariance, prediction Jacobians, GPS conversion, rotated IMU
 input, timing rejection, intermediate GPS corrections, calibrated IMU
-values, measurement conversion, the generic estimator and template filter,
+values, measurement conversion, the generic estimator and example filter,
 bounds, mount restrictions, output fanout, and closure. Opt-in native tests
 (`ROBOTLAB_TEST_GAZEBO=1`, `tests/integration/test_gazebo_ekf.py`) fly a
 moving drone with unaligned IMU/GPS rates, plus noisy/rotated sensors, and

@@ -1,18 +1,18 @@
-"""Wheel-odometry template: kinematic solve, propagation, GPS, estimator wiring."""
+"""Wheel-odometry example: kinematic solve, propagation, GPS, estimator wiring."""
 
 import numpy as np
 import pytest
 
 from robotlab.estimation.filter.estimator import FilterEstimator
 from robotlab.estimation.filter.measurements import GpsFix, WheelMotion
-from robotlab.estimation.filter.wheel_odometry import (
-    TemplateWheelOdometry,
+from robotlab.estimation.examples.wheel_odometry_filter import (
+    WheelOdometryFilter,
     body_velocity,
 )
 from robotlab.testing.scenarios import SCENARIOS, scenario_context
 
 HUBS = np.array([[1.5, 0.8], [1.5, -0.8], [-1.3, 0.8], [-1.3, -0.8]])
-FILTER = "robotlab.estimation.filter.wheel_odometry:TemplateWheelOdometry"
+FILTER = "robotlab.estimation.examples.wheel_odometry_filter:WheelOdometryFilter"
 
 
 def rolling(
@@ -40,7 +40,7 @@ def test_skid_steering_leaves_unobservable_side_speed_at_zero() -> None:
 
 
 def test_straight_drive_integrates_along_the_heading() -> None:
-    odometry = TemplateWheelOdometry({"initial_yaw_deg": 90.0})
+    odometry = WheelOdometryFilter({"initial_yaw_deg": 90.0})
     for _ in range(100):
         odometry.predict_wheel_encoders(rolling((2.0, 0.0, 0.0), (True,) * 4), 0.01)
     state = odometry.state()
@@ -50,7 +50,7 @@ def test_straight_drive_integrates_along_the_heading() -> None:
 
 
 def test_gps_correction_pulls_position_and_reports_innovation() -> None:
-    odometry = TemplateWheelOdometry({"initial_position_std_m": 2.0})
+    odometry = WheelOdometryFilter({"initial_position_std_m": 2.0})
     fix = GpsFix(np.array([1.0, 0.0, 0.0]), np.eye(3) * 0.01, np.zeros(3))
     innovation = odometry.update_gps(fix)
     assert innovation.accepted and innovation.dof == 3
@@ -60,9 +60,9 @@ def test_gps_correction_pulls_position_and_reports_innovation() -> None:
 
 def test_options_are_validated() -> None:
     with pytest.raises(ValueError, match="unknown options"):
-        TemplateWheelOdometry({"gain": 1})
+        WheelOdometryFilter({"gain": 1})
     with pytest.raises(ValueError, match="positive"):
-        TemplateWheelOdometry({"speed_std_mps": 0})
+        WheelOdometryFilter({"speed_std_mps": 0})
 
 
 def test_estimator_subscribes_to_encoders_and_needs_them() -> None:

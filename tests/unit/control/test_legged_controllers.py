@@ -1,4 +1,4 @@
-"""Legged controller contract: built-ins, template, and the contract kit."""
+"""Legged controller contract: built-ins, example, and the contract kit."""
 
 from collections.abc import Mapping
 from typing import Any
@@ -8,7 +8,9 @@ import pytest
 
 from robotlab.control.legged import LeggedControlState, WalkCommand
 from robotlab.control.legged_hold import HoldPose
-from robotlab.control.legged_template import TemplateLeggedController
+from robotlab.control.examples.pose_hold_legged_controller import (
+    PoseHoldLeggedController,
+)
 from robotlab.core.algorithms import AlgorithmContext
 from robotlab.core.legged import JointTargets
 from robotlab.testing.plugins import (
@@ -30,9 +32,9 @@ def test_hold_pose_follows_the_contract() -> None:
         HoldPose(synthetic_context(), {})
 
 
-def test_template_lean_feedback_agrees_for_truth_and_imu() -> None:
+def test_example_lean_feedback_agrees_for_truth_and_imu() -> None:
     gains = {"lean_gains": {"left_ankle_pitch": 1.0, "right_ankle_pitch": -2.0}}
-    report = check_legged_controller(TemplateLeggedController, gains)
+    report = check_legged_controller(PoseHoldLeggedController, gains)
     # Probes: no data, then (truth, sensors-only) pairs at 0, +0.2, -0.3 rad,
     # each with and without a request.
     left = [round(c.position_rad[2], 9) for c in report.commands]
@@ -41,14 +43,14 @@ def test_template_lean_feedback_agrees_for_truth_and_imu() -> None:
     assert report.summary["last_lean_rad"] == pytest.approx(-0.3)
 
 
-def test_template_rejects_unknown_options_and_joints() -> None:
+def test_example_rejects_unknown_options_and_joints() -> None:
     context = legged_context(nominal_legged())
     with pytest.raises(ValueError, match="unknown options"):
-        TemplateLeggedController(context, {"gain": 1})
+        PoseHoldLeggedController(context, {"gain": 1})
     with pytest.raises(ValueError, match="no actuated joint"):
-        TemplateLeggedController(context, {"lean_gains": {"tail": 1.0}})
+        PoseHoldLeggedController(context, {"lean_gains": {"tail": 1.0}})
     with pytest.raises(ValueError, match="finite"):
-        TemplateLeggedController(context, {"lean_gains": {"left_knee": float("inf")}})
+        PoseHoldLeggedController(context, {"lean_gains": {"left_knee": float("inf")}})
 
 
 def test_walk_command_must_be_finite() -> None:

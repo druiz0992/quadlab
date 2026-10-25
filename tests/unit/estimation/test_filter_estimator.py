@@ -1,4 +1,4 @@
-"""Generic filter estimator: converters, filter loading, the template filter."""
+"""Generic filter estimator: converters, filter loading, the example filter."""
 
 from typing import Any
 
@@ -17,12 +17,12 @@ from robotlab.core.measurements import (
 from robotlab.estimation.filter.estimator import FilterEstimator
 from robotlab.estimation.filter.protocol import predict_kind, update_kinds
 from robotlab.estimation.filter.measurements import MeasurementConverter
-from robotlab.estimation.filter.template import TemplateInertialFilter
+from robotlab.estimation.examples.imu_gps_filter import ImuGpsFilter
 from robotlab.testing.plugins import check_estimator, synthetic_context
 from robotlab.sensors.wheel_encoders import EncoderReading
 from robotlab.testing.scenarios import SCENARIOS, run_scenario, scenario_context
 
-TEMPLATE = "robotlab.estimation.filter.template:TemplateInertialFilter"
+EXAMPLE = "robotlab.estimation.examples.imu_gps_filter:ImuGpsFilter"
 REFERENCE = GpsReading(40.4168, -3.7038, 650.0)
 
 
@@ -82,11 +82,11 @@ def test_converter_rejects_bad_options(options: dict, message: str) -> None:
 
 
 def test_update_kinds_found_by_name() -> None:
-    assert update_kinds(TemplateInertialFilter({})) == ("baro", "gps")
+    assert update_kinds(ImuGpsFilter({})) == ("baro", "gps")
 
 
-def test_template_passes_the_contract_kit_and_the_hover_scenario() -> None:
-    options = {"filter": TEMPLATE, "filter_options": {"initial_position_m": [0, 0, 1]}}
+def test_example_passes_the_contract_kit_and_the_hover_scenario() -> None:
+    options = {"filter": EXAMPLE, "filter_options": {"initial_position_m": [0, 0, 1]}}
     report = check_estimator(FilterEstimator, options)
     error = report.final_position_error_m
     assert error is not None and error < 0.5
@@ -95,7 +95,7 @@ def test_template_passes_the_contract_kit_and_the_hover_scenario() -> None:
 
 
 def test_inputs_follow_enabled_sensors() -> None:
-    options = {"filter": TEMPLATE}
+    options = {"filter": EXAMPLE}
     gps_only = FilterEstimator(synthetic_context(("imu", "gps")), options)
     assert gps_only.inputs == ("imu", "gps")
     both = FilterEstimator(synthetic_context(("imu", "gps", "baro")), options)
@@ -111,14 +111,14 @@ def test_inputs_follow_enabled_sensors() -> None:
     "options, message",
     [
         ({}, 'needs option "filter"'),
-        ({"filter": TEMPLATE, "gain": 1}, "unknown options"),
+        ({"filter": EXAMPLE, "gain": 1}, "unknown options"),
         ({"filter": "nope.mod:Filter"}, "Cannot import"),
-        ({"filter": "robotlab.estimation.filter.template:Missing"}, "no class"),
+        ({"filter": "robotlab.estimation.examples.imu_gps_filter:Missing"}, "no class"),
         (
             {"filter": "robotlab.core.measurements:BaroReading"},
             "RecursiveFilter|BaroReading",
         ),
-        ({"filter": TEMPLATE, "filter_options": {"bad": 1}}, "unknown options"),
+        ({"filter": EXAMPLE, "filter_options": {"bad": 1}}, "unknown options"),
     ],
 )
 def test_filter_loading_errors(options: dict, message: str) -> None:
@@ -129,13 +129,13 @@ def test_filter_loading_errors(options: dict, message: str) -> None:
 def test_debug_series_use_the_name_prefix() -> None:
     logged: list[str] = []
     context = synthetic_context(log=lambda name, *_, **__: logged.append(name))
-    estimator = FilterEstimator(context, {"filter": TEMPLATE, "name": "mine"})
+    estimator = FilterEstimator(context, {"filter": EXAMPLE, "name": "mine"})
     assert estimator.node.estimates.stream_id == "algorithms/mine/state"
     report = check_estimator(
         lambda c, o: FilterEstimator(
             synthetic_context(log=lambda name, *_, **__: logged.append(name)), o
         ),
-        {"filter": TEMPLATE, "name": "mine"},
+        {"filter": EXAMPLE, "name": "mine"},
     )
     error = report.final_position_error_m
     assert error is not None and error < 1.0
@@ -161,7 +161,7 @@ def test_predict_kind_finds_the_single_driving_stream() -> None:
     assert predict_kind(_stub(predict_wheel_encoders=_noop, update_gps=_noop)) == (
         "wheel_encoders"
     )
-    assert predict_kind(TemplateInertialFilter({})) == "imu"
+    assert predict_kind(ImuGpsFilter({})) == "imu"
 
 
 @pytest.mark.parametrize(

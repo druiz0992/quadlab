@@ -68,7 +68,7 @@ from .wheeled_mission import WheeledMissionLoop, WheeledParts
 
 BUILTIN_CONTROLLERS = {
     "keyboard": "robotlab.control.wheeled_keyboard:KeyboardDriver",
-    "template": "robotlab.control.wheeled_template:TemplateWheeledController",
+    "example": "robotlab.control.examples.speed_yaw_wheeled_controller:SpeedYawWheeledController",
     "track_follower": "robotlab.control.track_follower:TrackFollower",
 }
 

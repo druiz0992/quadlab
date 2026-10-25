@@ -1,14 +1,14 @@
-"""Template wheel-odometry filter: driven by wheel encoders, corrected by GPS.
+"""Example wheel-odometry filter: driven by wheel encoders, corrected by GPS.
 
 Select it with::
 
     "algorithms": {"estimator": "filter",
                    "estimator_options": {
-                       "filter": "robotlab.estimation.filter.wheel_odometry:TemplateWheelOdometry",
+                       "filter": "robotlab.estimation.examples.wheel_odometry_filter:WheelOdometryFilter",
                        "filter_options": {"initial_yaw_deg": 90.0}}}
 
 with ``sensors.wheel_encoders`` and ``sensors.gps`` enabled on a wheeled
-robot. Like the IMU template (template.py) it holds only the mathematics;
+robot. Like the IMU example (imu_gps_filter.py) it holds only the mathematics;
 the node (node.py) does the timing and converts each encoder reading into
 a ``WheelMotion`` (hub positions, rolling directions, rolling speeds in
 body x/y, from the context's nominal wheel geometry). Deliberately simple:
@@ -49,7 +49,7 @@ from scipy.spatial.transform import Rotation
 
 from ...core.measurements import EstimatedState
 from ..interface import Innovation
-from .measurements import GpsFix, WheelMotion
+from ..filter.measurements import GpsFix, WheelMotion
 
 DEFAULTS: dict[str, Any] = dict(
     initial_position_m=[0.0, 0.0, 0.0],
@@ -83,15 +83,13 @@ def _yaw_matrix(yaw_rad: float) -> NDArray[np.float64]:
     return np.array([[c, -s], [s, c]])
 
 
-class TemplateWheelOdometry:
+class WheelOdometryFilter:
     """Wheel odometry with GPS corrections (module docs)."""
 
     def __init__(self, options: Mapping[str, Any]) -> None:
         unknown = set(options) - set(DEFAULTS)
         if unknown:
-            raise ValueError(
-                f"TemplateWheelOdometry: unknown options {sorted(unknown)}"
-            )
+            raise ValueError(f"WheelOdometryFilter: unknown options {sorted(unknown)}")
         o = {**DEFAULTS, **options}
         self.x = np.zeros(4)  # [east, north, up, yaw]
         self.x[:3] = np.asarray(o["initial_position_m"], dtype=float)

@@ -8,7 +8,9 @@ from robotlab.control.wheeled_keyboard import (
     KeyboardDriver,
     steering_angles,
 )
-from robotlab.control.wheeled_template import TemplateWheeledController
+from robotlab.control.examples.speed_yaw_wheeled_controller import (
+    SpeedYawWheeledController,
+)
 from robotlab.testing.plugins import (
     PluginContractError,
     check_wheeled_controller,
@@ -110,7 +112,7 @@ def test_driver_command_validation(kwargs):
 
 
 @pytest.mark.parametrize("kind", ["rover", "car", "tractor"])
-@pytest.mark.parametrize("controller", [KeyboardDriver, TemplateWheeledController])
+@pytest.mark.parametrize("controller", [KeyboardDriver, SpeedYawWheeledController])
 def test_built_in_controllers_follow_the_contract(kind, controller):
     report = check_wheeled_controller(controller, kind=kind)
     assert len(report.commands) == 24

@@ -11,8 +11,9 @@ the ``StateEstimator`` plug-in around it, selected as
 ``algorithms.estimator: filter`` with ``estimator_options.filter:
 "package.module:Class"``. The built-in GPS/IMU EKF
 (estimation/gps_imu_ekf/) is just such a filter; ``algorithms.estimator:
-gps_imu_ekf`` is this estimator running it. Templates: template.py
-(IMU-driven) and wheel_odometry.py (wheel-encoder-driven).
+gps_imu_ekf`` is this estimator running it. Examples:
+estimation/examples/imu_gps_filter.py (IMU-driven) and
+wheel_odometry_filter.py (wheel-encoder-driven).
 """
 
 from .measurements import BaroAltitude, GpsFix, ImuInput, MagneticField, WheelMotion

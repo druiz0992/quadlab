@@ -1,7 +1,7 @@
-"""Template wheeled-vehicle controller: copy this file to start your own.
+"""Example wheeled-vehicle controller (``WheeledController``): speed and yaw rate.
 
 Select it with
-``algorithms.controller: robotlab.control.wheeled_template:TemplateWheeledController``
+``algorithms.controller: robotlab.control.examples.speed_yaw_wheeled_controller:SpeedYawWheeledController``
 (or your copy's ``package.module:Class``), and test it with
 ``robotlab.testing.plugins.check_wheeled_controller`` before driving it in
 Gazebo.
@@ -30,10 +30,10 @@ from typing import Any
 
 import numpy as np
 
-from ..core.algorithms import AlgorithmContext
-from ..core.wheeled import WheelCommands
-from .wheeled import DriverCommand, WheeledControlState
-from .wheeled_keyboard import steering_angles
+from ...core.algorithms import AlgorithmContext
+from ...core.wheeled import WheelCommands
+from ..wheeled import DriverCommand, WheeledControlState
+from ..wheeled_keyboard import steering_angles
 
 DEFAULTS = dict(
     cruise_speed_mps=2.0,
@@ -43,16 +43,16 @@ DEFAULTS = dict(
 )
 
 
-class TemplateWheeledController:
+class SpeedYawWheeledController:
     """Speed and yaw-rate P controller following ``WheeledController``."""
 
     def __init__(self, context: AlgorithmContext, options: Mapping[str, Any]) -> None:
         if context.wheeled is None:
-            raise ValueError("TemplateWheeledController needs a wheeled vehicle")
+            raise ValueError("SpeedYawWheeledController needs a wheeled vehicle")
         unknown = set(options) - set(DEFAULTS)
         if unknown:
             raise ValueError(
-                f"TemplateWheeledController: unknown options {sorted(unknown)}"
+                f"SpeedYawWheeledController: unknown options {sorted(unknown)}"
             )
         self.options = {**DEFAULTS, **options}
         self.vehicle = context.wheeled

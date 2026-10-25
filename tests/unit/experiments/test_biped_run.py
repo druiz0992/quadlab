@@ -245,15 +245,15 @@ def test_invalid_controller_output_fails_the_run(tmp_path: Path) -> None:
     assert written["health"]["verdict"] == "failed"
 
 
-def test_template_controller_runs_from_config(tmp_path: Path) -> None:
+def test_example_controller_runs_from_config(tmp_path: Path) -> None:
     layer = {
         "algorithms": {
-            "controller": "template",
+            "controller": "example",
             "controller_options": {"lean_gains": {"left_ankle_pitch": 0.5}},
         }
     }
     summary = mission(tmp_path, layer, 0.5).run()
-    assert summary["control"]["controller"] == "template"
+    assert summary["control"]["controller"] == "example"
     assert summary["health"]["verdict"] == "ok"
 
 

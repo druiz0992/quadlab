@@ -20,7 +20,7 @@ import pytest
 from scipy.spatial.transform import Rotation
 
 from robotlab.estimation.filter.estimator import FilterEstimator
-from robotlab.estimation.template import TemplateEstimator
+from robotlab.estimation.examples.complementary_estimator import ComplementaryEstimator
 from robotlab.experiments.harness.algorithms import gps_imu_ekf_options
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.testing.scenarios import (
@@ -74,11 +74,11 @@ def ekf_options(scenario: EstimatorScenario) -> dict[str, Any]:
 
 
 def wheel_odometry_options(scenario: EstimatorScenario) -> dict[str, Any]:
-    """Wheel-odometry template with the start position and yaw declared."""
+    """Wheel-odometry example with the start position and yaw declared."""
     start = initial_truth(scenario)
     yaw_deg = Rotation.from_quat(start.quaternion_xyzw).as_euler("xyz", degrees=True)[2]
     return dict(
-        filter="robotlab.estimation.filter.wheel_odometry:TemplateWheelOdometry",
+        filter="robotlab.estimation.examples.wheel_odometry_filter:WheelOdometryFilter",
         filter_options=dict(
             initial_position_m=list(start.position_m), initial_yaw_deg=float(yaw_deg)
         ),
@@ -86,8 +86,8 @@ def wheel_odometry_options(scenario: EstimatorScenario) -> dict[str, Any]:
     )
 
 
-def template_options(scenario: EstimatorScenario) -> dict[str, Any]:
-    """The template only takes a start position (it starts level, facing east)."""
+def complementary_options(scenario: EstimatorScenario) -> dict[str, Any]:
+    """The complementary estimator only takes a start position (it starts level, facing east)."""
     return dict(initial_position_m=list(initial_truth(scenario).position_m))
 
 
@@ -125,9 +125,9 @@ CANDIDATES = {
     ),
     # Velocity from GPS differences (noisy), no bias estimation, fixed
     # covariance and no innovations: looser limits, no NIS check.
-    "template": Candidate(
-        TemplateEstimator,
-        template_options,
+    "complementary": Candidate(
+        ComplementaryEstimator,
+        complementary_options,
         {
             "hover": dict(position_rmse_m=0.15, velocity_rmse_mps=2.0),
             "constant_velocity": dict(position_rmse_m=0.15, velocity_rmse_mps=2.0),
@@ -202,7 +202,7 @@ def test_estimator_meets_its_scenario_limits(candidate_name, scenario_name):
 
 def test_bias_learning_shows_in_the_outage():
     """The EKF learns the biases before the outage and coasts far better
-    than the template, which does not estimate them."""
+    than the complementary estimator, which does not estimate them."""
     ekf = report_for("gps_imu_ekf", "biased_imu")
-    template = report_for("template", "biased_imu")
-    assert ekf.max_position_error_m < 0.1 * template.max_position_error_m
+    complementary = report_for("complementary", "biased_imu")
+    assert ekf.max_position_error_m < 0.1 * complementary.max_position_error_m

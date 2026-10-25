@@ -25,7 +25,7 @@ organization, and shared conventions. Following documents:
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
 | Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse; surface friction zones and spawn points for wheeled robots |
 | Ground vehicles | `--robot rover/car/tractor`: ray-cast suspension, transient Magic Formula tyres, drive/brake/steering actuators, aerodynamics in Python; wheel encoders; keyboard driver; wheeled controller plug-ins ([8 Ground vehicles](8_ground_vehicles.md)) |
-| Bipeds | `--robot biped` in MuJoCo: MJCF models (built-in test biped, or Pollen Robotics' Microduck from a local checkout), IMU and joint encoders on the sensor bus, joint-level controller plug-ins (hold, template, ONNX policies such as Pollen's), keyboard walking, Rerun view, fall health check ([9 Bipeds](9_bipeds.md)) |
+| Bipeds | `--robot biped` in MuJoCo: MJCF models (built-in test biped, or Pollen Robotics' Microduck from a local checkout), IMU and joint encoders on the sensor bus, joint-level controller plug-ins (hold, example, ONNX policies such as Pollen's), keyboard walking, Rerun view, fall health check ([9 Bipeds](9_bipeds.md)) |
 
 **Not implemented:** the full Gazebo session API (algorithms run serially
 on the mission thread, not in worker threads), obstacle avoidance,
@@ -61,12 +61,13 @@ src/robotlab/
 │                           #   applying IMU/magnetometer calibrations (calibration.py)
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
-│   ├── template.py         # Full estimator plug-in template (complementary filter)
+│   ├── examples/           # Example estimators, one per contract: complementary_estimator
+│   │                       #   (full plug-in), imu_gps_filter, wheel_odometry_filter
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
 │   ├── imu_calibration.py  # Static IMU calibration fit
 │   ├── filter/             # Reusable for any predict/update filter: node (timing, held
 │   │                       #   driving readings), measurement conversion, the `filter`
-│   │                       #   plug-in, example filters (template.py, wheel_odometry.py)
+│   │                       #   plug-in
 │   └── gps_imu_ekf/
 │       └── ekf.py          # The EKF: only a RecursiveFilter (run by filter/)
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,
@@ -74,7 +75,8 @@ src/robotlab/
 │                           #   verdict (health.py; bipeds: biped_health.py)
 ├── control/
 │   ├── interface.py        # RotorController plug-in contract, ControlState
-│   ├── template.py         # Copyable template controller (cascaded PD)
+│   ├── examples/           # Example controllers, one per contract: cascaded_pd_rotor_,
+│   │                       #   speed_yaw_wheeled_, pose_hold_legged_controller
 │   ├── references.py       # Mission reference trajectories (analytic derivatives)
 │   ├── waypoint.py         # Waypoint → body-velocity feedback (native mode)
 │   ├── manual.py           # Position and attitude loops → four rotor thrusts
@@ -82,12 +84,10 @@ src/robotlab/
 │   ├── drone.py            # Exclusive thrust handle, receipts, publication worker
 │   ├── legged.py           # LeggedController plug-in contract, state, WalkCommand
 │   ├── legged_hold.py      # Built-in "hold": keep the start keyframe's targets
-│   ├── legged_template.py  # Copyable legged template (pose hold + lean feedback)
 │   ├── legged_keyboard.py  # Held keys → ramped WalkCommand
 │   ├── onnx_policy.py      # Exported RL policy runner (Microduck contract)
 │   ├── wheeled.py          # WheeledController plug-in contract, state, DriverCommand
-│   ├── wheeled_keyboard.py # Keyboard driver and steering geometry
-│   └── wheeled_template.py # Copyable template wheeled controller
+│   └── wheeled_keyboard.py # Keyboard driver and steering geometry
 ├── perception/             # Placeholder: images and point clouds
 ├── planning/               # Placeholder: global_planning, local_planning, behavior
 ├── rl/                     # Placeholder: environments, rewards, training, policies
@@ -201,7 +201,7 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
   other stream): write only the filter, a class with one `predict_<kind>`,
   one `update_<kind>` per fused sensor, and `state`
   ([5 Estimation](5_estimation.md#writing-your-own-filter));
-  `estimation/filter/template.py` (IMU) and `wheel_odometry.py` (wheel
+  `estimation/examples/imu_gps_filter.py` (IMU) and `wheel_odometry_filter.py` (wheel
   encoders) are optional starting points. Select it with
   `algorithms.estimator: filter` and
   `estimator_options.filter: "package.module:Class"`; the built-in
@@ -210,7 +210,7 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
   rewinding for late measurements) and **controllers:** write a full
   plug-in following the contracts in
   [7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms), starting
-  from `estimation/template.py` or `control/template.py`, and select it
+  from `estimation/examples/complementary_estimator.py` or `control/examples/cascaded_pd_rotor_controller.py`, and select it
   with `algorithms.estimator`/`algorithms.controller` as
   `package.module:Class`.
 

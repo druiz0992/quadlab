@@ -1,7 +1,7 @@
-"""Template legged-robot controller: copy this file to start your own.
+"""Example legged-robot controller (``LeggedController``): pose hold.
 
 Select it with
-``algorithms.controller: robotlab.control.legged_template:TemplateLeggedController``
+``algorithms.controller: robotlab.control.examples.pose_hold_legged_controller:PoseHoldLeggedController``
 (or your copy's ``package.module:Class``), and test it with
 ``robotlab.testing.plugins.check_legged_controller`` before running it in
 MuJoCo.
@@ -30,9 +30,9 @@ from typing import Any
 
 import numpy as np
 
-from ..core.algorithms import AlgorithmContext
-from ..core.legged import JointTargets
-from .legged import LeggedControlState, WalkCommand
+from ...core.algorithms import AlgorithmContext
+from ...core.legged import JointTargets
+from ..legged import LeggedControlState, WalkCommand
 
 DEFAULTS: dict[str, Any] = dict(
     # Joint name -> lean gain (rad/rad); empty: hold the pose only.
@@ -40,16 +40,16 @@ DEFAULTS: dict[str, Any] = dict(
 )
 
 
-class TemplateLeggedController:
+class PoseHoldLeggedController:
     """Pose hold plus lean feedback following ``LeggedController``."""
 
     def __init__(self, context: AlgorithmContext, options: Mapping[str, Any]) -> None:
         if context.legged is None:
-            raise ValueError("TemplateLeggedController needs a legged robot")
+            raise ValueError("PoseHoldLeggedController needs a legged robot")
         unknown = set(options) - set(DEFAULTS)
         if unknown:
             raise ValueError(
-                f"TemplateLeggedController: unknown options {sorted(unknown)}"
+                f"PoseHoldLeggedController: unknown options {sorted(unknown)}"
             )
         self.options = {**DEFAULTS, **options}
         robot = context.legged

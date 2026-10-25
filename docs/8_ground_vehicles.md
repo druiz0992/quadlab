@@ -26,7 +26,7 @@ robotlab --robot car --keyboard --headless --scene worlds/airfield.json --output
 robotlab --robot rover --keyboard --headless --scene worlds/hills.json --output outputs/rover
 robotlab --robot tractor --keyboard --headless --output outputs/tractor
 
-# Your controller (see "Controllers"); here the template at a 10 m/s cruise
+# Your controller (see "Controllers"); here the example at a 10 m/s cruise
 robotlab --robot car --headless --config my_controller.json --duration 20 --output outputs/car-auto
 
 # Race: you drive the car on the circuit against three opponents
@@ -157,7 +157,7 @@ input. Disabled encoders pass truth to the controller and never enter
 the bus. A filter on the shared filter estimator receives each reading as a
 `WheelMotion` (hub positions, rolling directions, rolling speeds from the
 nominal wheel geometry), either driving it (`predict_wheel_encoders`; see
-`estimation/filter/wheel_odometry.py`) or correcting an IMU-driven filter
+`estimation/examples/wheel_odometry_filter.py`) or correcting an IMU-driven filter
 (`update_wheel_encoders`); see
 [5 Estimation](5_estimation.md#writing-your-own-filter).
 
@@ -342,7 +342,7 @@ maximum 1.5 ± 0.7 m, no off-track episodes.
 A wheeled controller is `cls(context, options)` with `update(state,
 request, dt_s) -> WheelCommands` (`control/wheeled.py`), selected by
 `algorithms.controller` (`package.module:Class`, or the aliases `keyboard`,
-`template`, and `track_follower`) with `algorithms.controller_options`, and called at
+`example`, and `track_follower`) with `algorithms.controller_options`, and called at
 `control.control_rate_hz` (100 Hz in the presets):
 
 - `context.wheeled` is the nominal vehicle (`core/wheeled_vehicle.py`): wheel
@@ -363,7 +363,7 @@ request, dt_s) -> WheelCommands` (`control/wheeled.py`), selected by
 
 Optional: `implement_lowered() -> bool` commands the tractor implement.
 
-Start from `control/wheeled_template.py` (speed and yaw-rate P control) and
+Start from `control/examples/speed_yaw_wheeled_controller.py` (speed and yaw-rate P control) and
 check a controller without Gazebo:
 
 ```python
@@ -389,7 +389,7 @@ own collisions as its own, and body-on-ground contact as
 ## Verified behaviour
 
 `tests/integration/test_gazebo_wheeled.py` (opt-in, `ROBOTLAB_TEST_GAZEBO=1`)
-pins, verified on 2026-10-22: the car on the template controller at 10 m/s
+pins, verified on 2026-10-22: the car on the example controller at 10 m/s
 covers 48.59 m in 6 s and agrees with the same model on the Python
 reference integrator (`rigid_body.py`) within 0.1 m; parked ride heights
 0.219 m (rover), 0.358 m (car), 1.023 m (tractor); repeated rover runs are

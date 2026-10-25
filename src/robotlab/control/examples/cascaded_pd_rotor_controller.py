@@ -1,6 +1,6 @@
-"""Template controller plug-in: copy this file to start your own.
+"""Example multirotor controller (``RotorController``): cascaded PD.
 
-Select it with ``algorithms.controller: robotlab.control.template:TemplateController``
+Select it with ``algorithms.controller: robotlab.control.examples.cascaded_pd_rotor_controller:CascadedPdRotorController``
 (or your copy's ``package.module:Class``), and test it with
 ``robotlab.testing.plugins.check_controller`` before flying it in Gazebo.
 
@@ -34,10 +34,10 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
-from ..core.algorithms import AlgorithmContext
-from .interface import ControlState
-from .manual import FlightCommand
-from .references import ReferencePoint
+from ...core.algorithms import AlgorithmContext
+from ..interface import ControlState
+from ..manual import FlightCommand
+from ..references import ReferencePoint
 
 DEFAULTS = dict(
     position_gain=1.0,  # 1/s²
@@ -49,13 +49,15 @@ DEFAULTS = dict(
 )
 
 
-class TemplateController:
+class CascadedPdRotorController:
     """Cascaded PD controller following the ``RotorController`` contract."""
 
     def __init__(self, context: AlgorithmContext, options: Mapping[str, Any]) -> None:
         unknown = set(options) - set(DEFAULTS)
         if unknown:
-            raise ValueError(f"TemplateController: unknown options {sorted(unknown)}")
+            raise ValueError(
+                f"CascadedPdRotorController: unknown options {sorted(unknown)}"
+            )
         self.options = {**DEFAULTS, **options}
         vehicle = context.vehicle
         self._mass_kg = vehicle.mass

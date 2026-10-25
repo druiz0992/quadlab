@@ -35,17 +35,17 @@ def test_controller_selection():
     driver = build_wheeled_controller(config.data, context, keyboard=True)
     assert type(driver).__name__ == "KeyboardDriver"
     data = dict(
-        config.data, algorithms=dict(config.data["algorithms"], controller="template")
+        config.data, algorithms=dict(config.data["algorithms"], controller="example")
     )
     assert (
         type(build_wheeled_controller(data, context, False)).__name__
-        == "TemplateWheeledController"
+        == "SpeedYawWheeledController"
     )
     bad = dict(
         config.data,
         algorithms=dict(
             config.data["algorithms"],
-            controller="robotlab.control.template:TemplateController",
+            controller="robotlab.control.examples.cascaded_pd_rotor_controller:CascadedPdRotorController",
         ),
     )
     with pytest.raises(ValueError, match="WheeledController"):
