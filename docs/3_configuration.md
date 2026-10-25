@@ -12,7 +12,7 @@ Files are small building blocks, organized by topic under `configs/`. Repeat
 `--drone` to layer them; later files override earlier ones:
 
 ```bash
-robotlab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --drone configs/algorithms/ekf_observer.json --control-mode rotor-thrust \
   --drone configs/vehicles/10in_4s.json \
   --drone configs/sensors/sensor_errors.json \
   --drone configs/environment/turbulence.json \
@@ -143,7 +143,7 @@ motor faults).
 | `sensors` | IMU, GPS, barometer, magnetometer, rangefinder, optical flow, battery monitor, contacts, camera, lidar (2D or 3D): enablement, rate (Hz), mount (except contacts), errors; camera resolution/FOV/clipping; lidar samples/ranges; GPS dropout and error model; IMU vibration and error model; barometer native noise and error model |
 | `controller` | Python thrust-mode position, velocity, attitude, angular-rate gains; acceleration limit; max position-setpoint error; min commanded altitude |
 | `velocity_controller` | Native Gazebo velocity-mode gains and acceleration limits |
-| `ekf` | Estimator priors, uncertainties, assumed noise, gate, buffer/watchdog settings (used with `--ekf`) |
+| `ekf` | GPS/IMU EKF priors, uncertainties, assumed noise, and gate (options of `algorithms.estimator: gps_imu_ekf`) |
 | `control` | Publication rate, command lifetime (sim s), watchdog (wall s), truth-odometry rate; controller tick and position-loop rates, state/command latency, publish-on-send (see [4 Control](4_control.md#controller-timing-and-latency)) |
 | `pilot` | Forward/back speed (m/s), yaw rate (rad/s), climb/descent speed (m/s); automatic take-off altitude (m) and climb rate (m/s) |
 | `environment` | `ambient_temperature_c` (°C) for the battery and IMU temperature models ([Temperature effects](#temperature-effects)) |
@@ -375,7 +375,7 @@ order:
 | `timestamp_jitter_s` | s | 0 | Reported stamp moved by N(0, σ²), clipped to ±0.45 sample periods |
 
 How the effects behave:
-- **Lost samples** are never recorded, delivered, or given to `--ekf`;
+- **Lost samples** are never recorded or delivered to estimators;
   `summary.json.imu_imperfections` counts them.
 - **Jitter** changes only the reported timestamp, never the physics.
 - **Bias truth:** the Gauss–Markov bias is part of the true bias that
@@ -456,8 +456,8 @@ When enabled, the autopilot side applies it like a driver:
   `calibrated_specific_force_mps2`, `calibrated_angular_rate_rad_s`, and
   `temperature_c` next to the raw values. `best_specific_force_mps2` and
   `best_angular_rate_rad_s` return the calibrated values when present.
-- **Consumers:** the built-in EKF, both as a plug-in and through `--ekf`,
-  and estimate-driven body rates use the calibrated values.
+- **Consumers:** every inertial estimator (estimation/inertial/) and
+  estimate-driven body rates use the calibrated values.
 - **EKF priors:** the EKF's bias states then track only the residual, so
   its initial bias uncertainty is taken from `filter_*_bias_std` instead of
   the `ekf` section. `robotlab-imucal` writes these as
@@ -485,7 +485,7 @@ procedure took 17 s:
     defaults 0.2 and 0.02),
   - gyro bias error 0.0074 → 0.0021 → 0.0003 rad/s,
   - accelerometer bias error 0.24 → 0.034 → 0.030 m/s²,
-  - the `--ekf` path, now also calibrated, matched it (0.49°).
+  - the former `--ekf` observer, also calibrated, matched it (0.49°).
 
   Position stayed about 1.8 m, dominated by the correlated GPS error of
   `sensor_errors.json`.

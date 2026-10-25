@@ -9,7 +9,6 @@ from robotlab.testing.plugins import synthetic_context
 @pytest.mark.parametrize(
     "kwargs, message",
     [
-        (dict(ekf=True), "algorithms.estimator"),
         (dict(world="saved.sdf"), "generated world"),
         (dict(control_mode="rotor-thrust"), "multirotors only"),
         (dict(duration=0.0), "Duration"),

@@ -302,7 +302,7 @@ determinism is then not guaranteed, and the health verdict warns). Rendered sens
 
 Gazebo is the interactive world; Rerun is the telemetry and replay view.
 Select the `sim_time` timeline in Rerun. Rerun shows the blue truth vehicle
-and path, the magenta EKF vehicle and path with `--ekf`, forward arrows for
+and path, the magenta estimate vehicle and path with an estimator plug-in, forward arrows for
 body +X, an **EKF vs truth** tab, and a **Rotor thrust targets (N)** tab in
 thrust modes. Displayed paths keep at most 2,000 vertices; files keep every
 sample. The ground is drawn as the 3D view's 1 m line grid rather than a
@@ -388,8 +388,8 @@ robotlab --edit --render-sensors --output outputs/editor
 3. Fly it with `--world worlds/my-world.sdf`.
 
 Keep the world named `robotlab`, the drone named `drone`, and its plugins and
-topics intact. `--world` uses the SDF without regenerating; `--drone`,
-`--keyboard`, and `--ekf` are rejected with saved worlds. Without `--world`,
+topics intact. `--world` uses the SDF without regenerating; `--drone` and
+`--keyboard` are rejected with saved worlds. Without `--world`,
 each run regenerates `<output>/world.sdf`.
 
 ### Terrain (`terrain` in a scene)
@@ -517,7 +517,7 @@ robotlab --headless --target 8 0 1 --duration 10 --output outputs/collision   # 
 | `telemetry.jsonl` | Ground-truth poses |
 | `commands.jsonl` | Rotor-control records: requested thrusts, motor-speed targets, setpoints, saturation, command IDs, accepted thrusts, expiry, tick/state/release times |
 | `command-events.jsonl` | Command publication, supersession, expiry, stop, and failure events |
-| `estimates.jsonl` | EKF state, covariance, and provenance (`--ekf`) |
+| `estimates.jsonl` | Estimator plug-in state, covariance, and provenance |
 | `wind-commands.jsonl` | Published dynamic wind targets (random/scheduled wind) |
 | `replay.jsonl` | Bus deliveries and truth for `robotlab-replay` (`algorithms.record_bus`) |
 | `algorithm-debug.jsonl` | Plug-in debug series (`context.log`), only when a plug-in logs |

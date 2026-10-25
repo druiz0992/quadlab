@@ -230,3 +230,13 @@ def test_compare_estimators_side_by_side(recorded, tmp_path):
     assert (tmp_path / "cmp" / "Echo-2" / "estimates.jsonl").exists()
     assert "| Metric | Echo | Echo-2 |" in table
     assert (tmp_path / "cmp" / "comparison.md").read_text() == table
+
+
+def test_removed_live_ekf_settings_are_migrated() -> None:
+    from robotlab.experiments.harness.replay import migrate_settings
+
+    recorded: dict = {"ekf": {"gps_std_m": [1, 1, 1], "reorder_capacity": 4096}, "x": 1}
+    settings, dropped = migrate_settings(recorded)
+    assert dropped == ["ekf.reorder_capacity"]
+    assert settings == {"ekf": {"gps_std_m": [1, 1, 1]}, "x": 1}
+    assert "reorder_capacity" in recorded["ekf"]  # input untouched

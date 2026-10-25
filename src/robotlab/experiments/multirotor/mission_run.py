@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation
 
 from .takeoff import TakeoffSequence
 from .failsafe import BatteryFailsafe
-from ..harness.live_ekf import reference_from_world
+from ...simulation.gazebo.world import reference_from_world
 from ..common.mission import MissionRunner
 from ..harness.run_evaluation import RunEvaluation
 from ..common.run_setup import prepare_world, validate_run
@@ -120,14 +120,6 @@ def fly(args, config, open_keyboard, command_source):
     keyboard = open_keyboard() if open_keyboard is not None else None
     if keyboard is not None:
         keyboard.pilot_rates = settings["pilot"]
-
-    live_ekf = None
-    estimate_reader = None
-    if args.ekf:
-        from ..harness.live_ekf import LiveEkf
-
-        live_ekf = LiveEkf(settings, reference_from_world(world))
-        estimate_reader = live_ekf.estimates.subscribe(capacity=4096)
 
     # Keep discovery private to this run, without interfering with another simulator.
     os.environ["GZ_PARTITION"] = "robotlab_" + uuid.uuid4().hex
@@ -369,8 +361,6 @@ def fly(args, config, open_keyboard, command_source):
             failsafe=failsafe,
             effects=effects,
             stack=stack,
-            live_ekf=live_ekf,
-            estimate_reader=estimate_reader,
             evaluation=evaluation,
             health=health,
             mission=mission,

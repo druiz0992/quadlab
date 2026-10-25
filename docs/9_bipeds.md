@@ -37,7 +37,7 @@ The Microduck model is not copied here: its meshes are CC BY-NC-SA 4.0
 Holding the STAND pose without a balance policy, the Microduck tips over in
 about a second (verdict `failed`, `fallen`); the built-in test biped
 (`builtin:test_biped`, wide feet, statically stable) stands. Gazebo-only
-options (`--world`, `--edit`, `--ekf`, `--render-sensors`, `--scene`,
+options (`--world`, `--edit`, `--render-sensors`, `--scene`,
 `--target`, `--control-mode`) are rejected.
 
 `--keyboard` opens a key window (↑/↓ walk, ←/→ turn, A/D step sideways,

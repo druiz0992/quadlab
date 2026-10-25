@@ -1,12 +1,15 @@
 # 5. State estimation
 
-RobotLab's estimator is a GPS/IMU error-state EKF. It runs live from Gazebo
-sensor messages with `--ekf`, as an **observer only**: flight control keeps
-using truth. The estimator is initialized from declared priors and never
-receives simulator truth, true biases, wind, or fault-model information.
+RobotLab's estimator is a GPS/IMU error-state EKF, run as an estimator
+plug-in on the [sensor bus](7_experiments.md#sensor-bus-and-delivery-timing-sensor_timing):
+as an observer (`configs/algorithms/ekf_observer.json`, control flies on
+truth) or in the loop (`ekf_in_the_loop.json`). It is initialized from
+declared priors and never receives simulator truth, true biases, wind, or
+fault-model information. Your own filters run the same way
+([Writing your own](#writing-your-own-inertial-filter)).
 
 ```text
-bus samples (plug-in) or Gazebo IMU/GPS (--ekf, live_ekf.py reordering)
+sensor bus samples (imu, gps)
       → InertialNode (timing, mounts, GPS → ENU) → GpsImuEkf.predict / update_gps
                                                         ↓
                                               state channel → Rerun / estimates.jsonl
@@ -17,7 +20,6 @@ bus samples (plug-in) or Gazebo IMU/GPS (--ekf, live_ekf.py reordering)
 | `estimation/gps_imu_ekf/ekf.py` | Numerical prediction and correction (`GpsImuEkf`) |
 | `estimation/gps_imu_ekf/plugin.py` | Builds the filter from the `ekf` section; the `gps_imu_ekf` plug-in |
 | `estimation/inertial/` | Reusable for any inertial filter: `InertialNode` (sample checks, mounts, held IMU, timing, publication), measurement conversion, the `inertial` plug-in, a template filter ([Writing your own](#writing-your-own-inertial-filter)) |
-| `experiments/harness/live_ekf.py` | Gazebo decoding to channels, bounded reordering, watchdogs (`LiveEkf`) |
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
 | `sensors/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
 | `sensors/geodesy.py` | WGS84 ↔ ECEF ↔ local ENU conversion |
@@ -89,8 +91,8 @@ inertial filter; for the EKF:
 - The first IMU sample sets the prior's time. IMU intervals must be positive
   and at most 0.1 s. The node validates frames, epochs, stream identity, and
   sequence continuity, serializes handlers, and starts no threads.
-- Output: `node.outputs["state"]`, also `node.estimates` and
-  `LiveEkf.estimates`, a read-only channel of `Sample[EstimatedState]`.
+- Output: `node.outputs["state"]`, also `node.estimates`, a read-only
+  channel of `Sample[EstimatedState]`.
   Consumers subscribe before dispatch, e.g.
   `node.estimates.subscribe(capacity=128)`. Channels have bounded queues,
   overflow policies (`error`, `drop_oldest`), timeouts, and closure.
@@ -131,41 +133,37 @@ needs its own options). On the 10 s lockstep square with sensor errors the
 template replayed with 2.0 m position and 0.85° attitude RMSE (EKF: 1.6 m,
 1.3°); it estimates no biases, so it drifts on longer runs.
 
-## Live operation
+## Running it
 
-`experiments/harness/live_ekf.py` decodes Gazebo measurements on the mission thread
-into typed channels. A bounded adapter waits until both streams reach a
-timestamp, then dispatches buffered samples in source-time order (IMU before
-GPS at equal times). This tolerates asynchronous arrival and different rates
-without altering timestamps, at the cost of roughly one GPS interval of
-latency. No EKF math runs on a transport callback.
+```bash
+robotlab --headless --control-mode rotor-thrust --drone configs/missions/square.json \
+  --drone configs/algorithms/ekf_observer.json --drone configs/control/lockstep.json \
+  --duration 45 --output outputs/ekf
+```
 
+The sensor bus delivers the IMU and GPS samples in delivery order, after
+the error models and any modelled latency
+([7 Experiments](7_experiments.md#sensor-bus-and-delivery-timing-sensor_timing)).
 A GPS time inside an IMU interval is handled by **segmented propagation**:
 propagate with the held reading to the GPS time, correct, then continue to
 the next IMU sample. Process noise is applied per segment, without modelling
 correlated held-sample noise across the split; an educational approximation.
-GPS fixes that cannot be placed are counted as `rejected_gps_timing`; spatial
-outliers are gated separately.
+A fix older than the filter time (e.g. after GPS latency) is counted in
+`rejected_gps_timing`, since there is no rewind; spatial outliers are gated
+separately. Lost fixes (dropouts, outages) never reach the bus, so IMU
+prediction simply continues and corrections resume on recovery.
 
-Failures are visible and run owned-simulator cleanup: duplicate or reversed
-per-source timestamps, known IMU/GPS ingress drops, buffer overflow,
-excessive lag, IMU intervals over 0.1 s, and stalled streams. Flight
-watchdogs stay independent, so a pause can end the mission. At cleanup the
-unmatched tail after the last common timestamp is discarded rather than
-extrapolated, so estimates may end about one GPS interval before truth. A
-duration-completed mission without an accepted GPS correction is an error.
-
-**Requirements:** enabled IMU (≥ 20 Hz) and GPS, body-origin IMU (rotated
-mounts allowed), generated ENU/WGS84 world with zero heading. The GPS origin
-is read from the generated SDF's spherical coordinates, never from truth or
-the first fix. `--ekf` is rejected with `--world` and `--edit`.
-
-GPS dropouts still advance the ordering watermark through raw arrival timing,
-without exposing coordinates, so IMU prediction continues and corrections
-resume on recovery with contiguous sequences. Accelerometer vibration and the
-seeded IMU/GPS error models reach the EKF only as the resulting readings. See
+**Requirements:** enabled IMU and GPS, body-origin IMU (rotated mounts
+allowed), generated ENU/WGS84 world with zero heading: the GPS origin is
+read from the generated SDF's spherical coordinates
+(`simulation/gazebo/world.py: reference_from_world`), never from truth or
+the first fix. Accelerometer vibration and the seeded IMU/GPS error models
+reach the EKF only as the resulting readings. See
 [3 Configuration](3_configuration.md#gps-dropouts-and-wind) and
 [IMU and GPS error models](3_configuration.md#imu-and-gps-error-models).
+
+The examples below were measured with the former `--ekf` observer (removed
+2026-10-25), which ran the same filter on the same readings.
 
 **Example behaviour with sensor errors.** A 30 s headless rotor-thrust hover
 with `configs/sensors/sensor_errors.json` showed:
@@ -231,10 +229,9 @@ The `ekf` section of the drone JSON (all defaults listed in
   On `step_wind_seeds` the change lowered attitude RMSE from 2.23° to
   2.05° and mean NEES from 137 to 110; GPS NIS fell from 0.27 to 0.18
   (more conservative GPS weighting); the batch baseline was re-saved.
-- `reorder_capacity` bounds pending samples (default 4096);
-  `max_sensor_lag_sim_s` limits source-time separation (default 1 s, keep it
-  above a GPS period); `sensor_watchdog_wall_s` catches stalled streams
-  (default 5 s).
+- *Migration (2026-10-25):* `reorder_capacity`, `max_sensor_lag_sim_s`,
+  and `sensor_watchdog_wall_s` belonged to the removed `--ekf` observer and
+  are no longer accepted (recordings that carry them still replay).
 
 ## Outputs
 
@@ -253,8 +250,10 @@ matching timestamps. Truth is used there for evaluation, never by the EKF.
 
 Unit tests cover hover, yaw integration, GPS drift reduction, lever arms,
 outlier gates, covariance, prediction Jacobians, GPS conversion, rotated IMU
-input, timing rejection, reordering, intermediate GPS corrections, watchdogs,
+input, timing rejection, intermediate GPS corrections, calibrated IMU
+values, measurement conversion, the generic estimator and template filter,
 bounds, mount restrictions, output fanout, and closure. Opt-in native tests
-(`ROBOTLAB_TEST_GAZEBO=1`, `tests/integration/test_live_gazebo_ekf.py`) fly a
-moving drone with unaligned IMU/GPS rates, plus noisy/rotated sensors.
+(`ROBOTLAB_TEST_GAZEBO=1`, `tests/integration/test_gazebo_ekf.py`) fly a
+moving drone with unaligned IMU/GPS rates, plus noisy/rotated sensors, and
+wind with a modelled GPS outage.
 Rerun appearance needs a separate visual check.

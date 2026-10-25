@@ -166,8 +166,9 @@ estimate in this mode, as on a real vehicle.
 `ekf_in_the_loop.json` flies on it. Both declare the launch point as the
 filter's prior.
 
-`--ekf` keeps the older live-EKF path ([5 Estimation](5_estimation.md)); it
-cannot be combined with `algorithms.estimator`.
+*Migration (2026-10-25):* the `--ekf` live observer was removed; use
+`--drone configs/algorithms/ekf_observer.json`, which runs the same filter
+on the sensor bus, scored and replayable.
 
 ### Writing a plug-in: templates and the contract test kit
 
@@ -581,8 +582,10 @@ truth.
 Replay is **open loop**: the recorded flight does not change, so it suits
 estimators, not controllers, and flying on a different estimate still
 needs the simulator. The context is as recorded (sensor overrides do not
-change it). The `--ekf` live observer does not use the bus and is not
-recorded. Verified in lockstep: replaying the built-in EKF on a 20 s
+change it). Recordings made before 2026-10-25 carry three removed
+`ekf` keys (`reorder_capacity`, `max_sensor_lag_sim_s`,
+`sensor_watchdog_wall_s`); replay drops them and lists them in
+`replay-summary.json.migrated_settings`. Verified in lockstep: replaying the built-in EKF on a 20 s
 square with sensor errors reproduced the live `estimates.jsonl`,
 `algorithm-debug.jsonl`, and estimation metrics exactly, in 3.4 s.
 

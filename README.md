@@ -51,8 +51,8 @@ Run from the repository root (scene paths are relative to it) and use a fresh
 # Fly with the keyboard in the obstacle circuit (Gazebo headless, Rerun + key window)
 robotlab --keyboard --headless --scene worlds/circuit.json --output outputs/keyboard
 
-# Same, with the live EKF estimate shown next to truth
-robotlab --keyboard --headless --ekf --scene worlds/circuit.json --output outputs/live-ekf
+# Same, with the EKF estimate shown next to truth (an estimator plug-in, observer only)
+robotlab --keyboard --headless --drone configs/algorithms/ekf_observer.json --scene worlds/circuit.json --output outputs/live-ekf
 
 # Automatic flight to a waypoint with Gazebo GUI, Rerun, camera and lidar
 robotlab --render-sensors --duration 20 --output outputs/waypoint
@@ -60,7 +60,7 @@ robotlab --render-sensors --duration 20 --output outputs/waypoint
 # Window-free recording runs
 robotlab --headless --duration 10 --output outputs/headless
 robotlab --headless --control-mode rotor-thrust --duration 10 --output outputs/thrust-hover
-robotlab --headless --rerun --ekf --control-mode rotor-thrust --duration 15 --output outputs/ekf-hover
+robotlab --headless --rerun --drone configs/algorithms/ekf_observer.json --control-mode rotor-thrust --duration 15 --output outputs/ekf-hover
 
 # Start on the ground and take off automatically (rotor-thrust/keyboard)
 robotlab --keyboard --headless --drone configs/scenarios/ground_start.json --output outputs/ground-start
@@ -89,15 +89,15 @@ robotlab --keyboard --headless --scene worlds/circuit.json \
 
 # Custom vehicle / sensors / disturbances. Configs are building blocks under
 # configs/{vehicles,sensors,faults,environment,control,scenarios}; repeat --drone to layer them.
-robotlab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --drone configs/algorithms/ekf_observer.json --control-mode rotor-thrust \
   --drone configs/vehicles/10in_4s.json --drone configs/sensors/sensor_errors.json \
   --drone configs/environment/turbulence.json --duration 30 --output outputs/combined
 robotlab --keyboard --headless --drone configs/vehicles/quad_x.json --output outputs/configured
-robotlab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --drone configs/algorithms/ekf_observer.json --control-mode rotor-thrust \
   --drone configs/scenarios/disturbances.json --duration 25 --output outputs/disturbances
-robotlab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --drone configs/algorithms/ekf_observer.json --control-mode rotor-thrust \
   --drone configs/sensors/imu_vibration.json --duration 20 --output outputs/imu-vibration
-robotlab --headless --rerun --ekf --control-mode rotor-thrust \
+robotlab --headless --rerun --drone configs/algorithms/ekf_observer.json --control-mode rotor-thrust \
   --drone configs/sensors/sensor_errors.json --duration 30 --output outputs/sensor-errors
 
 # Vehicle physics: battery running out, turbulence, ground effect, 10-inch/4S preset
@@ -154,9 +154,9 @@ robotlab --headless --rerun --control-mode rotor-thrust --drone configs/faults/m
   --drone configs/control/lockstep.json --duration 15 --output outputs/motor-degraded
 
 # Fault injection: fly through circuit gate G1 with GPS blockout/multipath, or IMU faults
-robotlab --headless --rerun --ekf --scene worlds/circuit.json --target 11 0 1.8 \
+robotlab --headless --rerun --drone configs/algorithms/ekf_observer.json --scene worlds/circuit.json --target 11 0 1.8 \
   --drone configs/faults/gps_faults.json --duration 28 --output outputs/gps-faults
-robotlab --headless --rerun --ekf --scene worlds/circuit.json --target 11 0 1.8 \
+robotlab --headless --rerun --drone configs/algorithms/ekf_observer.json --scene worlds/circuit.json --target 11 0 1.8 \
   --drone configs/faults/imu_faults.json --duration 28 --output outputs/imu-faults
 
 # Reference missions scored against truth (metrics.json): step, square laps, circuit lap
@@ -274,7 +274,7 @@ window instead ([keys](docs/8_ground_vehicles.md#keyboard)).
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--scene PATH` | `worlds/training.json` | JSON scene used to generate the world SDF |
-| `--world PATH` | – | Use a world saved from Gazebo instead of generating one (no `--drone`, `--keyboard`, or `--ekf`) |
+| `--world PATH` | – | Use a world saved from Gazebo instead of generating one (no `--drone` or `--keyboard`) |
 | `--drone PATH`, `--config PATH` | built-in | JSON configuration; repeat to layer files, later ones overriding earlier ([combining files](docs/3_configuration.md#combining-files)) |
 | `--robot {multirotor,rover,car,tractor}` | `multirotor` (or `robot.kind` from `--config`) | Robot type; wheeled kinds load their preset ([8 Ground vehicles](docs/8_ground_vehicles.md)) |
 | `--output DIR` | `outputs/gazebo` | Directory for the world and run artifacts |
@@ -282,7 +282,6 @@ window instead ([keys](docs/8_ground_vehicles.md#keyboard)).
 | `--keyboard` | off | Fly with arrows and Q/A using the per-rotor thrust controller (wheeled robots: drive); opens Rerun |
 | `--control-mode {velocity,rotor-thrust}` | `velocity` | `velocity`: Gazebo native controller to `--target`. `rotor-thrust`: Python controller holds the initial pose |
 | `--target X Y Z` | `3 0 2` | Waypoint in metres (velocity mode only) |
-| `--ekf` | off | Run the live GPS/IMU EKF; records `estimates.jsonl` and shows it in Rerun |
 | `--headless` | off | Gazebo server only, no Gazebo GUI |
 | `--rerun` | off | Open live Rerun even with `--headless` (automatic with `--keyboard`) |
 | `--render-sensors` | off | Enable camera and GPU lidar (needs working graphics/EGL) |
@@ -299,7 +298,7 @@ Each mission writes `flight.rrd`, `telemetry.jsonl`, `commands.jsonl`,
 `command-events.jsonl`, `summary.json`, and `gazebo.log`. Generated worlds add
 `world.sdf` and `drone-resolved.json`; every run writes `metrics.json`
 (estimation and control scores, [7 Experiments](docs/7_experiments.md#metrics-metricsjson));
-`--ekf` or an estimator plug-in adds `estimates.jsonl`; dynamic
+an estimator plug-in adds `estimates.jsonl`; dynamic
 wind adds `wind-commands.jsonl`; camera runs save `camera-first.png`;
 `algorithms.record_bus` adds `replay.jsonl` for `robotlab-replay`; plug-ins
 that log debug series add `algorithm-debug.jsonl`. Check

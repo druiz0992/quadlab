@@ -32,7 +32,6 @@ class GazeboConfig:
     edit: bool = False
     keyboard: bool = False
     control_mode: str = "velocity"
-    ekf: bool = False
     # Robot family (``--robot``); None: from the config layers (default
     # multirotor). See simulation/wheeled/config.py; ``biped`` runs in
     # MuJoCo instead (experiments/biped/biped_run.py).

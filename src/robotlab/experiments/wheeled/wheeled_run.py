@@ -59,7 +59,7 @@ from ...simulation.wheeled.ground import GroundModel
 from ...simulation.wheeled.model import WheeledVehicleModel
 from ..harness.algorithm_debug import AlgorithmDebugLog
 from ..harness.algorithms import build_algorithm_stack, load_class
-from ..harness.live_ekf import reference_from_world
+from ...simulation.gazebo.world import reference_from_world
 from ..common.mission import MissionRunner
 from ..harness.run_evaluation import RunEvaluation
 from ..common.run_setup import prepare_world
@@ -82,10 +82,6 @@ def validate_wheeled_run(
     if args.world:
         raise ValueError(
             f"{kind}: needs a generated world (the wheel model reads the scene); omit --world"
-        )
-    if args.ekf:
-        raise ValueError(
-            f"{kind}: --ekf is the multirotor live EKF; set algorithms.estimator: gps_imu_ekf"
         )
     if args.control_mode != "velocity":
         raise ValueError(f"{kind}: --control-mode applies to multirotors only")

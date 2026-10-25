@@ -63,12 +63,6 @@ def test_validate_run_reports_mode():
             False,
             "publish_on_send",
         ),
-        (
-            replace(ROTOR, ekf=True),
-            {"algorithms": {"estimator": "gps_imu_ekf"}},
-            False,
-            "not both",
-        ),
         (GazeboConfig(), {"mission": {"type": "hold"}}, False, "mission reference"),
         (ROTOR, {"mission": {"type": "hold"}}, True, "mission reference"),
         (replace(ROTOR, world="x.sdf"), {}, False, "generated scene"),

@@ -115,8 +115,6 @@ class MissionParts:
     failsafe: Any | None
     effects: Any | None
     stack: Any
-    live_ekf: Any | None
-    estimate_reader: Any | None
     evaluation: Any
     health: Any
     mission: Any
@@ -246,9 +244,7 @@ class MissionLoop:
             return open_file(name) if condition else None
 
         return RunFiles(
-            estimates=open_if(
-                parts.args.ekf or parts.stack.estimator is not None, "estimates.jsonl"
-            ),
+            estimates=open_if(parts.stack.estimator is not None, "estimates.jsonl"),
             gazebo_log=open_file("gazebo.log"),
             telemetry=open_file("telemetry.jsonl"),
             commands=open_file("commands.jsonl"),
@@ -354,9 +350,6 @@ class MissionLoop:
             self.process.stop(GAZEBO_STOP_TIMEOUT_WALL_S)
         if self.thrust_control is not None:
             self._drain_command_events()
-        if parts.live_ekf is not None:
-            parts.live_ekf.close()
-            _started(parts.estimate_reader, "estimate reader").close()
         if parts.stack.bus is not None:
             parts.stack.bus.close()
 
@@ -408,11 +401,6 @@ class MissionLoop:
     def _housekeeping(self) -> bool:
         """Health checks and keyboard input; False when the keyboard closed."""
         parts = self.parts
-        if parts.live_ekf is not None:
-            parts.live_ekf.check_health()
-            dropped = parts.ingress.dropped
-            if dropped["imu"] or dropped["gps"]:
-                raise RuntimeError("Sensor ingress loss during live EKF mission")
         if self.thrust_control is not None:
             self.thrust_control.check_health()
             self._drain_command_events()
@@ -529,18 +517,6 @@ class MissionLoop:
             for sample in estimates:
                 self._write_estimate(sample)
             parts.evaluation.on_innovations(innovations)
-        if parts.live_ekf is not None:
-            calibrated = parts.pipeline.calibrated_imu
-            parts.live_ekf.ingest(
-                kind,
-                message,
-                received_at=received_at,
-                gps_dropped=gps_dropped,
-                calibrated=(
-                    calibrated[:2] if kind == "imu" and calibrated is not None else None
-                ),
-            )
-            self._drain_live_estimates()
 
     def _write_estimate(self, sample: Any) -> None:
         """Record one estimate (estimates.jsonl, Rerun, metrics, health)."""
@@ -555,19 +531,6 @@ class MissionLoop:
             state.velocity_mps,
             state.quaternion_xyzw,
         )
-
-    def _drain_live_estimates(self) -> None:
-        reader = self.parts.estimate_reader
-        if reader is None:
-            return
-        from ...sensors.streams import ReadTimeout
-
-        while True:
-            try:
-                sample = reader.next(timeout_wall_s=0)
-            except ReadTimeout:
-                break
-            self._write_estimate(sample)
 
     # Truth step ---------------------------------------------------------------
 
@@ -619,11 +582,6 @@ class MissionLoop:
             self._velocity_command(p, quaternion)
             self._last_command_time = t
         if t - self.first_time >= parts.args.duration:
-            live_ekf = parts.live_ekf
-            if live_ekf is not None and live_ekf.ekf.accepted_gps == 0:
-                raise RuntimeError(
-                    "Live EKF has no accepted GPS correction; inspect summary"
-                )
             self.completed = True
             return False
         # Everything for this period is done: advance one burst.

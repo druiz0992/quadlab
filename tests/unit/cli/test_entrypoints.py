@@ -40,16 +40,14 @@ def test_retired_backend_option_is_rejected():
     assert "unrecognized arguments" in result.stderr
 
 
-def test_live_ekf_option_is_forwarded(monkeypatch):
+def test_removed_ekf_option_is_rejected(monkeypatch):
+    # --ekf was removed 2026-10-25: use configs/algorithms/ekf_observer.json.
     from robotlab.cli import gazebo
 
-    configurations = []
-    monkeypatch.setattr(sys, "argv", ["robotlab", "--ekf", "--headless", "--rerun"])
-    monkeypatch.setattr(gazebo, "run", configurations.append)
-    gazebo.main()
-    assert (
-        configurations[0].ekf and configurations[0].headless and configurations[0].rerun
-    )
+    monkeypatch.setattr(sys, "argv", ["robotlab", "--ekf", "--headless"])
+    with pytest.raises(SystemExit) as raised:
+        gazebo.main()
+    assert raised.value.code == 2
 
 
 def test_repeated_drone_option_layers_files_and_records_sources(tmp_path):

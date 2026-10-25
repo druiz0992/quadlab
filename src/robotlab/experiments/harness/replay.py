@@ -54,6 +54,28 @@ def read_log(path: Path) -> tuple[dict[str, Any], Iterator[dict[str, Any]]]:
     return header, events()
 
 
+# Settings removed since recordings were made, dropped on replay (each is
+# listed in replay-summary.json "migrated_settings"): the --ekf live
+# observer's reordering keys (removed 2026-10-25).
+REMOVED_SETTINGS = (
+    ("ekf", "reorder_capacity"),
+    ("ekf", "max_sensor_lag_sim_s"),
+    ("ekf", "sensor_watchdog_wall_s"),
+)
+
+
+def migrate_settings(recorded: Mapping[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """A copy of ``recorded`` without ``REMOVED_SETTINGS``, and the dotted
+    keys that were dropped."""
+    settings = json.loads(json.dumps(recorded))
+    dropped = []
+    for section, key in REMOVED_SETTINGS:
+        if key in settings.get(section, {}):
+            del settings[section][key]
+            dropped.append(f"{section}.{key}")
+    return settings, dropped
+
+
 def replay_settings(
     recorded: Mapping[str, Any], overrides: Mapping[str, Any], output: Path
 ) -> dict[str, Any]:
@@ -93,7 +115,8 @@ def replay(
         raise ValueError(f"{output} is not empty; use a fresh replay output")
     output.mkdir(parents=True, exist_ok=True)
     header, events = read_log(Path(log_path))
-    settings = replay_settings(header["settings"], overrides or {}, output)
+    recorded, migrated = migrate_settings(header["settings"])
+    settings = replay_settings(recorded, overrides or {}, output)
     debug = AlgorithmDebugLog(output / "algorithm-debug.jsonl")
     context = replace(decode(header["context"]), log=debug)
     estimator = build_estimator(settings, context)
@@ -108,6 +131,7 @@ def replay(
         estimator=settings["algorithms"]["estimator"],
         estimator_summary=estimator.summary(),
         algorithm_debug_entries=debug.entries,
+        migrated_settings=migrated,
         **counts,
     )
     (output / "replay-summary.json").write_text(json.dumps(summary, indent=2) + "\n")

@@ -31,6 +31,14 @@ split into `experiments/run.py` (`GazeboConfig`, `run`),
 `robotlab.experiments.algorithms` → `robotlab.experiments.harness.algorithms`.
 Commands, configs, plug-in specs, and outputs are unchanged.
 
+*Migration (2026-10-25, later):* `--ekf` and its live observer
+(`experiments/harness/live_ekf.py`) were removed; run the same EKF with
+`--drone configs/algorithms/ekf_observer.json`. `summary.json` no longer
+has an `ekf` entry (the plug-in's is `algorithms.estimator_summary`), the
+`ekf` keys `reorder_capacity`, `max_sensor_lag_sim_s`, and
+`sensor_watchdog_wall_s` are gone (old recordings still replay), and
+`reference_from_world` moved to `simulation/gazebo/world.py`.
+
 ## Status
 
 | Area | Implemented today |
@@ -41,7 +49,7 @@ Commands, configs, plug-in specs, and outputs are unchanged.
 | Sensor errors | Gazebo native bias/noise (IMU, GPS, barometer, camera, lidar); seeded IMU noise density, bias random walk, turn-on bias, bias instability, scale/misalignment, g-sensitivity, saturation, sample loss and jitter; time-correlated GPS position and velocity error, receiver status, RTK, dual-antenna heading; magnetometer interference, drift, and structure anomalies; ESC telemetry; lidar weather, reflectivity, beam spread, and multiple returns |
 | Vehicle physics | Gazebo motor lag/limits; ESC update rate and resolution; Python battery voltage sag and depletion, rotor ground effect; still-air body drag; centre-of-mass offset, per-rotor spread, per-run randomization of the true vehicle |
 | Disturbances and faults | GPS dropouts/outages/blockout zones, GPS multipath jumps, scheduled IMU faults (bias step, stuck, spikes, scale, noise), native wind with Dryden-style turbulence, accelerometer vibration/clipping |
-| Estimation | GPS/IMU error-state EKF, as a live observer (`--ekf`) or an estimator plug-in |
+| Estimation | GPS/IMU error-state EKF as an estimator plug-in (observer or in the loop); reusable inertial estimator for your own filters (write only predict/update/state) |
 | Algorithm harness | Estimator/controller plug-ins on a typed sensor bus with modelled delivery delay and clock offsets; control on truth or on the estimate; reference missions (step, waypoints/laps, circle, figure-eight, chirp, doublet); estimation and control metrics; truth-based run health verdict (crash, flip, impact, contact, no lift-off); offline estimator replay of recorded runs; plug-in debug channel; batch sweeps with regression baselines ([7 Experiments](7_experiments.md)) |
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
 | Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse; surface friction zones and spawn points for wheeled robots |
@@ -147,7 +155,7 @@ src/robotlab/
 │   │                       #   runner, estimate-driven state), algorithm_debug.py,
 │   │                       #   run_evaluation.py (metrics.json), replay.py and
 │   │                       #   replay_log.py (robotlab-replay), comparison.py,
-│   │                       #   batch.py (robotlab-batch), live_ekf.py (--ekf observer)
+│   │                       #   batch.py (robotlab-batch)
 │   ├── common/             # Shared by several robots: run_setup.py (option checks, world),
 │   │                       #   sensor_pipeline.py (error/fault models → recording → bus),
 │   │                       #   gazebo_helpers.py, mission.py (reference clock),

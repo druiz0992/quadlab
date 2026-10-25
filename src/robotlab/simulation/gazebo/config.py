@@ -633,9 +633,6 @@ DEFAULTS: dict[str, Any] = {
         "initialize_position_from_gps": True,
         # GPS covariance from the fix's own GpsStatus accuracies when present.
         "use_receiver_gps_accuracy": True,
-        "reorder_capacity": 4096,
-        "max_sensor_lag_sim_s": 1.0,
-        "sensor_watchdog_wall_s": 5.0,
     },
     "control": {
         "publish_rate_hz": 50.0,

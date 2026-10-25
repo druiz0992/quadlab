@@ -25,6 +25,7 @@ from .wheeled_vehicle import (
     build_wheeled_vehicle,
     opponent_name,
 )
+from ...core.measurements import GpsReading
 from ...core.track import Track
 from ..wheeled.config import WHEELED_KINDS
 from ..wheeled.ground import GroundModel, surfaces_from_scene, validate_surfaces
@@ -514,3 +515,27 @@ def build_world(
     output.parent.mkdir(parents=True, exist_ok=True)
     ET.ElementTree(root).write(output, encoding="unicode", xml_declaration=True)
     return output
+
+
+def reference_from_world(world: str | Path) -> GpsReading:
+    """WGS84 origin of a generated world's local ENU frame (its
+    ``spherical_coordinates``); raises ValueError for anything but a WGS84,
+    ENU world with zero heading."""
+    coordinates = ET.parse(world).find("./world/spherical_coordinates")
+    if (
+        coordinates is None
+        or coordinates.findtext("surface_model") != "EARTH_WGS84"
+        or coordinates.findtext("world_frame_orientation") != "ENU"
+        or float(coordinates.findtext("heading_deg", "0")) != 0
+    ):
+        raise ValueError("Estimators require a WGS84, ENU world with zero heading")
+
+    def number(tag: str) -> float:
+        text = coordinates.findtext(tag)
+        if text is None:
+            raise ValueError(f"World spherical_coordinates lacks {tag}")
+        return float(text)
+
+    return GpsReading(
+        number("latitude_deg"), number("longitude_deg"), number("elevation")
+    )

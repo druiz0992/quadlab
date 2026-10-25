@@ -77,7 +77,7 @@ document and update the status below.
 | Radio-link delay/loss and failsafes; GNSS jamming/spoofing | Out of scope (user decision, 2026-10-20) |
 | Barometer propeller-wash and airspeed errors | Implemented ([3 Configuration](3_configuration.md#barometer-sensorsbaro)) |
 | GPS blockout zones, multipath jumps, scheduled IMU faults | Implemented ([3 Configuration](3_configuration.md#fault-injection)) |
-| EKF robustness: GPS gate lock-out recovery, fault detection, IMU sample-gap handling | Future (exposed by fault runs, see [5 Estimation](5_estimation.md#live-operation)) |
+| EKF robustness: GPS gate lock-out recovery, fault detection, IMU sample-gap handling | Future (exposed by fault runs, see [5 Estimation](5_estimation.md#running-it)) |
 | Geometry-based (ray-traced) multipath | Not planned |
 | Fixed controller rate, separate position-loop rate, state and command latency | Implemented ([4 Control](4_control.md#controller-timing-and-latency)) |
 | Sensor delivery delay to the EKF | Implemented with the sensor bus; the built-in EKF rejects GPS older than its state (no re-propagation) |

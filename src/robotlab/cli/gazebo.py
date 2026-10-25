@@ -46,11 +46,6 @@ def main():
         default="velocity",
         help="rotor-thrust holds the initial pose unless keyboard input is enabled",
     )
-    parser.add_argument(
-        "--ekf",
-        action="store_true",
-        help="Run GPS/IMU EKF live alongside truth control; record and visualize estimates",
-    )
     parser.add_argument("--target", nargs=3, type=float, default=[3.0, 0.0, 2.0])
     parser.add_argument(
         "--headless",

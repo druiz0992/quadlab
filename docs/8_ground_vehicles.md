@@ -53,8 +53,7 @@ steps per period and four 1 ms tyre substeps, a 125 Hz controller. Against
 56.730 s). Gazebo runs the bursts unthrottled and Python paces the run:
 `simulation.real_time_factor` 1 (the default) is real time (keyboard
 driving), 0 as fast as possible; `summary.json.real_time` reports the
-achieved factor (a slow period is not caught up). Not supported yet: `--world` (saved worlds), `--ekf` (use
-`algorithms.estimator: gps_imu_ekf`), mission references, randomization,
+achieved factor (a slow period is not caught up). Not supported yet: `--world` (saved worlds), mission references, randomization,
 and the multirotor-only features (payload, wind, battery, fixed wing, ground
 effect, optical flow, airspeed); the configuration rejects them.
 

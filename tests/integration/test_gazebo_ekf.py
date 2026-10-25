@@ -1,3 +1,5 @@
+"""The GPS/IMU EKF plug-in in Gazebo (opt-in: ROBOTLAB_TEST_GAZEBO=1)."""
+
 import json
 import os
 
@@ -13,9 +15,12 @@ from robotlab.experiments.run import GazeboConfig, run
     reason="requires native Gazebo physics/transport",
 )
 @pytest.mark.parametrize("noisy", [False, True])
-def test_live_ekf_tracks_moving_drone_with_unaligned_sensor_rates(tmp_path, noisy):
+def test_ekf_tracks_moving_drone_with_unaligned_sensor_rates(tmp_path, noisy):
     config = tmp_path / "drone.json"
-    data = {"sensors": {"imu": {"rate_hz": 160}, "gps": {"rate_hz": 7}}}
+    data: dict = {
+        "sensors": {"imu": {"rate_hz": 160}, "gps": {"rate_hz": 7}},
+        "algorithms": {"estimator": "gps_imu_ekf"},
+    }
     if noisy:
         data["sensors"]["imu"].update(
             {
@@ -44,7 +49,6 @@ def test_live_ekf_tracks_moving_drone_with_unaligned_sensor_rates(tmp_path, nois
             duration=5,
             headless=True,
             control_mode="rotor-thrust",
-            ekf=True,
         ),
         command_source=pilot,
     )
@@ -54,15 +58,16 @@ def test_live_ekf_tracks_moving_drone_with_unaligned_sensor_rates(tmp_path, nois
         for line in (output / "estimates.jsonl").read_text().splitlines()
     ]
     assert summary["completed"]
-    assert summary["ekf"]["gps_updates"] > 20
-    assert summary["ekf"]["rejected_gps_timing"] <= 1  # GPS may precede first IMU
+    ekf = summary["algorithms"]["estimator_summary"]
+    assert ekf["gps_updates"] > 20
+    assert ekf["rejected_gps_timing"] <= 1  # GPS may precede first IMU
     assert not summary["dropped"]
     assert len(estimates) > 400
     assert estimates[0]["position_m"] == [0, 0, 0]  # declared prior, not spawn truth
     assert np.linalg.norm(
         np.array(estimates[-1]["position_m"]) - summary["final_position"]
     ) < (0.8 if noisy else 0.4)
-    assert "ground truth" in summary["ekf"]["control_feedback"]
+    assert "ground truth" in summary["state_source"]  # observer: control flies on truth
 
 
 @pytest.mark.skipif(
@@ -86,6 +91,7 @@ def test_native_wind_and_modeled_gps_outage_recovery(tmp_path):
                         {"time_s": 2, "velocity_enu_mps": [3, 0, 0]},
                     ],
                 },
+                "algorithms": {"estimator": "gps_imu_ekf"},
                 "sensors": {
                     "gps": {
                         "dropout": {
@@ -106,7 +112,6 @@ def test_native_wind_and_modeled_gps_outage_recovery(tmp_path):
             duration=5,
             headless=True,
             control_mode="rotor-thrust",
-            ekf=True,
         ),
         command_source=lambda t: FlightCommand(),
     )
@@ -119,10 +124,8 @@ def test_native_wind_and_modeled_gps_outage_recovery(tmp_path):
         losses["delivered"] + losses["random_drops"] + losses["scheduled_drops"]
         == losses["received"]
     )
-    assert (
-        summary["ekf"]["gps_modeled_drops"]
-        == losses["random_drops"] + losses["scheduled_drops"]
-    )
+    # Lost fixes never reach the estimator: the bus carries only delivered ones.
+    assert summary["sensor_bus"]["delivered"]["gps"] == losses["delivered"]
     assert not summary["dropped"]
     wind_commands = [
         json.loads(line)
@@ -137,7 +140,7 @@ def test_native_wind_and_modeled_gps_outage_recovery(tmp_path):
     ]
     during = [e for e in estimates if 1.2e9 < e["sim_time_ns"] < 2.8e9]
     assert len(during) > 100
-    assert summary["ekf"]["gps_updates"] > 10
+    assert summary["algorithms"]["estimator_summary"]["gps_updates"] > 10
     telemetry = [
         json.loads(line)
         for line in (output / "telemetry.jsonl").read_text().splitlines()

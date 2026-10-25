@@ -747,10 +747,7 @@
     ],
     "gps_gate_squared": 25.0,
     "initialize_position_from_gps": true,
-    "use_receiver_gps_accuracy": true,
-    "reorder_capacity": 4096,
-    "max_sensor_lag_sim_s": 1.0,
-    "sensor_watchdog_wall_s": 5.0
+    "use_receiver_gps_accuracy": true
   },
   "control": {
     "publish_rate_hz": 50.0,

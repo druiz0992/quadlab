@@ -33,7 +33,6 @@ def build_summary(loop: Any, metrics: dict[str, Any]) -> dict[str, Any]:
                 parts.orderer.barrier_timeouts if parts.orderer is not None else 0
             ),
         ),
-        ekf=parts.live_ekf.summary() if parts.live_ekf is not None else None,
         exit_reason=exit_reason,
         control_mode="rotor-thrust" if rotor_mode else "velocity",
         state_source=_state_source(settings, parts.stack),

@@ -45,7 +45,6 @@ GPS_REFERENCE = GpsReading(40.4168, -3.7038, WORLD_ELEVATION_M)
 _GAZEBO_ONLY = (
     ("world", None, "--world"),
     ("edit", False, "--edit"),
-    ("ekf", False, "--ekf"),
     ("render_sensors", False, "--render-sensors"),
 )
 

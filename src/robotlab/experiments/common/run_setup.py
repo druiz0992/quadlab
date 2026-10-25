@@ -54,14 +54,6 @@ def validate_run(
     programmatic pilot drives the run.
     """
     timing, algorithms = settings["control"], settings["algorithms"]
-    if args.ekf:
-        from ..harness.live_ekf import validate_live_settings
-
-        if args.world or args.edit:
-            raise ValueError(
-                "--ekf requires a generated mission; omit --world and --edit"
-            )
-        validate_live_settings(settings)
     rotor_mode = args.keyboard or args.control_mode == "rotor-thrust"
     if args.control_mode not in {"velocity", "rotor-thrust"}:
         raise ValueError("Unknown control mode")
@@ -100,8 +92,6 @@ def validate_run(
 def _validate_algorithms(
     args: Any, algorithms: dict[str, Any], rotor_mode: bool
 ) -> None:
-    if algorithms["estimator"] and args.ekf:
-        raise ValueError("Choose --ekf or algorithms.estimator, not both")
     if algorithms["control_state_source"] == "estimate" and not rotor_mode:
         raise ValueError("Estimate-driven control needs rotor-thrust mode")
     if (algorithms["estimator"] or algorithms["controller"]) and args.world:

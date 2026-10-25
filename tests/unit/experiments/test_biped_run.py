@@ -16,7 +16,6 @@ from robotlab.simulation.mujoco.config import BUILTIN_MODELS, load_biped_config
 @pytest.mark.parametrize(
     "kwargs, message",
     [
-        (dict(ekf=True), "--ekf"),
         (dict(world="saved.sdf"), "--world"),
         (dict(control_mode="rotor-thrust"), "multirotors only"),
         (dict(scene="worlds/yard.json"), "biped.model_path"),
