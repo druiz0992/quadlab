@@ -177,7 +177,9 @@ def test_selection_is_validated():
 
 
 def test_every_bus_stream_can_be_synthesized():
-    assert set(SENSOR_KINDS) == set(STREAMS)
+    # Joint encoders need a jointed (biped) body; the scenarios are rigid
+    # bodies, so that stream comes only from MuJoCo runs (docs/9_bipeds.md).
+    assert set(SENSOR_KINDS) == set(STREAMS) - {"joint_encoders"}
 
 
 def test_more_sensors_leave_other_streams_unchanged():

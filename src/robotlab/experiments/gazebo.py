@@ -60,7 +60,8 @@ class GazeboConfig:
     control_mode: str = "velocity"
     ekf: bool = False
     # Robot family (``--robot``); None: from the config layers (default
-    # multirotor). See simulation/wheeled/config.py.
+    # multirotor). See simulation/wheeled/config.py; ``biped`` runs in
+    # MuJoCo instead (experiments/biped_run.py).
     robot: str | None = None
 
 
@@ -151,7 +152,12 @@ def _ground_height(settings, terrain):
 def _run(args, open_keyboard, command_source):
     from ..simulation.gazebo.actuators import RotorThrustControl
 
-    from ..simulation.gazebo.config import load_drone_config
+    from ..simulation.gazebo.config import load_drone_config, requested_robot_kind
+
+    if requested_robot_kind(args.robot, args.drone) == "biped":
+        from .biped_run import run_biped
+
+        return run_biped(args, command_source is not None)
 
     if args.drone and args.world:
         raise ValueError("--drone/--config requires a generated world; omit --world")

@@ -1,0 +1,68 @@
+<!--
+  RobotLab's built-in test biped (MJCF), authored for this repository.
+
+  A statically stable two-legged body for tests and for trying the biped
+  backend without an external robot checkout: a box trunk on two
+  three-joint legs (hip, knee, ankle pitch about body +Y) with wide box
+  feet, so it stands with every joint held at zero. Not a model of a real
+  robot. Frames: z-up world, body +X forward, +Y left (docs/1_overview.md).
+  Units: m, kg, rad; position actuators take target angles (rad).
+-->
+<mujoco model="robotlab_test_biped">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <default>
+    <joint type="hinge" axis="0 1 0" damping="0.05" armature="0.002" range="-1.5 1.5"/>
+    <position kp="6.0" kv="0.1" forcerange="-3 3" ctrlrange="-1.5 1.5"/>
+    <geom friction="0.8 0.02 0.001" rgba="0.75 0.72 0.65 1"/>
+  </default>
+
+  <worldbody>
+    <geom name="floor" type="plane" size="0 0 0.05" rgba="0.3 0.35 0.4 1"/>
+    <body name="trunk" pos="0 0 0.167">
+      <freejoint name="trunk_freejoint"/>
+      <geom name="trunk" type="box" size="0.05 0.06 0.03" mass="0.4"/>
+      <site name="imu" pos="0 0 0.01"/>
+      <body name="left_thigh" pos="0 0.045 -0.03">
+        <joint name="left_hip_pitch"/>
+        <geom type="capsule" fromto="0 0 0 0 0 -0.06" size="0.012" mass="0.05"/>
+        <body name="left_shin" pos="0 0 -0.06">
+          <joint name="left_knee"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.06" size="0.011" mass="0.04"/>
+          <body name="left_foot" pos="0 0 -0.06">
+            <joint name="left_ankle_pitch"/>
+            <geom name="left_foot" type="box" pos="0.01 0 -0.01" size="0.05 0.025 0.006" mass="0.03"/>
+          </body>
+        </body>
+      </body>
+      <body name="right_thigh" pos="0 -0.045 -0.03">
+        <joint name="right_hip_pitch"/>
+        <geom type="capsule" fromto="0 0 0 0 0 -0.06" size="0.012" mass="0.05"/>
+        <body name="right_shin" pos="0 0 -0.06">
+          <joint name="right_knee"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.06" size="0.011" mass="0.04"/>
+          <body name="right_foot" pos="0 0 -0.06">
+            <joint name="right_ankle_pitch"/>
+            <geom name="right_foot" type="box" pos="0.01 0 -0.01" size="0.05 0.025 0.006" mass="0.03"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="left_hip_pitch" joint="left_hip_pitch"/>
+    <position name="left_knee" joint="left_knee"/>
+    <position name="left_ankle_pitch" joint="left_ankle_pitch"/>
+    <position name="right_hip_pitch" joint="right_hip_pitch"/>
+    <position name="right_knee" joint="right_knee"/>
+    <position name="right_ankle_pitch" joint="right_ankle_pitch"/>
+  </actuator>
+
+  <keyframe>
+    <!-- Feet bottoms start 1 mm above the floor:
+         0.167 - 0.03 (hip) - 0.12 (legs) - 0.016 (foot) = 0.001 m. -->
+    <key name="STAND" qpos="0 0 0.167 1 0 0 0  0 0 0  0 0 0" ctrl="0 0 0 0 0 0"/>
+  </keyframe>
+</mujoco>

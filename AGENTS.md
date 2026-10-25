@@ -52,8 +52,9 @@ in [README.md](README.md); design, behavior, and reference material are in
 - Sensor models and message decoding go in `sensors`; simulator adapters and
   SDF construction in `simulation`; orchestration in `experiments`; plotting,
   recording, and UI in `visualization`. Keep `cli` thin and `core` small.
-- Preserve the separate step-based (RotorPy) and asynchronous (Gazebo)
-  execution models; do not force them behind one interface.
+- Preserve the separate step-based (RotorPy, MuJoCo) and asynchronous
+  (Gazebo) execution models; do not force them behind one interface.
+  Bipeds run only in MuJoCo, every other robot only in Gazebo.
 - Keep ground-truth control and estimator initialization explicit. **Never
   give an estimator hidden access to simulator truth.**
 
@@ -95,6 +96,8 @@ in [README.md](README.md); design, behavior, and reference material are in
     components. Tests needing Gazebo or a display are opt-in through
     `ROBOTLAB_TEST_GAZEBO=1` / `ROBOTLAB_TEST_GUI=1` and must skip otherwise;
     missions of several minutes also need `ROBOTLAB_TEST_GAZEBO_SLOW=1`.
+    MuJoCo biped tests run in CI with the built-in test biped; the
+    Microduck test needs `ROBOTLAB_MICRODUCK_MODEL` (its model is external).
   - **Gazebo regression tests** in `tests/integration/test_gazebo_regression.py`
     pin verified simulator numbers in lockstep. Add one when you verify a new
     Gazebo behavior, and run the suite after changing the mission loop,
@@ -133,6 +136,7 @@ Documentation must match the code at the end of every change.
 | `docs/6_roadmap.md` | Proposed APIs and future work | Plans change or a proposal is implemented |
 | `docs/7_experiments.md` | Algorithm plug-ins, sensor bus, missions, metrics, batch runs | The harness or its contracts change |
 | `docs/8_ground_vehicles.md` | Wheeled robots: model, presets, settings, controllers, outputs | Wheeled-robot behavior or contracts change |
+| `docs/9_bipeds.md` | Bipeds in MuJoCo: models, settings, timing, outputs | Biped behavior or contracts change |
 
 When a proposal in the roadmap is implemented, move its description into the
 relevant numbered doc. Do not create new top-level docs; extend these, or add
@@ -144,7 +148,9 @@ a new numbered file if a topic truly needs one. Keep links relative and valid.
   arrays in measurement samples). Gazebo bindings (`gz.transport13`,
   `gz.msgs10`) must match the system interpreter: currently Python 3.12
   from ROS Jazzy (`source /opt/ros/jazzy/setup.bash`).
-- RotorPy and Rerun are pinned in `pyproject.toml`; change pins deliberately.
+- RotorPy, Rerun, and MuJoCo are pinned in `pyproject.toml`; change pins
+  deliberately. Never copy external robot models with restrictive licences
+  (e.g. the Microduck's CC BY-NC-SA meshes) into the repository.
 - `gazebo_plugins/` holds C++ gz-sim system plugins (currently the lockstep
   barrier), built with `robotlab-build-plugins` into `build/` (never
   committed). Python must keep working without them (fallback and a clear

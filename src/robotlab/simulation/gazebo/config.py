@@ -19,6 +19,7 @@ import numpy as np
 from ...core.vehicle import DroneProperties
 from ..wheeled.config import (
     GROUND_VEHICLE_DEFAULTS,
+    MUJOCO_KINDS,
     ROBOT_KINDS,
     WHEELED_KINDS,
     preset_layer,
@@ -1561,22 +1562,41 @@ def _lookup(tree: dict, dotted: str):
     return tree
 
 
-def _robot_kind(robot: str | None, layers: list[tuple[str, dict]]) -> str:
+def _robot_kind(
+    robot: str | None,
+    layers: list[tuple[str, dict]],
+    allowed: tuple[str, ...] = ROBOT_KINDS,
+) -> str:
     """Robot kind from ``--robot`` and the layers' ``robot.kind`` (the last
-    layer that sets it); they must agree. Default: multirotor."""
+    layer that sets it); they must agree and be ``allowed``. Default:
+    multirotor."""
     kinds = [
         (source, layer["robot"]["kind"])
         for source, layer in layers
         if isinstance(layer.get("robot"), dict) and "kind" in layer["robot"]
     ]
     kind = kinds[-1][1] if kinds else (robot or "multirotor")
-    if kind not in ROBOT_KINDS:
-        raise ValueError(f"robot.kind must be one of {', '.join(ROBOT_KINDS)}")
+    if kind in MUJOCO_KINDS and allowed == ROBOT_KINDS:
+        raise ValueError(
+            f"robot.kind {kind!r} runs in MuJoCo: use robotlab --robot {kind} "
+            "(settings: simulation/mujoco/config.py), not a Gazebo/batch config"
+        )
+    if kind not in allowed:
+        raise ValueError(f"robot.kind must be one of {', '.join(allowed)}")
     if robot is not None and kind != robot:
         raise ValueError(
             f"--robot {robot} conflicts with robot.kind {kind!r} in {kinds[-1][0]}"
         )
     return kind
+
+
+def requested_robot_kind(robot: str | None, paths: ConfigPaths = None) -> str:
+    """Robot kind a run asks for (``--robot`` and the layers' ``robot.kind``),
+    including the MuJoCo kinds, without validating anything else; lets the
+    CLI pick the simulator before loading settings. Raises ValueError when
+    they conflict or name an unknown kind."""
+    layers = [layer for path in _as_paths(paths) for layer in _expand_layers(path)]
+    return _robot_kind(robot, layers, ROBOT_KINDS + MUJOCO_KINDS)
 
 
 def load_drone_config(
@@ -1604,7 +1624,7 @@ def load_drone_config(
     applies before every file layer.
     """
     layers = [layer for path in _as_paths(paths) for layer in _expand_layers(path)]
-    if robot is not None and robot not in ROBOT_KINDS:
+    if robot is not None and robot not in ROBOT_KINDS + MUJOCO_KINDS:
         raise ValueError(f"--robot must be one of {', '.join(ROBOT_KINDS)}")
     kind = _robot_kind(robot, layers)
     if kind != "multirotor":

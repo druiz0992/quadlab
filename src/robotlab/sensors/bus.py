@@ -44,6 +44,7 @@ from ..core.measurements import (
 )
 from .airspeed import AirspeedReading
 from .battery_monitor import BatteryReading
+from .joint_encoders import JointStateReading
 from .optical_flow import OpticalFlowReading
 from .streams import Channel, Publisher
 from .wheel_encoders import EncoderReading
@@ -63,6 +64,7 @@ STREAMS: dict[str, tuple[type, str]] = {
     "lidar": (LidarPoints, "drone/body"),
     "camera": (CameraFrame, "drone/camera"),
     "wheel_encoders": (EncoderReading, "vehicle/wheels"),
+    "joint_encoders": (JointStateReading, "biped/joints"),
 }
 PRIORITY = {kind: index for index, kind in enumerate(STREAMS)}
 

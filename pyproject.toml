@@ -12,6 +12,8 @@ dependencies = ["numpy>=1.24", "scipy>=1.18", "matplotlib>=3.7", "rotorpy==3.0.0
 [project.optional-dependencies]
 dev = ["pytest>=8", "black>=24", "mypy>=1.10"]
 gazebo = ["rerun-sdk==0.24.1", "protobuf>=4.25,<6"]
+# MuJoCo physics for bipeds (simulation/mujoco/, docs/9_bipeds.md).
+mujoco = ["mujoco==3.17.0"]
 
 [project.scripts]
 robotlab = "robotlab.cli.gazebo:main"
@@ -25,6 +27,9 @@ robotlab-build-plugins = "robotlab.cli.build_plugins:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"robotlab.simulation.mujoco" = ["assets/*.xml"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
@@ -36,8 +41,13 @@ mypy_path = "src"
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-# No type information: ROS-provided Gazebo bindings, RotorPy, and SciPy
-# (typed via the separate scipy-stubs package, not a dependency).
-module = ["gz.*", "rotorpy.*", "scipy.*"]
+# No type information: ROS-provided Gazebo bindings, RotorPy, MuJoCo, and
+# SciPy (typed via the separate scipy-stubs package, not a dependency).
+module = ["gz.*", "rotorpy.*", "mujoco.*", "scipy.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# MuJoCo ships only partial type information; treat its module as Any.
+module = ["mujoco", "mujoco.*"]
+follow_imports = "skip"
 

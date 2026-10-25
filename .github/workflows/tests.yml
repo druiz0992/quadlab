@@ -3,7 +3,8 @@
 #
 # Runs without Gazebo, ROS, or a display: the opt-in Gazebo and GUI suites
 # (ROBOTLAB_TEST_GAZEBO=1, ROBOTLAB_TEST_GUI=1) skip themselves here and
-# stay local (see AGENTS.md section 6). Python 3.12 matches the ROS Jazzy
+# stay local (see AGENTS.md section 6). MuJoCo biped tests run here with
+# the built-in test biped; the Microduck test needs ROBOTLAB_MICRODUCK_MODEL. Python 3.12 matches the ROS Jazzy
 # interpreter the Gazebo bindings need.
 name: tests
 
@@ -29,10 +30,11 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install
         # black and mypy are pinned to the local versions so results cannot
-        # drift; the gazebo extra (Rerun) lets mypy check the recorder too.
+        # drift; the gazebo extra (Rerun) lets mypy check the recorder too,
+        # and the mujoco extra (a CPU wheel) runs the biped missions.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev,gazebo]" "black==26.10.1" "mypy==2.4.0"
+          python -m pip install -e ".[dev,gazebo,mujoco]" "black==26.10.1" "mypy==2.4.0"
       - name: Formatting (black)
         run: black --check src tests
       - name: Static types (mypy)
@@ -42,4 +44,6 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: python -m pytest -q
       - name: World generation
-        run: python -m robotlab --generate-only --output "$RUNNER_TEMP/robotlab-world-check"
+        run: |
+          python -m robotlab --generate-only --output "$RUNNER_TEMP/robotlab-world-check"
+          python -m robotlab --robot biped --generate-only --output "$RUNNER_TEMP/robotlab-biped-check"

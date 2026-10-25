@@ -1,13 +1,14 @@
 # 1. Overview and architecture
 
 RobotLab provides inspectable robot experiments for learning state
-estimation and control: multirotors and a quadplane, and wheeled robots
-(rover, race car, tractor; [8 Ground vehicles](8_ground_vehicles.md)). This document covers purpose, current status, code
+estimation and control: multirotors and a quadplane, wheeled robots
+(rover, race car, tractor; [8 Ground vehicles](8_ground_vehicles.md)), and
+bipeds in MuJoCo ([9 Bipeds](9_bipeds.md)). This document covers purpose, current status, code
 organization, and shared conventions. Following documents:
 [2 Simulation](2_simulation.md) · [3 Configuration](3_configuration.md) ·
 [4 Control](4_control.md) · [5 Estimation](5_estimation.md) ·
 [6 Roadmap](6_roadmap.md) · [7 Experiments](7_experiments.md) ·
-[8 Ground vehicles](8_ground_vehicles.md).
+[8 Ground vehicles](8_ground_vehicles.md) · [9 Bipeds](9_bipeds.md).
 
 *Migration (2026-10-22):* the project was renamed from DroneLab to RobotLab
 with no compatibility alias, in preparation for ground vehicles. The Python
@@ -35,6 +36,7 @@ install -e .`.
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
 | Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse; surface friction zones and spawn points for wheeled robots |
 | Ground vehicles | `--robot rover/car/tractor`: ray-cast suspension, transient Magic Formula tyres, drive/brake/steering actuators, aerodynamics in Python; wheel encoders; keyboard driver; wheeled controller plug-ins ([8 Ground vehicles](8_ground_vehicles.md)) |
+| Bipeds | `--robot biped` in MuJoCo: MJCF models (built-in test biped, or Pollen Robotics' Microduck from a local checkout), held keyframe targets, IMU and joint encoders on the sensor bus, fall health check ([9 Bipeds](9_bipeds.md)); no controllers yet |
 
 **Not implemented:** the full Gazebo session API (algorithms run serially
 on the mission thread, not in worker threads), obstacle avoidance,
@@ -101,6 +103,8 @@ src/robotlab/
 │   ├── esc.py              # ESC update rate and command resolution
 │   ├── randomization.py    # Per-run true vehicle vs nominal (model mismatch)
 │   ├── backends/           # Retained RotorPy/reference library adapters (no CLI)
+│   ├── mujoco/             # Bipeds: settings (config.py), MJCF scene loading and edits
+│   │                       #   (scene.py), truth and IMU readout (state.py), test biped
 │   ├── wheeled/            # Wheeled robots: presets and validation (config.py), tyres,
 │                           #   ground ray casts and surfaces, actuators, the vehicle model,
 │                           #   spawn poses, reference rigid-body integrator
@@ -121,6 +125,8 @@ src/robotlab/
 │       └── messages.py     # Gazebo timestamp/vector adapters
 ├── experiments/
 │   ├── gazebo.py           # Compose a Gazebo mission (run entry point, wiring)
+│   ├── biped_run.py        # Compose a MuJoCo biped mission (--robot biped)
+│   ├── biped_loop.py       # Step-based biped loop: sensors, control, recording
 │   ├── run_setup.py        # Option checks, true vehicle draw, world and resolved config
 │   ├── mission_loop.py     # The running mission: message loop, truth step, shutdown
 │   ├── sensor_pipeline.py  # Error/fault models → recording → sensor bus; synthetic sensors
@@ -199,8 +205,9 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
   These are simulator features, not RobotLab Python algorithms.
 - The `gazebo_rerun` adapter deliberately understands Gazebo messages but
   does not control, plan, or estimate.
-- There is no shared simulator interface for Gazebo and RotorPy: one is
-  asynchronous transport, the other explicit stepping. Add shared types to
+- There is no shared simulator interface for Gazebo, RotorPy, and MuJoCo:
+  Gazebo is asynchronous transport, the others explicit stepping. Bipeds run
+  only in MuJoCo, every other robot only in Gazebo. Add shared types to
   `core` only when real integrations require them.
 - Optional imports (Gazebo bindings, Rerun, Tk) are deferred, so world
   generation and numerical tests work without them.
@@ -252,6 +259,7 @@ must be an explicit, recorded experiment decision.
 Base: NumPy, SciPy, Matplotlib, and pinned RotorPy (used only by retained
 backend library code). The `gazebo` extra adds pinned `rerun-sdk==0.24.1` and
 protobuf. The `gz` executable and `gz.transport13`/`gz.msgs10` bindings are
-system prerequisites (ROS Jazzy, Python 3.12 here). The `dev` extra adds
+system prerequisites (ROS Jazzy, Python 3.12 here). The `mujoco` extra adds
+pinned `mujoco==3.17.0` (CPU wheel) for bipeds. The `dev` extra adds
 pytest and black.
 

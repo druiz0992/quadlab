@@ -23,9 +23,10 @@ def main():
     )
     parser.add_argument(
         "--robot",
-        choices=["multirotor", "rover", "car", "tractor"],
+        choices=["multirotor", "rover", "car", "tractor", "biped"],
         help="Robot type (default: multirotor, or robot.kind from --config); "
-        "rover, car, and tractor load that vehicle's preset",
+        "rover, car, and tractor load that vehicle's preset; biped runs in "
+        "MuJoCo (biped.model_path; default: the built-in test biped)",
     )
     parser.add_argument("--output", default="outputs/gazebo")
     parser.add_argument(

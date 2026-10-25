@@ -115,11 +115,12 @@ def test_disturbance_scenario_matches_its_building_blocks():
 def test_all_example_configs_load_and_combine():
     from pathlib import Path
 
-    # Experiment files (robotlab-batch) are not drone layers; tested separately.
+    # Experiment files (robotlab-batch) and MuJoCo biped settings are not
+    # drone layers; tested separately.
     paths = sorted(
         str(p)
         for p in Path("configs").rglob("*.json")
-        if p.parent.name != "experiments"
+        if p.parent.name not in ("experiments", "bipeds")
     )
     assert len(paths) >= 15
     # Layers may depend on others; the battery monitor needs a battery.

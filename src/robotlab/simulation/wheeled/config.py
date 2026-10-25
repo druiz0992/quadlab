@@ -29,6 +29,9 @@ from ...core.wheeled_vehicle import STEERING_LAYOUTS, WheeledProperties
 
 ROBOT_KINDS = ("multirotor", "rover", "car", "tractor")
 WHEELED_KINDS = ("rover", "car", "tractor")
+# Robot kinds simulated in MuJoCo instead of Gazebo (simulation/mujoco/);
+# their settings load with load_biped_config, not load_drone_config.
+MUJOCO_KINDS = ("biped",)
 
 WHEEL_KEYS = {"name", "position_m", "steered", "driven", "braked"}
 

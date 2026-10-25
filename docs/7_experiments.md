@@ -354,6 +354,7 @@ and sensor-fusion mistakes, not tuning.
 | `lidar` | `LidarPoints` (body-axis points, reflectivity) | `drone/body` |
 | `camera` | `CameraFrame` (RGB) | `drone/camera` |
 | `wheel_encoders` | `EncoderReading` (wheeled robots: counts, wheel speeds, steering angles) | `vehicle/wheels` |
+| `joint_encoders` | `JointStateReading` (MuJoCo bipeds: counts, joint angles and velocities; [9 Bipeds](9_bipeds.md)) | `biped/joints` |
 
 Measurements enter after the error and fault models; a dropped GPS fix never
 enters. The bus is created when an estimator is configured.

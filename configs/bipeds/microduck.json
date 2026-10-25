@@ -1,0 +1,8 @@
+{
+  "robot": {"kind": "biped"},
+  "biped": {
+    "model_path": "../microduck_rl/src/mjlab_microduck/robot/microduck/scene.xml",
+    "initial_keyframe": "STAND",
+    "imu_site": "imu"
+  }
+}

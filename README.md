@@ -30,7 +30,7 @@ not install Gazebo. Keyboard control needs Tk (`python3-tk`) and a desktop.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev,gazebo]'   # use '.[dev]' for tests/world generation only
+python -m pip install -e '.[dev,gazebo,mujoco]'   # '.[dev]' for tests/world generation only; mujoco: bipeds
 ```
 
 Rerun the install after updating the checkout to refresh console entry points.
@@ -227,6 +227,11 @@ robotlab --render-sensors --drone configs/sensors/lidar_3d.json --scene worlds/t
 robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json --output outputs/rover-terrain
 # Your wheeled controller: algorithms.controller in a config layer; start from
 # control/wheeled_template.py and check it with check_wheeled_controller
+
+# Bipeds in MuJoCo (no Gazebo): built-in test biped, or the Microduck from a
+# microduck_rl checkout beside this repository (docs/9_bipeds.md)
+robotlab --robot biped --duration 10 --output outputs/biped
+robotlab --config configs/bipeds/microduck.json --duration 10 --output outputs/duck
 
 # Worlds: generate only, edit paused in Gazebo, fly a saved world
 robotlab --generate-only --output outputs/world-preview
