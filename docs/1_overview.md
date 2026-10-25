@@ -57,12 +57,13 @@ src/robotlab/
 │                           #   magnetometer errors, synthetic optical flow,
 │                           #   sensor bus (bus.py), IMU imperfections, GPS receiver
 │                           #   (velocity, status, RTK, heading), ESC telemetry,
-│                           #   magnetic anomalies, lidar returns, wheel and joint encoders
+│                           #   magnetic anomalies, lidar returns, wheel and joint encoders,
+│                           #   applying IMU/magnetometer calibrations (calibration.py)
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
 │   ├── template.py         # Full estimator plug-in template (complementary filter)
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
-│   ├── imu_calibration.py  # Static IMU fit and calibration driver
+│   ├── imu_calibration.py  # Static IMU calibration fit
 │   ├── filter/             # Reusable for any predict/update filter: node (timing, held
 │   │                       #   driving readings), measurement conversion, the `filter`
 │   │                       #   plug-in, example filters (template.py, wheel_odometry.py)

@@ -435,7 +435,7 @@ squares on static samples:
 The temperature slopes are only identifiable when temperatures vary;
 otherwise they are zero.
 
-**3. Use.** f̂ = A⁻¹(a − b_a − k_a ΔT) and
+**3. Use** (`sensors/calibration.py`). f̂ = A⁻¹(a − b_a − k_a ΔT) and
 ω̂ = ω − b_g − k_g ΔT − G f̂ − b_startup:
 
 | Key | Units | Meaning |
@@ -1320,7 +1320,7 @@ robotlab ... --drone configs/sensors/magnetometer.json --drone outputs/magcal/ma
 - **Interference:** a per-axis linear regression of readings on current or
   thrust.
 
-**3. Use.** Corrected field b̂ = C (m − o − k_I·I − k_T·T):
+**3. Use** (`sensors/calibration.py`). Corrected field b̂ = C (m − o − k_I·I − k_T·T):
 
 | Key | Units | Meaning |
 | --- | --- | --- |

@@ -37,11 +37,11 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from ...estimation.magnetometer_calibration import (
-    MagnetometerCalibration,
     fit_ellipsoid,
     fit_interference,
     heading_error_deg,
 )
+from ...sensors.calibration import MagnetometerCalibration
 from ...sensors.battery_monitor import BatteryMonitor
 from ...sensors.magnetometer import MagnetometerErrorModel
 from ...simulation.gazebo.config import (

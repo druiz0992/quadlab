@@ -30,8 +30,11 @@ from scipy.spatial.transform import Rotation
 
 from ...control.timing import DelayLine
 from ...core.measurements import CameraFrame, LidarPoints
-from ...estimation.imu_calibration import ImuCalibration, ImuCalibrationDriver
-from ...estimation.magnetometer_calibration import MagnetometerCalibration
+from ...sensors.calibration import (
+    ImuCalibration,
+    ImuCalibrationDriver,
+    MagnetometerCalibration,
+)
 from ...evaluation.imu_bias import EffectiveImuBias
 from ...sensors.airspeed import AirspeedSensor
 from ...sensors.barometer import BaroErrorModel

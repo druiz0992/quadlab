@@ -9,7 +9,6 @@ from scipy.spatial.transform import Rotation
 
 from robotlab.core.measurements import GpsReading, MagnetometerReading
 from robotlab.estimation.magnetometer_calibration import (
-    MagnetometerCalibration,
     fit_ellipsoid,
     fit_interference,
     heading_error_deg,
@@ -57,27 +56,6 @@ def test_interference_regression():
     np.testing.assert_allclose(intercept, [10, 20, 30])
     with pytest.raises(ValueError):
         fit_interference(raw, np.ones(50))
-
-
-def test_calibration_applies_compensation_and_checks_plausibility():
-    cal = MagnetometerCalibration(
-        HARD,
-        np.linalg.inv(SOFT),
-        np.array([0.4, 0, 0]),
-        np.zeros(3),
-        45.1,
-        55.4,
-        0.0,
-        5.0,
-        2.0,
-    )
-    true = Rotation.from_euler("z", 30, degrees=True).inv().apply(EARTH)
-    raw = SOFT @ true + HARD + np.array([0.4, 0, 0]) * 20.0
-    corrected = cal.apply(raw, current_a=20.0)
-    np.testing.assert_allclose(corrected, true, atol=1e-9)
-    assert cal.plausible(corrected) and not cal.plausible(corrected * 1.3)
-    again = MagnetometerCalibration.from_config(json.loads(json.dumps(cal.to_config())))
-    np.testing.assert_allclose(again.apply(raw, 20.0), corrected)
 
 
 def test_heading_error_in_world_axes():

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from robotlab.estimation.imu_calibration import ImuCalibration, ImuCalibrationDriver
+from robotlab.estimation.imu_calibration import fit_static
 from robotlab.evaluation.imu_bias import EffectiveImuBias
 from robotlab.experiments.common.sensor_pipeline import calibration_warnings
 from robotlab.experiments.calibration.imu_calibration import (
@@ -46,7 +46,7 @@ def static_data(temperatures=(5.0, 25.0, 45.0), noise=0.0):
 
 def test_static_fit_recovers_scale_offsets_temperature_and_g_sensitivity():
     accel, gyro, forces, temps = static_data()
-    cal = ImuCalibration.fit_static(accel, gyro, forces, temps)
+    cal = fit_static(accel, gyro, forces, temps)
     np.testing.assert_allclose(cal.accel_correction @ A, np.eye(3), atol=1e-9)
     np.testing.assert_allclose(cal.accel_offset_mps2, B_A, atol=1e-9)
     np.testing.assert_allclose(cal.accel_temperature_mps2_per_c, K_A, atol=1e-9)
@@ -59,32 +59,15 @@ def test_static_fit_recovers_scale_offsets_temperature_and_g_sensitivity():
 
 def test_single_temperature_reports_no_slope_and_needs_spanning_poses():
     accel, gyro, forces, temps = static_data(temperatures=(25.0,))
-    cal = ImuCalibration.fit_static(accel, gyro, forces, temps)
+    cal = fit_static(accel, gyro, forces, temps)
     assert not cal.accel_temperature_mps2_per_c.any()
     with pytest.raises(ValueError, match="spanning"):
-        ImuCalibration.fit_static(accel[:2], gyro[:2], forces[:2], temps[:2])
-
-
-def test_driver_learns_startup_gyro_bias_then_subtracts_it():
-    accel, gyro, forces, temps = static_data()
-    cal = ImuCalibration.fit_static(accel, gyro, forces, temps).with_startup(0.5)
-    driver = ImuCalibrationDriver(cal)
-    turn_on = np.array([0.002, -0.001, 0.0005])  # changes at every power-up
-    for i in range(101):  # 1 s at 100 Hz, still and level
-        driver.apply(
-            A @ [0, 0, 9.81] + B_A, G @ [0, 0, 9.81] + B_G + turn_on, 25.0, i * 10 * MS
-        )
-    assert driver.ready
-    _, rate = driver.apply(
-        A @ [0, 0, 9.81] + B_A, G @ [0, 0, 9.81] + B_G + turn_on, 25.0, 2000 * MS
-    )
-    np.testing.assert_allclose(rate, 0, atol=1e-12)
-    assert ImuCalibrationDriver(cal.with_startup(0.0)).ready
+        fit_static(accel[:2], gyro[:2], forces[:2], temps[:2])
 
 
 def test_config_round_trip_and_staleness_fingerprints(tmp_path):
     accel, gyro, forces, temps = static_data()
-    section = ImuCalibration.fit_static(accel, gyro, forces, temps).to_config()
+    section = fit_static(accel, gyro, forces, temps).to_config()
     sensors = load_drone_config().data["sensors"]
     section["fingerprint"] = sensor_fingerprint(sensors, "imu")
     path = tmp_path / "imu-calibration.json"

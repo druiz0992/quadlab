@@ -12,7 +12,7 @@ The simulated counterpart of an autopilot's accelerometer calibration
 3. Readings pass through the mission's IMU models: imperfections, Allan
    errors, temperature drift, and saturation (motors are off, so vibration
    and scheduled faults are left out).
-4. ``ImuCalibration.fit_static`` fits accelerometer scale/misalignment,
+4. ``fit_static`` (estimation/imu_calibration.py) fits accelerometer scale/misalignment,
    offsets, gyro g-sensitivity, and temperature slopes from the known
    specific force per pose (nominal mount, as an operator knows it).
 
@@ -43,7 +43,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from ...estimation.imu_calibration import ImuCalibration
+from ...estimation.imu_calibration import fit_static
 from ...sensors.imu_errors import ImuErrorModel
 from ...sensors.imu_imperfections import ImuImperfections, ImuSaturation
 from ...sensors.imu_temperature import ImuTemperatureModel
@@ -162,7 +162,7 @@ def run_imu_calibration(
         data = _collect(session, pipeline, poses, ambients, mount, samples)
     finally:
         session.close()
-    calibration = ImuCalibration.fit_static(
+    calibration = fit_static(
         data["accel"], data["gyro"], data["force"], data["temperature"]
     ).with_startup(startup_gyro_s)
     evaluation = _evaluate(data, calibration)
