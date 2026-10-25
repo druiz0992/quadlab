@@ -311,6 +311,31 @@ saved, Gazebo is stopped, and the exit status is 130 or 143; a failed run
 exits 1. Gazebo also stops if the Python process is killed outright
 (Linux, via `setpriv`). Details: [2 Simulation](docs/2_simulation.md#stopping-and-cleanup).
 
+## Training biped policies (external, optional)
+
+RobotLab only runs policies; training happens in Pollen Robotics'
+[microduck_rl](https://github.com/pollen-robotics/microduck_rl), cloned
+beside this repository. It needs a CUDA GPU (or `--hf-jobs` on Hugging
+Face) and [uv](https://docs.astral.sh/uv/):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh  # uv in ~/.local/bin
+git clone https://github.com/pollen-robotics/microduck_rl ../microduck_rl
+cd ../microduck_rl && UV_HTTP_TIMEOUT=600 ~/.local/bin/uv sync
+```
+
+`uv sync` downloads PyTorch with its NVIDIA CUDA libraries, MuJoCo Warp,
+mjlab, and BAM (from GitHub) through uv's cache (`~/.cache/uv`, about
+7 GB while downloading) and installs them into `../microduck_rl/.venv`
+(7.8 GB measured 2026-10-25; the cache shrinks to ~0.1 GB afterwards),
+separate from RobotLab's `.venv`. To remove it all: delete `../microduck_rl/.venv` and run
+`~/.local/bin/uv cache clean`. On a 4 GB laptop GPU, train with fewer
+parallel robots than Pollen's 4096 (`--env.scene.num-envs`): on an RTX
+3050 Ti Laptop (4 GB), measured 2026-10-25 on `Mjlab-Velocity-Flat-MicroDuck`,
+4096 ran out of memory, 2048 peaked at 2.5 GB and took 3.1 s per training
+iteration, 1024 1.3 GB and 1.9 s; log with `--agent.logger tensorboard`
+to avoid the default Weights & Biases account.
+
 ## Gazebo plugin (lockstep barrier)
 
 Lockstep runs are deterministic only if Gazebo reads each period's commands
