@@ -25,7 +25,8 @@ document and update the status below.
 | Procedural textures (`color`, `texture`, `ground_texture`, visual-only markings); textured yard with a lidar-degenerate corridor | Implemented ([2 Simulation](2_simulation.md#json-scenes)) |
 | MuJoCo biped backend core (`--robot biped`, MJCF loading, IMU and joint encoders on the bus, fall health) | Implemented ([9 Bipeds](9_bipeds.md)) |
 | Biped joint-level controller contract, template, contract kit | Implemented ([9 Bipeds](9_bipeds.md#controllers)) |
-| Microduck ONNX policies, ToF/camera/Rerun, Gymnasium environment | Planned ([Bipeds](#bipeds)) |
+| Microduck ONNX policies, keyboard walking, Rerun view | Implemented ([9 Bipeds](9_bipeds.md#pollens-policies-onnx_policy)) |
+| Biped ToF/camera, XL330 servo model, Gymnasium environment | Planned ([Bipeds](#bipeds)) |
 | EKF fusion of magnetometer (heading), rangefinder and optical flow (GPS-denied) | Future, with EKF robustness work |
 | Magnetometer calibration (hard/soft iron, current/throttle compensation; automated procedure; calibration for filters) | Implemented ([3 Configuration](3_configuration.md#magnetometer-calibration-sensorsmagnetometercalibration)) |
 | Online (in-filter) magnetometer offset estimation to follow drift | Future, with EKF robustness work |
@@ -290,13 +291,13 @@ before claiming autonomous laps or realistic wind response.
 Approved plan (2026-10-25) after the MuJoCo backend core ([9 Bipeds](9_bipeds.md)):
 
 1. **Controller contract:** implemented ([9 Bipeds](9_bipeds.md#controllers)).
-2. **Pollen's policies:** run the Microduck's ONNX policies (61 observations,
-   14 actions, 50 Hz; optional `onnxruntime`) with keyboard velocity
-   commands. Matching their observation layout and servo response is the
-   main risk: they were trained with BAM actuator models, not MuJoCo
-   position actuators.
-3. **Sensors and viewing:** the 8×8 time-of-flight sensor, the head camera
-   (MuJoCo rendering), a Rerun layout, the MuJoCo viewer as an option.
+2. **Pollen's policies:** implemented with keyboard walking and a Rerun
+   view ([9 Bipeds](9_bipeds.md#pollens-policies-onnx_policy)); walking is
+   about a third of the commanded speed on MuJoCo position actuators.
+   Next: a Python XL330 servo model (back-EMF, voltage limit, friction) to
+   compare with, and an attitude filter so `sensors` mode can stand.
+3. **Sensors:** the 8×8 time-of-flight sensor and the head camera (MuJoCo
+   rendering).
 4. **RL:** a Gymnasium environment in `rl` over the same loop.
 
 ## Ground vehicles

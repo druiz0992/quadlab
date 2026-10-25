@@ -60,6 +60,14 @@ BIPED_DEFAULTS: dict[str, Any] = {
         "control_rate_hz": 50.0,
         # telemetry.jsonl rate; the initial and final states are always kept.
         "record_rate_hz": 50.0,
+        # --keyboard walking (control/legged_keyboard.py): command maxima and
+        # ramp (fraction of the maximum per second of key hold).
+        "keyboard": {
+            "max_forward_mps": 0.3,
+            "max_left_mps": 0.2,
+            "max_yaw_rate_rad_s": 1.5,
+            "ramp_per_s": 2.0,
+        },
     },
     "sensors": {
         "imu": {
@@ -187,6 +195,8 @@ def validate_biped(data: dict[str, Any]) -> None:
         period_steps(biped[key], step_ns, f"biped.{key}")
     for kind in BIPED_STREAMS:
         period_steps(data["sensors"][kind]["rate_hz"], step_ns, f"sensors.{kind}")
+    for key, value in biped["keyboard"].items():
+        number(value, f"biped.keyboard.{key}", positive=True)
     encoders = data["sensors"]["joint_encoders"]
     count = encoders["counts_per_revolution"]
     if isinstance(count, bool) or not isinstance(count, int) or count < 1:

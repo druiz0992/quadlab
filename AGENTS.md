@@ -97,7 +97,8 @@ in [README.md](README.md); design, behavior, and reference material are in
     `ROBOTLAB_TEST_GAZEBO=1` / `ROBOTLAB_TEST_GUI=1` and must skip otherwise;
     missions of several minutes also need `ROBOTLAB_TEST_GAZEBO_SLOW=1`.
     MuJoCo biped tests run in CI with the built-in test biped; the
-    Microduck test needs `ROBOTLAB_MICRODUCK_MODEL` (its model is external).
+    Microduck tests need `ROBOTLAB_MICRODUCK_MODEL` (its model is external)
+    and, for walking, `ROBOTLAB_MICRODUCK_POLICY`.
   - **Gazebo regression tests** in `tests/integration/test_gazebo_regression.py`
     pin verified simulator numbers in lockstep. Add one when you verify a new
     Gazebo behavior, and run the suite after changing the mission loop,
@@ -148,7 +149,7 @@ a new numbered file if a topic truly needs one. Keep links relative and valid.
   arrays in measurement samples). Gazebo bindings (`gz.transport13`,
   `gz.msgs10`) must match the system interpreter: currently Python 3.12
   from ROS Jazzy (`source /opt/ros/jazzy/setup.bash`).
-- RotorPy, Rerun, and MuJoCo are pinned in `pyproject.toml`; change pins
+- RotorPy, Rerun, MuJoCo, and ONNX Runtime are pinned in `pyproject.toml`; change pins
   deliberately. Never copy external robot models with restrictive licences
   (e.g. the Microduck's CC BY-NC-SA meshes) into the repository.
 - `gazebo_plugins/` holds C++ gz-sim system plugins (currently the lockstep

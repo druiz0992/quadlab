@@ -22,7 +22,13 @@ HELP = {
 class DrivingKeyboardWindow:
     """Small always-on-top window; raises ValueError without a display."""
 
-    def __init__(self, title: str, steering_layout: str) -> None:
+    def __init__(
+        self,
+        title: str,
+        steering_layout: str,
+        held_keys: frozenset[str] = HELD_KEYS,
+        help_text: str | None = None,
+    ) -> None:
         import tkinter as tk
 
         try:
@@ -34,6 +40,7 @@ class DrivingKeyboardWindow:
         self.root.title(f"RobotLab — {title}")
         self.root.geometry("360x220")
         self.root.attributes("-topmost", True)
+        self.held_keys = held_keys
         self.keys: set[str] = set()
         self.presses: list[str] = []
         self.releases: dict[str, str] = {}
@@ -44,7 +51,7 @@ class DrivingKeyboardWindow:
         )
         tk.Label(
             self.root,
-            text=HELP.get(steering_layout, HELP["ackermann"]),
+            text=help_text or HELP.get(steering_layout, HELP["ackermann"]),
             justify="center",
         ).pack()
         self.status = tk.StringVar(value="Click here to drive")
@@ -66,7 +73,7 @@ class DrivingKeyboardWindow:
             return
         if key in self.releases:
             self.root.after_cancel(self.releases.pop(key))
-        if key in HELD_KEYS:
+        if key in self.held_keys:
             self.keys.add(key)
         elif key in PRESS_KEYS and key not in self.keys:
             self.presses.append(key)
@@ -98,9 +105,11 @@ class DrivingKeyboardWindow:
         except Exception:
             self.closed = True
             return frozenset()
+        if self.closed:  # Esc or the close button, handled inside update()
+            return frozenset()
         focused = self.root.focus_get() is not None
         self.status.set("Driving" if focused else "Click here to drive")
-        return frozenset(self.keys & HELD_KEYS)
+        return frozenset(self.keys & self.held_keys)
 
     def drain_presses(self) -> list[str]:
         presses, self.presses = self.presses, []

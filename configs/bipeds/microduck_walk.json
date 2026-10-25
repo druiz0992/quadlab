@@ -1,0 +1,9 @@
+{
+  "extends": "microduck.json",
+  "algorithms": {
+    "controller": "onnx_policy",
+    "controller_options": {
+      "policy_path": "../microduck-policies/velstand.onnx"
+    }
+  }
+}

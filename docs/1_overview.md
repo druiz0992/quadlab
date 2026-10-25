@@ -36,7 +36,7 @@ install -e .`.
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
 | Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse; surface friction zones and spawn points for wheeled robots |
 | Ground vehicles | `--robot rover/car/tractor`: ray-cast suspension, transient Magic Formula tyres, drive/brake/steering actuators, aerodynamics in Python; wheel encoders; keyboard driver; wheeled controller plug-ins ([8 Ground vehicles](8_ground_vehicles.md)) |
-| Bipeds | `--robot biped` in MuJoCo: MJCF models (built-in test biped, or Pollen Robotics' Microduck from a local checkout), IMU and joint encoders on the sensor bus, joint-level controller plug-ins (hold, template), fall health check ([9 Bipeds](9_bipeds.md)) |
+| Bipeds | `--robot biped` in MuJoCo: MJCF models (built-in test biped, or Pollen Robotics' Microduck from a local checkout), IMU and joint encoders on the sensor bus, joint-level controller plug-ins (hold, template, ONNX policies such as Pollen's), keyboard walking, Rerun view, fall health check ([9 Bipeds](9_bipeds.md)) |
 
 **Not implemented:** the full Gazebo session API (algorithms run serially
 on the mission thread, not in worker threads), obstacle avoidance,
@@ -93,6 +93,8 @@ src/robotlab/
 │   ├── legged.py           # LeggedController plug-in contract, state, WalkCommand
 │   ├── legged_hold.py      # Built-in "hold": keep the start keyframe's targets
 │   ├── legged_template.py  # Copyable legged template (pose hold + lean feedback)
+│   ├── legged_keyboard.py  # Held keys → ramped WalkCommand
+│   ├── onnx_policy.py      # Exported RL policy runner (Microduck contract)
 │   ├── wheeled.py          # WheeledController plug-in contract, state, DriverCommand
 │   ├── wheeled_keyboard.py # Keyboard driver and steering geometry
 │   └── wheeled_template.py # Copyable template wheeled controller
@@ -131,6 +133,7 @@ src/robotlab/
 │   ├── gazebo.py           # Compose a Gazebo mission (run entry point, wiring)
 │   ├── biped_run.py        # Compose a MuJoCo biped mission (--robot biped)
 │   ├── biped_loop.py       # Step-based biped loop: sensors, control, recording
+│   ├── biped_keyboard.py   # Keyboard operator: key window, real-time pacing
 │   ├── run_setup.py        # Option checks, true vehicle draw, world and resolved config
 │   ├── mission_loop.py     # The running mission: message loop, truth step, shutdown
 │   ├── sensor_pipeline.py  # Error/fault models → recording → sensor bus; synthetic sensors
@@ -166,6 +169,7 @@ src/robotlab/
 └── visualization/
     ├── gazebo_rerun.py     # Gazebo-message-to-Rerun recording adapter
     ├── wheeled_rerun.py    # Wheeled-robot Rerun layout (wheels, surfaces, plots)
+    ├── biped_rerun.py      # Biped Rerun view (MuJoCo geoms, trunk/command plots)
     ├── driving_keyboard.py # Tk driving window
     ├── keyboard.py         # Tk keyboard window (key/focus state only)
     ├── live.py             # Matplotlib live drone view (retained)
@@ -264,6 +268,7 @@ Base: NumPy, SciPy, Matplotlib, and pinned RotorPy (used only by retained
 backend library code). The `gazebo` extra adds pinned `rerun-sdk==0.24.1` and
 protobuf. The `gz` executable and `gz.transport13`/`gz.msgs10` bindings are
 system prerequisites (ROS Jazzy, Python 3.12 here). The `mujoco` extra adds
-pinned `mujoco==3.17.0` (CPU wheel) for bipeds. The `dev` extra adds
+pinned `mujoco==3.17.0` (CPU wheel) for bipeds; `policies` adds pinned
+`onnxruntime==1.31.0` for the ONNX policy runner. The `dev` extra adds
 pytest and black.
 

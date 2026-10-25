@@ -20,6 +20,12 @@ t = k·Δ:
    earlier than the next step) through the IMU error model (bus ``imu``);
 7. truth due at t is recorded (``telemetry.jsonl``) and checked for health.
 
+With an ``operator`` (the keyboard, experiments/biped_keyboard.py) each
+control period also asks it for the walking request, and after every step
+it may pace the run to real time; closing it ends the run (exit reason
+``keyboard_closed``). A ``recorder`` (Rerun) logs every recorded state;
+body poses come from MuJoCo's kinematics of step 1 (time t).
+
 The final state at the run's end is always recorded, as is the initial one.
 Results (``summary.json``) are written also after errors and Ctrl-C.
 """
@@ -30,12 +36,12 @@ from dataclasses import dataclass, field
 import json
 from pathlib import Path
 import time
-from typing import Any, TextIO
+from typing import Any, Protocol, TextIO
 
 import numpy as np
 from numpy.typing import NDArray
 
-from ..control.legged import LeggedControlState, TrunkState
+from ..control.legged import LeggedControlState, TrunkState, WalkCommand
 from ..core.legged import JointTargets, LeggedProperties
 from ..core.measurements import ImuReading, Sample
 from ..evaluation.biped_health import BipedHealth
@@ -47,6 +53,44 @@ from ..simulation.mujoco.scene import BipedScene
 from ..simulation.mujoco.state import BipedTruth, imu_reading, read_truth
 from .interrupts import shielded
 from .run_summary import final_exit_reason
+
+
+class Operator(Protocol):
+    """Interactive input and display for a run (see module docs)."""
+
+    def request(self, sim_time_ns: int) -> WalkCommand | None:
+        """The walking request for the control period at ``sim_time_ns``."""
+        ...
+
+    def running(self) -> bool:
+        """False once the user closed the window."""
+        ...
+
+    def after_step(self, data: Any, sim_time_ns: int) -> None:
+        """Called after each physics step with the time it reached."""
+        ...
+
+    def close(self) -> None:
+        """Close its windows (called once after the run)."""
+        ...
+
+
+class StateRecorder(Protocol):
+    """Viewer/recording of recorded states (visualization/biped_rerun.py)."""
+
+    def log_state(
+        self, data: Any, truth: BipedTruth, request: WalkCommand | None
+    ) -> None:
+        """Log one recorded state; ``data`` holds MuJoCo's body poses."""
+        ...
+
+    def close(self) -> None:
+        """Flush and disconnect (called once after the run)."""
+        ...
+
+
+class _UserExit(Exception):
+    """The operator closed: end the run normally."""
 
 
 @dataclass
@@ -67,6 +111,8 @@ class BipedParts:
     health: BipedHealth
     output: Path
     duration_s: float
+    operator: Operator | None = None
+    recorder: StateRecorder | None = None
     wall_clock: Callable[[], float] = field(default=time.perf_counter)
 
 
@@ -100,6 +146,7 @@ class BipedLoop:
         self.latest: dict[str, Sample] = {}
         self.limited = {name: 0 for name in parts.properties.joint_names}
         self.control_ticks = 0
+        self.last_request: WalkCommand | None = None
         self._previous_control_ns: int | None = None
         self.steps_done = 0
         self.completed = False
@@ -107,12 +154,14 @@ class BipedLoop:
         self.delivered = 0
         self.summary: dict[str, Any] | None = None
         self._files: dict[str, TextIO] = {}
+        # Created here so an operator's viewer can show it before the run.
+        self.data = parts.scene.new_data()
 
     def run(self) -> dict[str, Any]:
         """Step the mission; return ``summary.json`` (also written on failure)."""
         import mujoco
 
-        data = self.parts.scene.new_data()
+        data = self.data
         start_wall = self.parts.wall_clock()
         with ExitStack() as stack:
             for name in ("telemetry", "commands"):
@@ -128,6 +177,8 @@ class BipedLoop:
             except KeyboardInterrupt:
                 self.exit_reason = "interrupted"
                 print("Interrupted; saving recorded data.")
+            except _UserExit:
+                self.exit_reason = "keyboard_closed"
             finally:
                 with shielded():
                     self._write_summary(data, self.parts.wall_clock() - start_wall)
@@ -162,6 +213,10 @@ class BipedLoop:
             bus.submit("imu", ImuReading(force, rate), t_ns)
         if self._due("record", step):
             self._record(truth)
+            if self.parts.recorder is not None:
+                self.parts.recorder.log_state(data, truth, self.last_request)
+        if self.parts.operator is not None:
+            self.parts.operator.after_step(data, t_ns + self.step_ns)
 
     def _control(self, data: Any, truth: BipedTruth) -> None:
         """Run the controller and apply its clipped targets (module docs)."""
@@ -176,17 +231,30 @@ class BipedLoop:
             imu=self.latest.get("imu"),
             trunk=_trunk(truth) if self.truth_for_control else None,
         )
-        requested = self.parts.controller.update(state, None, dt_s)
+        request = None
+        operator = self.parts.operator
+        if operator is not None:
+            if not operator.running():
+                raise _UserExit
+            request = operator.request(t_ns)
+        self.last_request = request
+        requested = self.parts.controller.update(state, request, dt_s)
         applied, limited = self._accept(requested)
         self.control_ticks += 1
         self.parts.health.on_command(t_ns, applied)
         data.ctrl[:] = applied
-        line = dict(
+        line: dict[str, Any] = dict(
             sim_time_ns=t_ns,
             joint_target_rad=applied.tolist(),
             requested_rad=list(requested.position_rad),
             limited=limited,
         )
+        if request is not None:
+            line["walk_command"] = [
+                request.forward_mps,
+                request.left_mps,
+                request.yaw_rate_rad_s,
+            ]
         self._files["commands"].write(json.dumps(line) + "\n")
 
     def _accept(self, requested: Any) -> tuple[NDArray[np.float64], list[int]]:

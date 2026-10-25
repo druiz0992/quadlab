@@ -18,8 +18,6 @@ from robotlab.simulation.mujoco.config import BUILTIN_MODELS, load_biped_config
     [
         (dict(ekf=True), "--ekf"),
         (dict(world="saved.sdf"), "--world"),
-        (dict(keyboard=True), "--keyboard"),
-        (dict(rerun=True), "--rerun"),
         (dict(control_mode="rotor-thrust"), "multirotors only"),
         (dict(scene="worlds/yard.json"), "biped.model_path"),
         (dict(target=(1.0, 0.0, 1.0)), "multirotor missions"),
@@ -273,3 +271,57 @@ def test_template_controller_runs_from_config(tmp_path: Path) -> None:
 def test_bad_controller_specs_raise(tmp_path: Path, spec: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         mission(tmp_path, {"algorithms": {"controller": spec}})
+
+
+class _Operator:
+    """Operator that walks forward for ``periods`` control periods, then closes."""
+
+    def __init__(self, periods: int) -> None:
+        self.left = periods
+        self.steps = 0
+
+    def request(self, sim_time_ns: int) -> Any:
+        from robotlab.control.legged import WalkCommand
+
+        self.left -= 1
+        return WalkCommand(0.1, 0.0, 0.0)
+
+    def running(self) -> bool:
+        return self.left > 0
+
+    def after_step(self, data: Any, sim_time_ns: int) -> None:
+        self.steps += 1
+
+    def close(self) -> None:
+        pass
+
+
+def test_operator_requests_reach_the_controller_and_closing_ends_the_run(
+    tmp_path: Path,
+) -> None:
+    loop = mission(tmp_path, duration_s=1.0)
+    recorder, operator = _Recorder(), _Operator(5)
+    loop.parts.controller, loop.parts.operator = recorder, operator
+    summary = loop.run()
+    assert summary["exit_reason"] == "keyboard_closed" and not summary["completed"]
+    assert summary["health"]["verdict"] == "ok"
+    assert summary["control"]["ticks"] == 5 and operator.steps == 50
+    line = lines(tmp_path / "out" / "commands.jsonl")[0]
+    assert line["walk_command"] == [0.1, 0.0, 0.0]
+
+
+def test_rerun_recording_of_the_test_biped(tmp_path: Path) -> None:
+    pytest.importorskip("rerun")
+    from robotlab.visualization.biped_rerun import BipedRerunRecorder
+
+    loop = mission(tmp_path, duration_s=0.2)
+    scene = loop.parts.scene
+    recorder = BipedRerunRecorder(scene.model, tmp_path / "out", True, "test")
+    loop.parts.recorder = recorder
+    try:
+        loop.run()
+    finally:
+        recorder.close()
+    # One body per visible link (floor plane and world geoms excluded).
+    assert len(recorder._bodies) == 7
+    assert (tmp_path / "out" / "biped.rrd").stat().st_size > 1000

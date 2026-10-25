@@ -13,6 +13,8 @@ reads the same for every robot:
 | ``incomplete`` | failed | the run ended on an error before its duration |
 | ``interrupted`` | warning | the user interrupted the run |
 
+Closing the keyboard window (``keyboard_closed``) is a normal end.
+
 ``fallen`` is a failed verdict even when a fall is the experiment: a
 standing or walking biped is the expected result. Times are seconds since
 the first truth sample.
@@ -27,7 +29,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from ..simulation.mujoco.state import BipedTruth, tilt_deg
-from .health import FAILED, OK, WARNING, Finding
+from .health import FAILED, OK, USER_EXITS, WARNING, Finding
 
 
 class BipedHealth:
@@ -87,7 +89,7 @@ class BipedHealth:
             self._report(
                 "simulator_warning", None, f"MuJoCo warning {name}", count=count
             )
-        if not completed:
+        if not completed and exit_reason not in USER_EXITS:
             if exit_reason == "interrupted":
                 self._report(
                     "interrupted",

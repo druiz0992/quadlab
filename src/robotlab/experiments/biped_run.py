@@ -35,6 +35,7 @@ from .biped_loop import BipedLoop, BipedParts
 BUILTIN_CONTROLLERS = {
     "hold": "robotlab.control.legged_hold:HoldPose",
     "template": "robotlab.control.legged_template:TemplateLeggedController",
+    "onnx_policy": "robotlab.control.onnx_policy:OnnxPolicyController",
 }
 # The generated Gazebo worlds' origin (simulation/gazebo/world.py), so GPS
 # references agree across simulators; bipeds have no GPS yet.
@@ -46,8 +47,6 @@ _GAZEBO_ONLY = (
     ("edit", False, "--edit"),
     ("ekf", False, "--ekf"),
     ("render_sensors", False, "--render-sensors"),
-    ("rerun", False, "--rerun"),
-    ("keyboard", False, "--keyboard"),
 )
 
 
@@ -94,12 +93,17 @@ def run_biped(args: Any, has_command_source: bool = False) -> dict[str, Any] | N
         return None
     loop = BipedLoop(_parts(config, scene, output, args.duration))
     try:
+        _open_frontends(args, config, scene, loop, output)
         summary = loop.run()
     except BaseException:
         if loop.summary is not None:
             print(f"Results: {output}")
             _print_health(loop.summary["health"])
         raise
+    finally:
+        for frontend in (loop.parts.operator, loop.parts.recorder):
+            if frontend is not None:
+                frontend.close()
     timing = summary["timing"]
     print(f"Results: {output}")
     print(
@@ -108,6 +112,29 @@ def run_biped(args: Any, has_command_source: bool = False) -> dict[str, Any] | N
     )
     _print_health(summary["health"])
     return summary
+
+
+def _open_frontends(
+    args: Any, config: BipedConfig, scene: Any, loop: BipedLoop, output: Path
+) -> None:
+    """Keyboard window (``--keyboard``) and the live Rerun viewer, recorded
+    to ``biped.rrd`` (``--keyboard`` or ``--rerun``, as for Gazebo runs)."""
+    if not (args.keyboard or args.rerun):
+        return
+    try:
+        from ..visualization.biped_rerun import BipedRerunRecorder
+    except ImportError as error:
+        raise ValueError(f"{error}. Install the gazebo extra (Rerun).") from error
+    loop.parts.recorder = BipedRerunRecorder(
+        scene.model, output, headless=False, title=f"{scene.name} (MuJoCo)"
+    )
+    if args.keyboard:
+        from ..control.legged_keyboard import WalkInput
+        from .biped_keyboard import open_keyboard_operator
+
+        loop.parts.operator = open_keyboard_operator(
+            WalkInput.from_settings(config.data["biped"]["keyboard"])
+        )
 
 
 def biped_context(settings: dict[str, Any], scene: Any) -> AlgorithmContext:

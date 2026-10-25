@@ -37,7 +37,8 @@ def main():
     parser.add_argument(
         "--keyboard",
         action="store_true",
-        help="Fly (multirotor: arrows and Q/A) or drive (wheeled robots: arrows)",
+        help="Fly (multirotor: arrows and Q/A), drive (wheeled robots: arrows), "
+        "or walk (bipeds: arrows, A/D)",
     )
     parser.add_argument(
         "--control-mode",

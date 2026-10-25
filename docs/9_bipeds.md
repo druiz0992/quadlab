@@ -10,9 +10,10 @@ from MuJoCo and the model file: results are not comparable with Gazebo
 physics, and the servos are MuJoCo position actuators (an approximation of
 the real ones, not a calibrated model).
 
-**Status:** the backend core and the joint-level controller contract are
-implemented. Pollen's policies, more sensors, and an RL environment are
-planned ([6 Roadmap](6_roadmap.md#bipeds)).
+**Status:** the backend core, the joint-level controller contract, the
+ONNX policy runner (Pollen's Microduck policies), keyboard walking, and a
+Rerun view are implemented. More sensors and an RL environment are planned
+([6 Roadmap](6_roadmap.md#bipeds)).
 
 ## Running
 
@@ -23,6 +24,11 @@ robotlab --robot biped --generate-only --output outputs/biped-scene # writes sce
 # Pollen Robotics' Microduck: clone microduck_rl beside this repository
 git clone https://github.com/pollen-robotics/microduck_rl ../microduck_rl
 robotlab --config configs/bipeds/microduck.json --duration 10 --output outputs/duck
+# Walk it with Pollen's velstand policy (Apache-2.0) and the keyboard
+pip install -e '.[policies,gazebo]'   # onnxruntime; Rerun
+curl -L --create-dirs -o ../microduck-policies/velstand.onnx \
+  https://huggingface.co/pollen-robotics/microduck-policies/resolve/main/velstand.onnx
+robotlab --config configs/bipeds/microduck_walk.json --keyboard --output outputs/duck-walk
 ```
 
 The Microduck model is not copied here: its meshes are CC BY-NC-SA 4.0
@@ -31,8 +37,15 @@ The Microduck model is not copied here: its meshes are CC BY-NC-SA 4.0
 Holding the STAND pose without a balance policy, the Microduck tips over in
 about a second (verdict `failed`, `fallen`); the built-in test biped
 (`builtin:test_biped`, wide feet, statically stable) stands. Gazebo-only
-options (`--world`, `--edit`, `--ekf`, `--keyboard`, `--rerun`,
-`--render-sensors`, `--scene`, `--target`, `--control-mode`) are rejected.
+options (`--world`, `--edit`, `--ekf`, `--render-sensors`, `--scene`,
+`--target`, `--control-mode`) are rejected.
+
+`--keyboard` opens a key window (↑/↓ walk, ←/→ turn, A/D step sideways,
+Esc ends; maxima and ramp in `biped.keyboard`) and paces the run to real
+time; `--keyboard` or `--rerun` shows the robot's bodies and trunk/command
+plots in Rerun and records `biped.rrd`. MuJoCo's own viewer is not used:
+its passive mode crashed or hung on shutdown in about half of the tries
+here (MuJoCo 3.17, X11).
 
 ## Model, settings, and timing
 
@@ -45,6 +58,7 @@ options (`--world`, `--edit`, `--ekf`, `--keyboard`, `--rerun`,
 | `sensors.imu` | `enabled`, `rate_hz`, `error_model` (as the drone IMU) |
 | `sensors.joint_encoders` | `enabled`, `rate_hz`, `counts_per_revolution`, `velocity_resolution_rad_s`, `position_noise_std_rad` (per sample), `seed` |
 | `sensor_timing` | `imu`, `joint_encoders` latency/jitter/offset, `reorder_window_s`, `seed` |
+| `biped.keyboard` | `max_forward_mps`, `max_left_mps`, `max_yaw_rate_rad_s`, `ramp_per_s` |
 | `algorithms` | `controller`, `controller_options`, `control_state_source` (`truth` or `sensors`) |
 | `health` | `fall_tilt_deg`, `fall_height_fraction` |
 
@@ -67,8 +81,8 @@ bounds, servo gains, initial targets, and control rate, and
 (rad per joint). `state` has the newest `joint_encoders` and `imu` bus
 samples and, with `algorithms.control_state_source: "truth"` (default), the
 trunk's true pose (`trunk`, a stand-in for an onboard attitude filter);
-`"sensors"` leaves it out. `request` (`WalkCommand`) is None until the
-keyboard arrives. Targets outside the bounds are clipped and counted per
+`"sensors"` leaves it out. `request` (`WalkCommand`) comes from the
+keyboard, else None. Targets outside the bounds are clipped and counted per
 joint (`summary.json.control.limited_commands`); a wrong length or
 non-finite target fails the run.
 
@@ -76,7 +90,32 @@ non-finite target fails the run.
 | --- | --- |
 | empty or `hold` | hold the start keyframe's targets |
 | `template` (`control/legged_template.py`) | hold plus forward-lean feedback on the joints in `lean_gains` (rad/rad; not a balance controller) |
+| `onnx_policy` | an exported RL policy (see below) |
 | `package.module:Class` | your controller; test it with `robotlab.testing.plugins.check_legged_controller` |
+
+## Pollen's policies (`onnx_policy`)
+
+`algorithms.controller: onnx_policy` (`control/onnx_policy.py`) runs an
+exported Microduck policy at 50 Hz: observation (61 for 14 joints) = gyro,
+projected gravity, joint angles minus the default pose, joint velocities,
+previous action, and a 13-value command (walking twist, then head and body
+pose held at zero); target = default + scale · action. The model's
+metadata must list the robot's joints in the same order and this layout;
+its `default_joint_pos` and `action_scale` are used. LSTM exports
+(`h_in`/`c_in`) keep their state between periods. Options: `policy_path`,
+`action_scale` (override), `twist` and `twist_after_s` (a constant
+command when nobody drives).
+
+Verified on 2026-10-25 (microduck_rl `b02fdea`, `velstand.onnx` from the
+policy set at `665ae4e`): with trunk truth standing in for the robot's
+IMU fusion, the Microduck stands still and, commanded 0.3 m/s, walks at
+about 0.1 m/s without falling (0.69 m in 7 s); at 0.15 m/s it keeps
+standing. With `control_state_source: "sensors"` gravity comes from the
+accelerometer direction, which includes the trunk's accelerations, and it
+falls after about 2.7 s. Pollen trains with BAM servo models (back-EMF,
+battery-voltage limits, fitted friction); these MuJoCo position actuators
+have a fixed torque cap at every speed, the likely reason for the weak
+walking. A Python XL330 model is a possible next step.
 
 ## Outputs
 
@@ -84,10 +123,13 @@ non-finite target fails the run.
 | --- | --- |
 | `summary.json` | `completed`, `health` (`fallen`, `non_finite`, `simulator_warning`, `incomplete`, `interrupted`), `robot` (model provenance, joint names), `control` (controller, state source, ticks, limited commands, its `summary()`), `config`, `timing` (real-time factor), `sensors`, `bus` |
 | `telemetry.jsonl` | trunk truth (position, quaternion xyzw, world velocity, body rates) and joint angles/velocities at `record_rate_hz`, plus the initial and final states |
-| `commands.jsonl` | per control period: applied `joint_target_rad`, `requested_rad`, `limited` joint indices |
+| `commands.jsonl` | per control period: applied `joint_target_rad`, `requested_rad`, `limited` joint indices, `walk_command` when there is a request |
 | `scene.xml` | `--generate-only`: the edited model, loadable on its own |
+| `biped.rrd` | `--keyboard` or `--rerun`: Rerun recording |
 
 The `joint_encoders` bus stream comes only from MuJoCo runs; the synthetic
 estimator scenarios have no joints. Tests: `tests/unit/*/test_*biped*`,
 `test_mujoco_*`, and the opt-in `tests/integration/test_microduck.py`
-(`ROBOTLAB_MICRODUCK_MODEL=<microduck_rl>/src/mjlab_microduck/robot/microduck/scene.xml`).
+(`ROBOTLAB_MICRODUCK_MODEL=<microduck_rl>/src/mjlab_microduck/robot/microduck/scene.xml`;
+the walking test also `ROBOTLAB_MICRODUCK_POLICY=<path>/velstand.onnx`);
+`ROBOTLAB_TEST_GUI=1` runs the paced keyboard test.

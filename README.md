@@ -30,7 +30,7 @@ not install Gazebo. Keyboard control needs Tk (`python3-tk`) and a desktop.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev,gazebo,mujoco]'   # '.[dev]' for tests/world generation only; mujoco: bipeds
+python -m pip install -e '.[dev,gazebo,mujoco,policies]'   # '.[dev]' for tests/world generation only; mujoco/policies: bipeds
 ```
 
 Rerun the install after updating the checkout to refresh console entry points.
@@ -232,6 +232,8 @@ robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json -
 # microduck_rl checkout beside this repository (docs/9_bipeds.md)
 robotlab --robot biped --duration 10 --output outputs/biped
 robotlab --config configs/bipeds/microduck.json --duration 10 --output outputs/duck
+# Walk the Microduck with Pollen's velstand policy and the keyboard (download in docs/9_bipeds.md)
+robotlab --config configs/bipeds/microduck_walk.json --keyboard --output outputs/duck-walk
 # Your biped controller: start from control/legged_template.py, check it with
 # check_legged_controller, select it with algorithms.controller
 
