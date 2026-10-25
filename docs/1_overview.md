@@ -85,10 +85,12 @@ src/robotlab/
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
 │   ├── imu_calibration.py  # Static IMU fit and calibration driver
 │   ├── dead_reckoning.py   # Retained IMU dead-reckoning baseline
+│   ├── inertial/           # Reusable for any inertial filter: node (timing, mounts,
+│   │                       #   held IMU), measurement conversion, the `inertial`
+│   │                       #   plug-in, template.py (copy to start a filter)
 │   └── gps_imu_ekf/
-│       ├── ekf.py          # Numerical prediction and correction
-│       ├── node.py         # Timestamp/frame adaptation and EKF state channel
-│       └── plugin.py       # The EKF as an estimator plug-in
+│       ├── ekf.py          # Numerical prediction and correction (an InertialFilter)
+│       └── plugin.py       # The EKF as an estimator plug-in (on estimation/inertial/)
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,
 │                           #   truth interpolation, effective IMU bias, run health
 │                           #   verdict (health.py; bipeds: biped_health.py)

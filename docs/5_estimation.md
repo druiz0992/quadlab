@@ -6,8 +6,8 @@ using truth. The estimator is initialized from declared priors and never
 receives simulator truth, true biases, wind, or fault-model information.
 
 ```text
-Gazebo IMU/GPS → decode → (dropout, vibration) → typed channels
-      → live_ekf.py (bounded timestamp ordering) → GpsImuEkfNode → GpsImuEkf
+bus samples (plug-in) or Gazebo IMU/GPS (--ekf, live_ekf.py reordering)
+      → InertialNode (timing, mounts, GPS → ENU) → GpsImuEkf.predict / update_gps
                                                         ↓
                                               state channel → Rerun / estimates.jsonl
 ```
@@ -15,7 +15,8 @@ Gazebo IMU/GPS → decode → (dropout, vibration) → typed channels
 | Module | Responsibility |
 | --- | --- |
 | `estimation/gps_imu_ekf/ekf.py` | Numerical prediction and correction (`GpsImuEkf`) |
-| `estimation/gps_imu_ekf/node.py` | Frame/timestamp adaptation, WGS84 reference, state output (`GpsImuEkfNode`) |
+| `estimation/gps_imu_ekf/plugin.py` | Builds the filter from the `ekf` section; the `gps_imu_ekf` plug-in |
+| `estimation/inertial/` | Reusable for any inertial filter: `InertialNode` (sample checks, mounts, held IMU, timing, publication), measurement conversion, the `inertial` plug-in, a template filter ([Writing your own](#writing-your-own-inertial-filter)) |
 | `experiments/harness/live_ekf.py` | Gazebo decoding to channels, bounded reordering, watchdogs (`LiveEkf`) |
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
 | `sensors/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
@@ -74,13 +75,17 @@ repropagation are not implemented.
 
 ## Node and frames
 
+The node is `InertialNode` (`estimation/inertial/node.py`), shared by every
+inertial filter; for the EKF:
+
 - GPS latitude/longitude/altitude convert through WGS84 ECEF to local ENU.
   The reference origin and altitude datum are explicit; altitude 650 m is not
   local z = 650. The ENU frame must be aligned with the simulation world.
 - The node rotates an explicitly mounted IMU into body axes. Nonzero IMU
   position offsets are rejected (no rotational lever-arm compensation).
-  GPS receiver offsets are in the measurement model. Camera, lidar,
-  barometer, magnetometer, rangefinder, and optical flow are not inputs yet.
+  GPS receiver offsets are in the measurement model. This EKF fuses GPS
+  position only; the shared node also converts GPS velocity, magnetometer,
+  and barometer measurements for filters that fuse them.
 - The first IMU sample sets the prior's time. IMU intervals must be positive
   and at most 0.1 s. The node validates frames, epochs, stream identity, and
   sequence continuity, serializes handlers, and starts no threads.
@@ -91,6 +96,40 @@ repropagation are not implemented.
   overflow policies (`error`, `drop_oldest`), timeouts, and closure.
   Prediction and correction outputs may share timestamps with distinct
   sequence numbers.
+
+## Writing your own inertial filter
+
+Write only the mathematics; `estimation/inertial/` does the rest. A filter
+is a class built as `cls(filter_options)` with:
+
+| Method | Called with |
+| --- | --- |
+| `predict(specific_force_mps2, angular_rate_rad_s, dt_s)` | one IMU reading in body axes, held over `dt_s` |
+| `update_gps(GpsFix)` | ENU antenna position, 3×3 covariance, lever arm, optional ENU velocity and variance |
+| `update_magnetometer(MagneticField)` | field in body axes (µT) and covariance |
+| `update_baro(BaroAltitude)` | altitude above the GPS reference (m) and variance |
+| `state()` | returns `EstimatedState` (covariance with RobotLab's right attitude error) |
+
+Implement any subset of the `update_*` methods: each returns an
+`Innovation` (or None for an initialization), and the estimator fuses every
+enabled stream its filter has a method for. Select it with:
+
+```json
+{"algorithms": {"estimator": "inertial",
+                "estimator_options": {"filter": "mypkg.my_ekf:MyEkf",
+                                      "filter_options": {"gyro_std_rad_s": 0.003},
+                                      "gps_std_m": [0.5, 0.5, 0.8],
+                                      "magnetometer_std_ut": 1.0, "baro_std_m": 0.5}}}
+```
+
+Start from `estimation/inertial/template.py` (6-state position/velocity
+Kalman filter, gyro-integrated attitude, GPS and barometer updates) and
+check it with `check_estimator(InertialEstimator, options)`, the scenario
+suite, and `robotlab-replay ... --estimator inertial --set
+'algorithms.estimator_options={...}'` (one estimator per replay when it
+needs its own options). On the 10 s lockstep square with sensor errors the
+template replayed with 2.0 m position and 0.85° attitude RMSE (EKF: 1.6 m,
+1.3°); it estimates no biases, so it drifts on longer runs.
 
 ## Live operation
 

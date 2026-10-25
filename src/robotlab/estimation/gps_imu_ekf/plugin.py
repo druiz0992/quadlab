@@ -6,6 +6,11 @@ mount rotation and the GPS antenna lever arm. Samples are handled exactly as
 delivered; a GPS fix older than the filter time (e.g. after GPS latency) is
 counted in ``rejected_gps_timing``, since the filter does not re-propagate.
 
+It is ``GpsImuEkf`` (ekf.py) run by the reusable inertial estimator
+(estimation/inertial/), which does the sample timing, mounts, GPS
+conversion, and publication for any filter; this module only builds the
+filter from the ``ekf`` section and keeps its summary.
+
 Debug channel (``context.log``, the reference example for plug-ins): at
 each GPS update, ``ekf/gps`` = NIS and accepted (1/0), and ``ekf/bias`` =
 the estimated accelerometer (m/s²) and gyro (rad/s) biases.
@@ -18,10 +23,9 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from ...core.algorithms import AlgorithmContext
-from ...core.measurements import EstimatedState, Sample
-from ..interface import Innovation
+from ..inertial.estimator import InertialEstimator
+from ..inertial.node import MeasurementOutcome
 from .ekf import GpsImuEkf
-from .node import GpsImuEkfNode
 
 
 def with_calibrated_priors(
@@ -67,19 +71,18 @@ def make_ekf(options: Mapping[str, Any]) -> GpsImuEkf:
         accel_bias_walk=e["accel_bias_walk"],
         gyro_bias_walk=e["gyro_bias_walk"],
         gps_gate_squared=e["gps_gate_squared"],
+        initialize_position_from_gps=e["initialize_position_from_gps"],
     )
 
 
-class GpsImuEkfEstimator:
-    """``StateEstimator`` wrapping ``GpsImuEkfNode`` (see module docs)."""
-
-    inputs = ("imu", "gps")
+class GpsImuEkfEstimator(InertialEstimator):
+    """``StateEstimator`` for ``GpsImuEkf`` (see module docs)."""
 
     def __init__(self, context: AlgorithmContext, options: Mapping[str, Any]) -> None:
-        for kind in self.inputs:
+        for kind in ("imu", "gps"):
             if kind not in context.sensors:
                 raise ValueError(f"gps_imu_ekf needs the {kind} sensor enabled")
-        imu, gps = context.sensors["imu"], context.sensors["gps"]
+        imu = context.sensors["imu"]
         # A calibrated IMU has smaller remaining biases: tighter priors.
         options = with_calibrated_priors(options, imu.calibration)
         self.priors = dict(
@@ -91,76 +94,39 @@ class GpsImuEkfEstimator:
             raise ValueError(
                 "gps_imu_ekf requires a body-origin IMU (rotation allowed)"
             )
-        self.node = GpsImuEkfNode(
+        super().__init__(
+            context,
+            dict(
+                gps_std_m=options["gps_std_m"],
+                use_receiver_gps_accuracy=options["use_receiver_gps_accuracy"],
+            ),
             make_ekf(options),
-            gps_reference=context.gps_reference,
-            gps_covariance_m2=np.diag(np.asarray(options["gps_std_m"]) ** 2),
-            imu_quaternion_body_xyzw=imu.mount_quaternion_xyzw,
-            gps_position_body_m=gps.mount_position_m,
-            allow_intermediate_gps=True,
-            initialize_from_gps=options["initialize_position_from_gps"],
-            use_receiver_accuracy=options["use_receiver_gps_accuracy"],
+            name="gps_imu_ekf",
+            log_prefix="ekf",
         )
-        self._estimates = self.node.estimates.subscribe(
-            capacity=1, overflow="drop_oldest"
-        )
-        self._latest: Sample[EstimatedState] | None = None
-        self._innovations: list[Innovation] = []
-        self._errors = 0
-        self._log = context.log
+        self.position_initialized_ns: int | None = None
 
-    def on_sample(self, kind: str, sample: Sample[Any]) -> None:
-        if kind == "imu":
-            self._latest = self.node.on_imu(sample)
-            return
-        before = self.node.ekf.accepted_gps + self.node.ekf.rejected_gps
-        accepted = self.node.on_gps(sample)
-        ekf = self.node.ekf
-        if (
-            ekf.accepted_gps + ekf.rejected_gps > before
-            and ekf.last_gps_nis is not None
-        ):
-            self._innovations.append(Innovation("gps", ekf.last_gps_nis, 3, accepted))
-            self._log(
-                "ekf/gps",
-                sample.sim_time_ns,
-                [ekf.last_gps_nis, float(accepted)],
-                ["nis", "accepted"],
-            )
-        if accepted:
-            self._latest = self._estimates.next(timeout_wall_s=0)
-            ekf = self.node.ekf  # full state: biases are always estimated
-            self._log(
-                "ekf/bias",
-                sample.sim_time_ns,
-                [*ekf.accel_bias, *ekf.gyro_bias],
-                ["accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z"],
-            )
-
-    def latest(self) -> Sample[EstimatedState] | None:
-        return self._latest
-
-    def drain_innovations(self) -> list[Innovation]:
-        innovations, self._innovations = self._innovations, []
-        return innovations
+    def _record(self, kind: str, sim_time_ns: int, outcome: MeasurementOutcome) -> None:
+        if outcome.accepted and outcome.innovation is None:
+            self.position_initialized_ns = sim_time_ns
+        super()._record(kind, sim_time_ns, outcome)
 
     def summary(self) -> dict[str, Any]:
-        ekf = self.node.ekf
+        ekf: GpsImuEkf = self.filter
+        initialized = self.position_initialized_ns
         return dict(
             gps_updates=ekf.accepted_gps,
             gps_outliers=ekf.rejected_gps,
-            rejected_gps_timing=self.node.rejected_gps_timing,
+            rejected_gps_timing=self.node.rejected_timing["gps"],
             initialization=(
                 "position from the first GPS fix; other states from declared "
                 "ekf priors; no simulator truth"
-                if self.node.initialize_from_gps
+                if ekf.initialize_position_from_gps
                 else "declared ekf priors; no simulator truth"
             ),
             position_initialized_from_gps_s=(
-                None
-                if self.node.position_initialized_ns is None
-                else self.node.position_initialized_ns * 1e-9
+                None if initialized is None else initialized * 1e-9
             ),
-            receiver_covariance_fixes=self.node.receiver_covariance_fixes,
+            receiver_covariance_fixes=self.node.converter.receiver_covariance_fixes,
             priors=self.priors,
         )

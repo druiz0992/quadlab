@@ -45,6 +45,8 @@ from ...sensors.bus import STREAMS, SensorBus
 
 BUILTIN_ESTIMATORS = {
     "gps_imu_ekf": "robotlab.estimation.gps_imu_ekf.plugin:GpsImuEkfEstimator",
+    # Any InertialFilter: estimator_options.filter = "package.module:Class".
+    "inertial": "robotlab.estimation.inertial.estimator:InertialEstimator",
 }
 BUILTIN_CONTROLLERS = {
     "manual": "robotlab.control.manual:ManualRotorController",

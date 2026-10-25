@@ -12,6 +12,8 @@ from scipy.spatial.transform import Rotation
 
 from ...core.frames import GRAVITY
 from ...core.measurements import EstimatedState, readonly_array
+from ..inertial.measurements import GpsFix
+from ..interface import Innovation
 
 
 def skew(v: ArrayLike) -> NDArray[np.float64]:
@@ -56,6 +58,7 @@ class GpsImuEkf:
         accel_bias_walk: float = 0.001,
         gyro_bias_walk: float = 0.0001,
         gps_gate_squared: float = 25.0,
+        initialize_position_from_gps: bool = False,
     ) -> None:
         self.position = readonly_array(position_m, (3,)).copy()
         self.velocity = readonly_array(velocity_mps, (3,)).copy()
@@ -79,6 +82,10 @@ class GpsImuEkf:
         # Normalized innovation squared of the latest GPS update (3 dof),
         # gated or not, for consistency checks (NIS).
         self.last_gps_nis: float | None = None
+        # With initialize_position_from_gps the first fix sets the position
+        # (initialize_position) instead of correcting the declared prior.
+        self.initialize_position_from_gps = initialize_position_from_gps
+        self.position_initialized = False
 
     def predict(
         self,
@@ -174,6 +181,23 @@ class GpsImuEkf:
         self.P = (self.P + self.P.T) / 2
         self.accepted_gps += 1
         return True
+
+    def update_gps(self, fix: GpsFix) -> Innovation | None:
+        """``InertialFilter`` GPS update: the first fix initializes the
+        position when configured (no innovation, returns None), every other
+        fix corrects (``correct_gps``) and returns its 3-dof innovation."""
+        lever = fix.lever_arm_body_m
+        if self.initialize_position_from_gps and not self.position_initialized:
+            self.initialize_position(
+                fix.position_enu_m, fix.covariance_m2, receiver_position_body_m=lever
+            )
+            self.position_initialized = True
+            return None
+        accepted = self.correct_gps(
+            fix.position_enu_m, fix.covariance_m2, receiver_position_body_m=lever
+        )
+        assert self.last_gps_nis is not None
+        return Innovation("gps", self.last_gps_nis, 3, accepted)
 
     def state(self) -> EstimatedState:
         return EstimatedState(

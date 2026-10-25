@@ -620,7 +620,7 @@ class MissionLoop:
             self._last_command_time = t
         if t - self.first_time >= parts.args.duration:
             live_ekf = parts.live_ekf
-            if live_ekf is not None and live_ekf.node.ekf.accepted_gps == 0:
+            if live_ekf is not None and live_ekf.ekf.accepted_gps == 0:
                 raise RuntimeError(
                     "Live EKF has no accepted GPS correction; inspect summary"
                 )

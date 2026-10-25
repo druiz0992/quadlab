@@ -5,12 +5,12 @@ import heapq
 import time
 import xml.etree.ElementTree as ET
 
-import numpy as np
 from scipy.spatial.transform import Rotation
 
+from ...core.algorithms import SensorDescription
 from ...core.measurements import GpsReading, ImuReading
-from ...estimation.gps_imu_ekf import GpsImuEkfNode
 from ...estimation.gps_imu_ekf.plugin import make_ekf, with_calibrated_priors
+from ...estimation.inertial import InertialNode
 from ...sensors.streams import Publisher
 from ...simulation.gazebo.messages import timestamp_ns, vector
 
@@ -59,18 +59,32 @@ class LiveEkf:
         )
         self._now = monotonic
         imu, gps = settings["sensors"]["imu"], settings["sensors"]["gps"]
-        ekf = make_ekf(self.settings)
-        self.node = GpsImuEkfNode(
-            ekf,
+        self.ekf = make_ekf(self.settings)
+        mounts = {
+            "imu": SensorDescription(
+                "imu",
+                "drone/imu",
+                imu["rate_hz"],
+                mount_quaternion_xyzw=tuple(
+                    Rotation.from_euler(
+                        "xyz", imu["mount"]["rotation_deg"], degrees=True
+                    ).as_quat()
+                ),
+            ),
+            "gps": SensorDescription(
+                "gps", "wgs84", gps["rate_hz"], tuple(gps["mount"]["position_m"])
+            ),
+        }
+        self.node = InertialNode(
+            self.ekf,
+            name="gps_imu_ekf",
             gps_reference=reference,
-            gps_covariance_m2=np.diag(np.asarray(self.settings["gps_std_m"]) ** 2),
-            imu_quaternion_body_xyzw=Rotation.from_euler(
-                "xyz", imu["mount"]["rotation_deg"], degrees=True
-            ).as_quat(),
-            gps_position_body_m=gps["mount"]["position_m"],
-            allow_intermediate_gps=True,
-            initialize_from_gps=self.settings["initialize_position_from_gps"],
-            use_receiver_accuracy=self.settings["use_receiver_gps_accuracy"],
+            sensors=mounts,
+            converter_options=dict(
+                gps_std_m=self.settings["gps_std_m"],
+                use_receiver_gps_accuracy=self.settings["use_receiver_gps_accuracy"],
+            ),
+            allow_intermediate=True,
         )
         self.estimates = self.node.estimates
         self.sensors = {
@@ -160,7 +174,7 @@ class LiveEkf:
                 self.node.on_imu(sample)
                 self.stats["imu_dispatched"] += 1
             else:
-                self.node.on_gps(sample)
+                self.node.on_measurement("gps", sample)
                 self.stats["gps_dispatched"] += 1
 
     def check_health(self):
@@ -175,9 +189,9 @@ class LiveEkf:
     def summary(self):
         return dict(
             self.stats,
-            gps_updates=self.node.ekf.accepted_gps,
-            gps_outliers=self.node.ekf.rejected_gps,
-            rejected_gps_timing=self.node.rejected_gps_timing,
+            gps_updates=self.ekf.accepted_gps,
+            gps_outliers=self.ekf.rejected_gps,
+            rejected_gps_timing=self.node.rejected_timing["gps"],
             pending_at_close=len(self._pending),
             initialization="declared ekf priors; no simulator truth",
             priors=dict(

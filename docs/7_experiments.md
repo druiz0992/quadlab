@@ -176,6 +176,7 @@ Start from a template; both are short and commented, and pass the kit:
 | Template | Selects with | What it does |
 | --- | --- | --- |
 | `estimation/template.py` | `robotlab.estimation.template:TemplateEstimator` | Complementary filter: gyro-integrated attitude pulled towards the accelerometer's gravity direction, GPS-blended position and velocity; fixed reported covariance (NEES not meaningful); logs `template/gps_error` |
+| `estimation/inertial/template.py` | `inertial` with `estimator_options.filter: robotlab.estimation.inertial.template:TemplateInertialFilter` | An `InertialFilter`: only the mathematics (position/velocity Kalman filter, gyro-integrated attitude, GPS and barometer updates); the shared node does timing, mounts, and conversion ([5 Estimation](5_estimation.md#writing-your-own-inertial-filter)) |
 | `control/template.py` | `robotlab.control.template:TemplateController` | Cascaded PD: position → tilt-limited acceleration → desired attitude (geometric attitude error, Lee et al. 2010) → torque → pseudo-inverse allocation over the lift rotors |
 
 Wheeled robots have their own controller contract, template

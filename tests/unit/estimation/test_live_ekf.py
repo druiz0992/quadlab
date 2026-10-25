@@ -45,9 +45,9 @@ def test_reordering_and_intermediate_gps_without_truth():
             sample.sim_time_ns for sample in samples
         )
         # The first fix initializes the position; the other three correct.
-        assert live.node.position_initialized_ns is not None
-        assert live.node.ekf.accepted_gps == 3 - 1
-        assert live.node.rejected_gps_timing == 0
+        assert live.ekf.position_initialized
+        assert live.ekf.accepted_gps == 3 - 1
+        assert live.node.rejected_timing["gps"] == 0
         np.testing.assert_allclose(samples[-1].payload.position_m, 0, atol=1e-10)
         assert "no simulator truth" in live.summary()["initialization"]
     finally:
@@ -73,9 +73,9 @@ def test_vibrating_acceleration_reaches_ekf_without_modifying_gyro_or_timestamps
             assert measured.angular_velocity == raw.angular_velocity
             live.ingest("imu", measured)
             live.ingest("gps", message("gps", stamp), gps_dropped=stamp > 0)
-        np.testing.assert_allclose(live.node.ekf.velocity, [0.02, 0, 0], atol=1e-12)
+        np.testing.assert_allclose(live.ekf.velocity, [0.02, 0, 0], atol=1e-12)
         np.testing.assert_allclose(
-            live.node.ekf.rotation.as_quat(), [0, 0, 0, 1], atol=1e-12
+            live.ekf.rotation.as_quat(), [0, 0, 0, 1], atol=1e-12
         )
         assert (
             live.estimates.latest(
@@ -143,10 +143,10 @@ def test_modeled_gps_outage_keeps_imu_prediction_and_recovers_without_sequence_g
                     gps = NS(header=gps.header)
                 live.ingest("gps", gps, gps_dropped=outage)
             if tick == 0:
-                initial_covariance = live.node.ekf.P.copy()
+                initial_covariance = live.ekf.P.copy()
             if tick == 590:
-                assert live.node.ekf.accepted_gps == 1
-                assert live.node.ekf.P[0, 0] > initial_covariance[0, 0]
+                assert live.ekf.accepted_gps == 1
+                assert live.ekf.P[0, 0] > initial_covariance[0, 0]
                 assert (
                     live.estimates.latest(
                         now_sim_time_ns=stamp, max_age_sim_s=0.11
@@ -154,9 +154,9 @@ def test_modeled_gps_outage_keeps_imu_prediction_and_recovers_without_sequence_g
                     >= stamp - 100_000_000
                 )
         assert live.summary()["gps_modeled_drops"] == 59
-        assert live.node.ekf.accepted_gps == 12
-        assert live.node.rejected_gps_timing == 0
-        assert live.node._last[GpsReading][1] == 12
+        assert live.ekf.accepted_gps == 12
+        assert live.node.rejected_timing["gps"] == 0
+        assert live.node._last["gps"][1] == 12
         # Real transport disappearance still trips health checks.
         now[0] = 13
         with pytest.raises(RuntimeError, match="watchdog"):
