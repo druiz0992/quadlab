@@ -338,6 +338,14 @@ def test_keyboard_driving_path_in_real_time(tmp_path, monkeypatch):
     monkeypatch.setattr(
         driving, "DrivingKeyboardWindow", lambda title, layout: ScriptedKeys(script)
     )
+    # Keyboard runs open the live Rerun viewer, a separate process that
+    # outlives the test: stream to a file instead of spawning a window.
+    import rerun
+
+    monkeypatch.setattr(rerun, "spawn", lambda **_: None)
+    monkeypatch.setattr(
+        rerun, "GrpcSink", lambda *_, **__: rerun.FileSink(str(tmp_path / "live.rrd"))
+    )
     output = tmp_path / "run"
     run(
         GazeboConfig(
