@@ -52,7 +52,7 @@ in [README.md](README.md); design, behavior, and reference material are in
 - Sensor models and message decoding go in `sensors`; simulator adapters and
   SDF construction in `simulation`; orchestration in `experiments`; plotting,
   recording, and UI in `visualization`. Keep `cli` thin and `core` small.
-- Preserve the separate step-based (RotorPy, MuJoCo) and asynchronous
+- Preserve the separate step-based (MuJoCo) and asynchronous
   (Gazebo) execution models; do not force them behind one interface.
   Bipeds run only in MuJoCo, every other robot only in Gazebo.
 - Keep ground-truth control and estimator initialization explicit. **Never
@@ -149,7 +149,7 @@ a new numbered file if a topic truly needs one. Keep links relative and valid.
   arrays in measurement samples). Gazebo bindings (`gz.transport13`,
   `gz.msgs10`) must match the system interpreter: currently Python 3.12
   from ROS Jazzy (`source /opt/ros/jazzy/setup.bash`).
-- RotorPy, Rerun, MuJoCo, and ONNX Runtime are pinned in `pyproject.toml`; change pins
+- Rerun, MuJoCo, and ONNX Runtime are pinned in `pyproject.toml`; change pins
   deliberately. Never copy external robot models with restrictive licences
   (e.g. the Microduck's CC BY-NC-SA meshes) into the repository.
 - `gazebo_plugins/` holds C++ gz-sim system plugins (currently the lockstep

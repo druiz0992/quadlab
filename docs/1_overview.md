@@ -92,13 +92,12 @@ src/robotlab/
 ├── planning/               # Placeholder: global_planning, local_planning, behavior
 ├── rl/                     # Placeholder: environments, rewards, training, policies
 ├── simulation/
-│   ├── state.py            # Initial state for retained backend helpers
+│   ├── state.py            # Initial state dict used by numerical tests
 │   ├── battery.py          # LiPo pack voltage, current, state of charge
 │   ├── aerodynamics.py     # Ground effect, Dryden-style turbulence
 │   ├── powertrain.py       # Battery speed limit and ground effect on motor speeds
 │   ├── esc.py              # ESC update rate and command resolution
 │   ├── randomization.py    # Per-run true vehicle vs nominal (model mismatch)
-│   ├── backends/           # Retained RotorPy/reference library adapters (no CLI)
 │   ├── mujoco/             # Bipeds: settings (config.py), MJCF scene loading and edits
 │   │                       #   (scene.py), truth and IMU readout (state.py), test biped
 │   ├── wheeled/            # Wheeled robots: presets and validation (config.py), tyres,
@@ -151,7 +150,6 @@ src/robotlab/
     ├── biped_rerun.py      # Biped Rerun view (MuJoCo geoms, trunk/command plots)
     ├── driving_keyboard.py # Tk driving window
     ├── keyboard.py         # Tk keyboard window (key/focus state only)
-    ├── live.py             # Matplotlib live drone view (retained)
     └── plotting.py         # Static flight plots (retained)
 
 gazebo_plugins/             # C++ gz-sim system plugins (lockstep barrier); built into
@@ -192,8 +190,8 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
   These are simulator features, not RobotLab Python algorithms.
 - The `gazebo_rerun` adapter deliberately understands Gazebo messages but
   does not control, plan, or estimate.
-- There is no shared simulator interface for Gazebo, RotorPy, and MuJoCo:
-  Gazebo is asynchronous transport, the others explicit stepping. Bipeds run
+- There is no shared simulator interface for Gazebo and MuJoCo: Gazebo is
+  asynchronous transport, MuJoCo explicit stepping. Bipeds run
   only in MuJoCo, every other robot only in Gazebo. Add shared types to
   `core` only when real integrations require them.
 - Optional imports (Gazebo bindings, Rerun, Tk) are deferred, so world
@@ -252,8 +250,7 @@ must be an explicit, recorded experiment decision.
 
 ## Dependencies
 
-Base: NumPy, SciPy, Matplotlib, and pinned RotorPy (used only by retained
-backend library code). The `gazebo` extra adds pinned `rerun-sdk==0.24.1` and
+Base: NumPy, SciPy, and Matplotlib. The `gazebo` extra adds pinned `rerun-sdk==0.24.1` and
 protobuf. The `gz` executable and `gz.transport13`/`gz.msgs10` bindings are
 system prerequisites (ROS Jazzy, Python 3.12 here). The `mujoco` extra adds
 pinned `mujoco==3.17.0` (CPU wheel) for bipeds; `policies` adds pinned

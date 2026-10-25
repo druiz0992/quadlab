@@ -1,4 +1,5 @@
-"""Initial state for the step-based simulation backends."""
+"""Initial rigid-body state dict (position, velocity, attitude, rates) used
+by numerical tests of the sensor models and dead reckoning."""
 
 import numpy as np
 

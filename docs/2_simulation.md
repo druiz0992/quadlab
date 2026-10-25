@@ -8,7 +8,7 @@ edited, and what each run records. Commands and options are in the
 
 RobotLab runs a self-contained quadrotor in Gazebo Harmonic (8.x) through
 native Gazebo transport, with Rerun 0.24.1. ROS nodes, PX4, and Fuel model
-downloads are not required. RotorPy is not part of this runtime.
+downloads are not required.
 
 Gazebo owns physics (0.002 s step by default), native multicopter motor and
 velocity plugins, contacts, and sensor simulation. The vehicle is a

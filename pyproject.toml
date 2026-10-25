@@ -7,7 +7,7 @@ name = "robotlab"
 version = "0.1.0"
 description = "Drone simulation lab for testing estimation and control algorithms"
 requires-python = ">=3.12"
-dependencies = ["numpy>=1.24", "scipy>=1.18", "matplotlib>=3.7", "rotorpy==3.0.0"]
+dependencies = ["numpy>=1.24", "scipy>=1.18", "matplotlib>=3.7"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "black>=24", "mypy>=1.10"]
@@ -43,9 +43,9 @@ mypy_path = "src"
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-# No type information: ROS-provided Gazebo bindings, RotorPy, MuJoCo, and
+# No type information: ROS-provided Gazebo bindings, MuJoCo, and
 # SciPy (typed via the separate scipy-stubs package, not a dependency).
-module = ["gz.*", "rotorpy.*", "mujoco.*", "onnxruntime.*", "scipy.*"]
+module = ["gz.*", "mujoco.*", "onnxruntime.*", "scipy.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

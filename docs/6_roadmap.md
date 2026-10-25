@@ -247,7 +247,7 @@ with AlgorithmRunner() as runner:
 **Stages:** envelopes/decoders → channels with fake transport → session
 extraction → worker connections → sensor-driven estimation experiment →
 estimator-driven control. Preserve CLI behavior and timestamp contracts.
-Do not build a universal Gazebo/RotorPy interface.
+Do not build a universal Gazebo/MuJoCo interface.
 
 ## Control modes
 
