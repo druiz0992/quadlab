@@ -63,7 +63,6 @@ src/robotlab/
 │   ├── template.py         # Full estimator plug-in template (complementary filter)
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
 │   ├── imu_calibration.py  # Static IMU fit and calibration driver
-│   ├── dead_reckoning.py   # Retained IMU dead-reckoning baseline
 │   ├── filter/             # Reusable for any predict/update filter: node (timing, held
 │   │                       #   driving readings), measurement conversion, the `filter`
 │   │                       #   plug-in, example filters (template.py, wheel_odometry.py)
@@ -92,7 +91,6 @@ src/robotlab/
 ├── planning/               # Placeholder: global_planning, local_planning, behavior
 ├── rl/                     # Placeholder: environments, rewards, training, policies
 ├── simulation/
-│   ├── state.py            # Initial state dict used by numerical tests
 │   ├── battery.py          # LiPo pack voltage, current, state of charge
 │   ├── aerodynamics.py     # Ground effect, Dryden-style turbulence
 │   ├── powertrain.py       # Battery speed limit and ground effect on motor speeds
@@ -149,8 +147,7 @@ src/robotlab/
     ├── wheeled_rerun.py    # Wheeled-robot Rerun layout (wheels, surfaces, plots)
     ├── biped_rerun.py      # Biped Rerun view (MuJoCo geoms, trunk/command plots)
     ├── driving_keyboard.py # Tk driving window
-    ├── keyboard.py         # Tk keyboard window (key/focus state only)
-    └── plotting.py         # Static flight plots (retained)
+    └── keyboard.py         # Tk keyboard window (key/focus state only)
 
 gazebo_plugins/             # C++ gz-sim system plugins (lockstep barrier); built into
                             #   build/gazebo_plugins by robotlab-build-plugins
@@ -253,8 +250,8 @@ must be an explicit, recorded experiment decision.
 
 ## Dependencies
 
-Base: NumPy, SciPy, and Matplotlib. The `gazebo` extra adds pinned `rerun-sdk==0.24.1` and
-protobuf. The `gz` executable and `gz.transport13`/`gz.msgs10` bindings are
+Base: NumPy, SciPy, and Matplotlib (reads mesh textures for the Rerun
+view). The `gazebo` extra adds pinned `rerun-sdk==0.24.1` and protobuf. The `gz` executable and `gz.transport13`/`gz.msgs10` bindings are
 system prerequisites (ROS Jazzy, Python 3.12 here). The `mujoco` extra adds
 pinned `mujoco==3.17.0` (CPU wheel) for bipeds; `policies` adds pinned
 `onnxruntime==1.31.0` for the ONNX policy runner. The `dev` extra adds

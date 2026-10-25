@@ -23,7 +23,6 @@ sensor bus samples (imu, gps)
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
 | `sensors/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
 | `sensors/geodesy.py` | WGS84 ↔ ECEF ↔ local ENU conversion |
-| `estimation/dead_reckoning.py` | Retained IMU dead-reckoning baseline (truth-initialized, explicit `dt`; not used live) |
 
 None of the numerical modules depend on Gazebo transport or Rerun.
 
