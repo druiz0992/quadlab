@@ -35,6 +35,7 @@ from ..gazebo.config import (
     stream_timing,
 )
 from ..wheeled.config import MUJOCO_KINDS
+from ...control.legged import CONTROL_STATE_SOURCES
 
 BUILTIN_PREFIX = "builtin:"
 ASSETS_DIR = Path(__file__).parent / "assets"
@@ -85,6 +86,14 @@ BIPED_DEFAULTS: dict[str, Any] = {
         "reorder_window_s": 0.0,
         "imu": stream_timing(),
         "joint_encoders": stream_timing(),
+    },
+    # Joint-level controller plug-in (control/legged.py): empty holds the
+    # start keyframe (built-in ``hold``). ``control_state_source`` ``truth``
+    # also hands the controller the trunk's true pose, ``sensors`` does not.
+    "algorithms": {
+        "controller": "",
+        "controller_options": {},
+        "control_state_source": "truth",
     },
     "health": {
         # Fallen: trunk tilt above this, or trunk height below this fraction
@@ -206,6 +215,12 @@ def validate_biped(data: dict[str, Any]) -> None:
     for key, values in imu_errors.items():
         if isinstance(values, list) and any(v < 0 for v in values):
             raise ValueError(f"sensors.imu.error_model.{key} must be nonnegative")
+    source = data["algorithms"]["control_state_source"]
+    if source not in CONTROL_STATE_SOURCES:
+        raise ValueError(
+            "algorithms.control_state_source must be one of "
+            + ", ".join(CONTROL_STATE_SOURCES)
+        )
     health = data["health"]
     number(health["fall_tilt_deg"], "health.fall_tilt_deg", positive=True)
     if not 0 < health["fall_height_fraction"] < 1:

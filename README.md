@@ -232,6 +232,8 @@ robotlab --robot rover --keyboard --headless --scene worlds/rover_terrain.json -
 # microduck_rl checkout beside this repository (docs/9_bipeds.md)
 robotlab --robot biped --duration 10 --output outputs/biped
 robotlab --config configs/bipeds/microduck.json --duration 10 --output outputs/duck
+# Your biped controller: start from control/legged_template.py, check it with
+# check_legged_controller, select it with algorithms.controller
 
 # Worlds: generate only, edit paused in Gazebo, fly a saved world
 robotlab --generate-only --output outputs/world-preview

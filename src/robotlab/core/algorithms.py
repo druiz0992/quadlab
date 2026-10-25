@@ -24,6 +24,7 @@ from .vehicle import DroneProperties
 from .track import Track
 from .camera import SENSOR_FROM_OPTICAL, CameraCalibration
 from .wheeled_vehicle import WheeledProperties
+from .legged import LeggedProperties
 
 
 @dataclass(frozen=True)
@@ -98,8 +99,8 @@ class AlgorithmContext:
     """
 
     gps_reference: GpsReading
-    # Nominal multirotor (for wheeled robots the unused multirotor defaults;
-    # use ``wheeled`` there).
+    # Nominal multirotor (for wheeled and legged robots the unused
+    # multirotor defaults; use ``wheeled`` or ``legged`` there).
     vehicle: DroneProperties
     sensors: Mapping[str, SensorDescription] = field(default_factory=dict)
     gravity_mps2: float = 9.81
@@ -112,6 +113,8 @@ class AlgorithmContext:
     )
     # The scene's race track (map knowledge, core/track.py), else None.
     track: Track | None = field(default=None, metadata={"serialize": False})
+    # Nominal legged robot (MuJoCo biped runs, core/legged.py), else None.
+    legged: LeggedProperties | None = field(default=None, metadata={"serialize": False})
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "sensors", MappingProxyType(dict(self.sensors)))

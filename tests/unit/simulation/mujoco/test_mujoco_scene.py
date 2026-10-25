@@ -126,3 +126,25 @@ def test_model_source_records_git_checkout() -> None:
     assert scene.source.path.endswith("test_biped.xml")
     # The built-in model lives in this repository; outside git both are None.
     assert (scene.source.commit is None) == (scene.source.dirty is None)
+
+
+def test_properties_and_imu_mount(tmp_path: Path) -> None:
+    text = TEST_BIPED.replace(
+        '<site name="imu" pos="0 0 0.01"/>',
+        '<site name="imu" pos="0.02 0 0.01" euler="0 0 1.5707963"/>',
+    ).replace(
+        '<position name="left_knee" joint="left_knee"/>',
+        '<position name="left_knee" joint="left_knee" ctrllimited="false"/>',
+    )
+    scene = build_scene(settings(), model_file(tmp_path, text))
+    robot = scene.properties(50.0)
+    assert robot.joint_names == scene.joint_names and robot.mass_kg == pytest.approx(
+        0.64
+    )
+    np.testing.assert_allclose(robot.position_gain, 6.0)
+    # No control range on the knee actuator: the joint range bounds it.
+    assert robot.target_lower_rad[1] == -1.5 and robot.target_upper_rad[1] == 1.5
+    position, quaternion = scene.imu_mount()
+    np.testing.assert_allclose(position, [0.02, 0, 0.01], atol=1e-9)
+    s = np.sqrt(0.5)
+    np.testing.assert_allclose(quaternion, [0, 0, s, s], atol=1e-6)

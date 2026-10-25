@@ -24,7 +24,8 @@ document and update the status below.
 | Camera calibration errors (estimator-side intrinsics differing from the simulated camera) | Future |
 | Procedural textures (`color`, `texture`, `ground_texture`, visual-only markings); textured yard with a lidar-degenerate corridor | Implemented ([2 Simulation](2_simulation.md#json-scenes)) |
 | MuJoCo biped backend core (`--robot biped`, MJCF loading, IMU and joint encoders on the bus, fall health) | Implemented ([9 Bipeds](9_bipeds.md)) |
-| Biped controller contract, Microduck ONNX policies, ToF/camera/Rerun, Gymnasium environment | Planned ([Bipeds](#bipeds)) |
+| Biped joint-level controller contract, template, contract kit | Implemented ([9 Bipeds](9_bipeds.md#controllers)) |
+| Microduck ONNX policies, ToF/camera/Rerun, Gymnasium environment | Planned ([Bipeds](#bipeds)) |
 | EKF fusion of magnetometer (heading), rangefinder and optical flow (GPS-denied) | Future, with EKF robustness work |
 | Magnetometer calibration (hard/soft iron, current/throttle compensation; automated procedure; calibration for filters) | Implemented ([3 Configuration](3_configuration.md#magnetometer-calibration-sensorsmagnetometercalibration)) |
 | Online (in-filter) magnetometer offset estimation to follow drift | Future, with EKF robustness work |
@@ -288,8 +289,7 @@ before claiming autonomous laps or realistic wind response.
 
 Approved plan (2026-10-25) after the MuJoCo backend core ([9 Bipeds](9_bipeds.md)):
 
-1. **Controller contract:** `JointTargets` commands, a `LeggedController`
-   protocol, a template, and a contract test kit, as for wheeled robots.
+1. **Controller contract:** implemented ([9 Bipeds](9_bipeds.md#controllers)).
 2. **Pollen's policies:** run the Microduck's ONNX policies (61 observations,
    14 actions, 50 Hz; optional `onnxruntime`) with keyboard velocity
    commands. Matching their observation layout and servo response is the

@@ -26,6 +26,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from ...core.legged import LeggedProperties
+
 GRAVITY_MPS2 = (0.0, 0.0, -9.81)
 ACCEL_SENSOR = "robotlab_imu_accelerometer"
 GYRO_SENSOR = "robotlab_imu_gyro"
@@ -48,7 +50,8 @@ class BipedScene:
 
     ``joint_names`` are the actuated joints in actuator (command) order;
     ``qpos_index``/``dof_index`` locate them in ``qpos``/``qvel``.
-    ``free_qpos``/``free_dof`` are the trunk free joint's first addresses.
+    ``free_qpos``/``free_dof`` are the trunk free joint's first addresses
+    and ``trunk_body`` its body; ``imu_site`` is the IMU site's index.
     ``initial_ctrl`` holds the keyframe's actuator targets.
     """
 
@@ -60,6 +63,8 @@ class BipedScene:
     dof_index: NDArray[np.int64]
     free_qpos: int
     free_dof: int
+    trunk_body: int
+    imu_site: int
     keyframe_id: int
     initial_ctrl: NDArray[np.float64]
     ctrl_range: NDArray[np.float64]
@@ -81,6 +86,46 @@ class BipedScene:
         mujoco.mj_resetDataKeyframe(self.model, data, self.keyframe_id)
         mujoco.mj_forward(self.model, data)
         return data
+
+    def properties(self, control_rate_hz: float) -> LeggedProperties:
+        """Nominal ``LeggedProperties`` for the algorithm context: command
+        bounds from the actuators' control ranges (the joint range when an
+        actuator has none), servo gains, keyframe targets, total mass."""
+        model = self.model
+        lower, upper = self.ctrl_range[:, 0].copy(), self.ctrl_range[:, 1].copy()
+        joints = model.actuator_trnid[:, 0]
+        for a in range(model.nu):
+            if not model.actuator_ctrllimited[a]:
+                joint = joints[a]
+                limited = model.jnt_limited[joint]
+                lower[a] = model.jnt_range[joint, 0] if limited else -np.inf
+                upper[a] = model.jnt_range[joint, 1] if limited else np.inf
+        return LeggedProperties(
+            name=self.name,
+            joint_names=self.joint_names,
+            target_lower_rad=lower,
+            target_upper_rad=upper,
+            position_gain=np.array(model.actuator_gainprm[:, 0], dtype=float),
+            initial_target_rad=self.initial_ctrl,
+            mass_kg=float(np.sum(model.body_mass)),
+            control_rate_hz=control_rate_hz,
+        )
+
+    def imu_mount(self) -> tuple[tuple[float, ...], tuple[float, ...]]:
+        """IMU site pose in trunk-body axes at the initial keyframe:
+        (position m, quaternion xyzw rotating sensor axes into body axes)."""
+        import mujoco
+
+        data = self.new_data()
+        trunk_r = data.xmat[self.trunk_body].reshape(3, 3)
+        site_r = data.site_xmat[self.imu_site].reshape(3, 3)
+        offset = trunk_r.T @ (
+            data.site_xpos[self.imu_site] - data.xpos[self.trunk_body]
+        )
+        wxyz = np.zeros(4)
+        mujoco.mju_mat2Quat(wxyz, (trunk_r.T @ site_r).flatten())
+        w, x, y, z = wxyz
+        return tuple(float(v) for v in offset), (float(x), float(y), float(z), float(w))
 
     def write_xml(self, path: Path) -> None:
         """Save the edited model as MJCF (asset paths made absolute so the
@@ -110,7 +155,9 @@ def build_scene(settings: dict[str, Any], model_path: Path) -> BipedScene:
         model = spec.compile()
     except Exception as error:
         raise ValueError(f"Cannot compile MJCF {model_path}: {error}") from error
-    return _index(model, spec, biped["initial_keyframe"], model_path, overrides)
+    return _index(
+        model, spec, biped["initial_keyframe"], biped["imu_site"], model_path, overrides
+    )
 
 
 def _absolute_asset_dirs(spec: Any, model_path: Path) -> None:
@@ -153,7 +200,12 @@ def _add_imu_sensors(spec: Any, site: str, mujoco: Any) -> None:
 
 
 def _index(
-    model: Any, spec: Any, keyframe: str, path: Path, overrides: dict[str, Any]
+    model: Any,
+    spec: Any,
+    keyframe: str,
+    imu_site: str,
+    path: Path,
+    overrides: dict[str, Any],
 ) -> BipedScene:
     """Validate the compiled model (see module docs) and build the scene."""
     import mujoco
@@ -177,6 +229,8 @@ def _index(
         dof_index=np.array([model.jnt_dofadr[j] for j in joints], dtype=np.int64),
         free_qpos=int(model.jnt_qposadr[free_joint]),
         free_dof=int(model.jnt_dofadr[free_joint]),
+        trunk_body=int(model.jnt_bodyid[free_joint]),
+        imu_site=int(mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, imu_site)),
         keyframe_id=int(key_id),
         initial_ctrl=np.array(model.key_ctrl[key_id], dtype=float),
         ctrl_range=np.array(model.actuator_ctrlrange, dtype=float),

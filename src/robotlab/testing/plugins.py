@@ -41,10 +41,20 @@ driven wheels, brakes >= 0 on braked wheels, angles only on steered
 wheels), repeats exactly on a second run, and ``summary()`` (optional) is
 a JSON-serializable dict.
 
+``check_legged_controller`` checks the ``LeggedController`` contract
+(control/legged.py) on a nominal six-joint biped shaped like the built-in
+test biped (no MuJoCo needed): before any sample arrives, upright and
+leaning, with trunk truth and with sensors only, with no request and with
+``WalkCommand`` requests, ``update`` returns ``JointTargets`` with one
+finite target per joint, repeats exactly on a second run, and
+``summary()`` (optional) is a JSON-serializable dict. Targets outside the
+joint bounds are allowed (the mission clips and counts them); the report
+lists them.
+
 ``run_estimator`` is the checked delivery loop on its own, for any sample
 list; ``testing/scenarios.py`` uses it to score estimators against truth.
 
-All three raise ``PluginContractError`` (an AssertionError) with the reason,
+All four raise ``PluginContractError`` (an AssertionError) with the reason,
 and return a report for further assertions. The data are synthetic and
 noise-light: passing says the plug-in fits the harness, not that it is a
 good algorithm; judge that with Gazebo runs and ``robotlab-replay``.
@@ -67,6 +77,7 @@ from ..core.algorithms import (
 )
 from ..core.measurements import EstimatedState, GpsReading, ImuReading, Sample
 from ..core.vehicle import DroneProperties
+from ..core.legged import JointTargets, LeggedProperties
 from ..core.wheeled import WheelCommands
 from ..core.wheeled_vehicle import WheeledProperties
 from ..estimation.interface import Innovation
@@ -571,3 +582,130 @@ def check_wheeled_controller(
         summary = controller.summary()
         _json_dict(summary, "summary()")
     return WheeledControllerReport(tuple(first), summary)
+
+
+@dataclass(frozen=True)
+class LeggedControllerReport:
+    """Targets ``check_legged_controller`` saw, in probe order, and the
+    probe indices whose targets fell outside the joint bounds."""
+
+    commands: tuple[JointTargets, ...]
+    out_of_bounds: tuple[int, ...] = ()
+    summary: dict[str, Any] = field(default_factory=dict)
+
+
+def nominal_legged() -> LeggedProperties:
+    """Six-joint biped like ``builtin:test_biped`` (hip, knee, ankle pitch
+    per leg; ±1.5 rad bounds; 6 N·m/rad servos; zero initial targets)."""
+    names = tuple(
+        f"{side}_{joint}"
+        for side in ("left", "right")
+        for joint in ("hip_pitch", "knee", "ankle_pitch")
+    )
+    return LeggedProperties(
+        name="robotlab_test_biped",
+        joint_names=names,
+        target_lower_rad=np.full(6, -1.5),
+        target_upper_rad=np.full(6, 1.5),
+        position_gain=np.full(6, 6.0),
+        initial_target_rad=np.zeros(6),
+        mass_kg=0.64,
+        control_rate_hz=50.0,
+    )
+
+
+def legged_context(properties: LeggedProperties) -> AlgorithmContext:
+    """Context like a biped run's: IMU and joint encoders at nominal rates."""
+    sensors = {
+        kind: SensorDescription(kind, STREAMS[kind][1], rate)
+        for kind, rate in (("imu", 250.0), ("joint_encoders", 50.0))
+    }
+    return AlgorithmContext(
+        REFERENCE, DroneProperties(), sensors, GRAVITY_MPS2, legged=properties
+    )
+
+
+def _legged_probes(properties: LeggedProperties) -> list[tuple[Any, Any]]:
+    """(state, request) pairs (see module docs)."""
+    from ..control.legged import LeggedControlState, TrunkState, WalkCommand
+    from ..sensors.joint_encoders import JointStateReading
+
+    n = properties.joint_count
+    probes: list[tuple[Any, Any]] = []
+    states = [LeggedControlState(0, None, None)]
+    for index, lean_rad in enumerate((0.0, 0.2, -0.3)):
+        t_ns = (index + 1) * 20_000_000
+        # World up in body axes when pitched forward by lean_rad.
+        up = np.array([-np.sin(lean_rad), 0.0, np.cos(lean_rad)])
+        imu = _sample("imu", index + 1, t_ns, ImuReading(9.81 * up, np.zeros(3)))
+        joints = _sample(
+            "joint_encoders",
+            index + 1,
+            t_ns,
+            JointStateReading(
+                t_ns, properties.joint_names, (0,) * n, np.zeros(n), np.zeros(n)
+            ),
+        )
+        half = lean_rad / 2
+        trunk = TrunkState(
+            np.array([0.0, 0.0, 0.17]),
+            np.zeros(3),
+            np.array([0.0, np.sin(half), 0.0, np.cos(half)]),
+            np.zeros(3),
+        )
+        states += [
+            LeggedControlState(t_ns, joints, imu, trunk),
+            LeggedControlState(t_ns, joints, imu, None),
+        ]
+    for state in states:
+        for request in (None, WalkCommand(0.1, 0.0, 0.3)):
+            probes.append((state, request))
+    return probes
+
+
+def _run_legged(factory, options, properties) -> tuple[list[JointTargets], Any]:
+    controller = factory(legged_context(properties), dict(options))
+    commands = []
+    for index, (state, request) in enumerate(_legged_probes(properties)):
+        command = controller.update(state, request, 0.0 if index == 0 else 0.02)
+        _fail(
+            isinstance(command, JointTargets),
+            f"update returned {type(command).__name__}, not JointTargets",
+        )
+        try:
+            command.validate(properties.joint_count)
+        except ValueError as error:
+            raise PluginContractError(f"invalid JointTargets: {error}") from error
+        commands.append(command)
+    return commands, controller
+
+
+def check_legged_controller(
+    factory: Callable[[AlgorithmContext, Mapping[str, Any]], Any],
+    options: Mapping[str, Any] | None = None,
+    properties: LeggedProperties | None = None,
+) -> LeggedControllerReport:
+    """Check a ``LeggedController`` class (see module docs) on
+    ``properties`` (default ``nominal_legged()``)."""
+    from ..control.legged import LeggedController
+
+    properties = properties or nominal_legged()
+    options = options or {}
+    first, controller = _run_legged(factory, options, properties)
+    _fail(
+        isinstance(controller, LeggedController),
+        "controller does not implement LeggedController (update)",
+    )
+    second, _ = _run_legged(factory, options, properties)
+    _fail(first == second, "two runs gave different targets (hidden state or RNG)")
+    summary: dict[str, Any] = {}
+    if hasattr(controller, "summary"):
+        summary = controller.summary()
+        _json_dict(summary, "summary()")
+    outside = tuple(
+        index
+        for index, command in enumerate(first)
+        if np.any(np.array(command.position_rad) < properties.target_lower_rad)
+        or np.any(np.array(command.position_rad) > properties.target_upper_rad)
+    )
+    return LeggedControllerReport(tuple(first), outside, summary)

@@ -61,6 +61,7 @@ def test_layers_merge_and_record_sources(tmp_path: Path) -> None:
         ({"sensor_timing": {"imu": {"latency_s": -0.1}}}, "nonnegative"),
         ({"health": {"fall_height_fraction": 1.0}}, r"\(0, 1\)"),
         ({"robot": {"kind": "rover"}}, "MuJoCo run"),
+        ({"algorithms": {"control_state_source": "estimate"}}, "control_state_source"),
         ({"biped": {"model_path": "builtin:nope"}}, "unknown built-in"),
         ({"biped": {"model_path": "/no/such/model.xml"}}, "not found"),
         (

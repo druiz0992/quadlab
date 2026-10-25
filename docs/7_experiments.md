@@ -181,6 +181,9 @@ Start from a template; both are short and commented, and pass the kit:
 Wheeled robots have their own controller contract, template
 (`control/wheeled_template.py`), and kit check (`check_wheeled_controller`);
 estimator plug-ins are shared ([8 Ground vehicles](8_ground_vehicles.md#controllers)).
+MuJoCo bipeds have a joint-level contract, template
+(`control/legged_template.py`), and kit check (`check_legged_controller`)
+([9 Bipeds](9_bipeds.md#controllers)).
 
 Both reject unknown option keys. Verified in lockstep on the training
 square (two laps, 45 s): the template controller tracked with 0.148 m

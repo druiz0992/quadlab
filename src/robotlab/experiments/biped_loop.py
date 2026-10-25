@@ -8,9 +8,12 @@ t = k·Δ:
 
 1. ``mj_step1``: positions, velocities, and their sensors at t;
 2. joint encoders due at t read the true joints at t (bus ``joint_encoders``);
-3. the sensor bus releases samples due by t (an estimator would read them here);
-4. control due at t writes the joint targets (``commands.jsonl``); while no
-   controller is configured the initial keyframe's targets are held;
+3. the sensor bus releases samples due by t; the newest of each stream is
+   kept for the controller;
+4. control due at t calls the controller (control/legged.py) with those
+   samples (and the trunk truth when ``algorithms.control_state_source``
+   is ``truth``), clips its targets to the joints' command ranges
+   (counted per joint), and applies them (``commands.jsonl``);
 5. ``mj_step2``: accelerations at t, then integration to t + Δ;
 6. an IMU sample due at t reads the accelerometer and gyro at t (they
    depend on the command applied at t, so the controller sees it no
@@ -32,7 +35,9 @@ from typing import Any, TextIO
 import numpy as np
 from numpy.typing import NDArray
 
-from ..core.measurements import ImuReading
+from ..control.legged import LeggedControlState, TrunkState
+from ..core.legged import JointTargets, LeggedProperties
+from ..core.measurements import ImuReading, Sample
 from ..evaluation.biped_health import BipedHealth
 from ..sensors.bus import SensorBus
 from ..sensors.imu_errors import ImuErrorModel
@@ -53,6 +58,9 @@ class BipedParts:
 
     config: BipedConfig
     scene: BipedScene
+    properties: LeggedProperties
+    controller: Any
+    controller_spec: str
     bus: SensorBus
     imu_errors: ImuErrorModel
     encoders: JointEncoderModel
@@ -86,7 +94,13 @@ class BipedLoop:
             imu=bool(sensors["imu"]["enabled"]),
             joint_encoders=bool(sensors["joint_encoders"]["enabled"]),
         )
-        self.target: NDArray[np.float64] = parts.scene.initial_ctrl.copy()
+        self.truth_for_control = (
+            settings["algorithms"]["control_state_source"] == "truth"
+        )
+        self.latest: dict[str, Sample] = {}
+        self.limited = {name: 0 for name in parts.properties.joint_names}
+        self.control_ticks = 0
+        self._previous_control_ns: int | None = None
         self.steps_done = 0
         self.completed = False
         self.exit_reason = "duration"
@@ -137,9 +151,11 @@ class BipedLoop:
                 t_ns, truth.joint_position_rad, truth.joint_velocity_rad_s
             )
             bus.submit("joint_encoders", reading, t_ns)
-        self.delivered += len(bus.advance(t_ns))
+        for kind, sample in bus.advance(t_ns):
+            self.latest[kind] = sample
+            self.delivered += 1
         if self._due("control", step):
-            self._control(data, t_ns)
+            self._control(data, truth)
         mujoco.mj_step2(scene.model, data)
         if self.enabled["imu"] and self._due("imu", step):
             force, rate = self.parts.imu_errors.apply(*imu_reading(scene, data), t_ns)
@@ -147,12 +163,53 @@ class BipedLoop:
         if self._due("record", step):
             self._record(truth)
 
-    def _control(self, data: Any, t_ns: int) -> None:
-        """Apply the joint targets (rad) for this control period."""
-        self.parts.health.on_command(t_ns, self.target)
-        data.ctrl[:] = self.target
-        line = dict(sim_time_ns=t_ns, joint_target_rad=self.target.tolist())
+    def _control(self, data: Any, truth: BipedTruth) -> None:
+        """Run the controller and apply its clipped targets (module docs)."""
+        t_ns = truth.sim_time_ns
+        dt_s = 0.0
+        if self._previous_control_ns is not None:
+            dt_s = (t_ns - self._previous_control_ns) * 1e-9
+        self._previous_control_ns = t_ns
+        state = LeggedControlState(
+            sim_time_ns=t_ns,
+            joints=self.latest.get("joint_encoders"),
+            imu=self.latest.get("imu"),
+            trunk=_trunk(truth) if self.truth_for_control else None,
+        )
+        requested = self.parts.controller.update(state, None, dt_s)
+        applied, limited = self._accept(requested)
+        self.control_ticks += 1
+        self.parts.health.on_command(t_ns, applied)
+        data.ctrl[:] = applied
+        line = dict(
+            sim_time_ns=t_ns,
+            joint_target_rad=applied.tolist(),
+            requested_rad=list(requested.position_rad),
+            limited=limited,
+        )
         self._files["commands"].write(json.dumps(line) + "\n")
+
+    def _accept(self, requested: Any) -> tuple[NDArray[np.float64], list[int]]:
+        """Validate and clip one command; raises RuntimeError when the
+        controller returned something the servos cannot accept at all."""
+        robot = self.parts.properties
+        if not isinstance(requested, JointTargets):
+            raise RuntimeError(
+                f"{self.parts.controller_spec}: update returned "
+                f"{type(requested).__name__}, not JointTargets"
+            )
+        try:
+            requested.validate(robot.joint_count)
+        except ValueError as error:
+            raise RuntimeError(
+                f"{self.parts.controller_spec}: invalid JointTargets: {error}"
+            ) from error
+        target = np.array(requested.position_rad)
+        applied = np.clip(target, robot.target_lower_rad, robot.target_upper_rad)
+        limited = [int(i) for i in np.flatnonzero(applied != target)]
+        for index in limited:
+            self.limited[robot.joint_names[index]] += 1
+        return applied, limited
 
     def _record(self, truth: BipedTruth) -> None:
         self.parts.health.on_truth(truth)
@@ -162,6 +219,15 @@ class BipedLoop:
         self.summary = biped_summary(self, data, wall_s)
         path = self.parts.output / "summary.json"
         path.write_text(json.dumps(self.summary, indent=2) + "\n")
+
+
+def _trunk(truth: BipedTruth) -> TrunkState:
+    return TrunkState(
+        position_m=truth.position_m,
+        velocity_world_mps=truth.velocity_mps,
+        quaternion_xyzw=truth.quaternion_xyzw,
+        body_rates_rad_s=truth.angular_velocity_rad_s,
+    )
 
 
 def mujoco_warnings(data: Any) -> dict[str, int]:
@@ -201,6 +267,7 @@ def biped_summary(loop: BipedLoop, data: Any, wall_s: float) -> dict[str, Any]:
             ),
             joint_names=list(scene.joint_names),
         ),
+        control=_control_summary(loop),
         config=dict(
             sources=list(parts.config.sources),
             content_hash=parts.config.content_hash,
@@ -221,4 +288,17 @@ def biped_summary(loop: BipedLoop, data: Any, wall_s: float) -> dict[str, Any]:
             joint_encoders=parts.encoders.summary(),
         ),
         bus=dict(parts.bus.summary(), delivered_total=loop.delivered),
+    )
+
+
+def _control_summary(loop: BipedLoop) -> dict[str, Any]:
+    """``summary.json.control``: controller, state source, ticks, limits."""
+    controller = loop.parts.controller
+    summary = controller.summary() if hasattr(controller, "summary") else None
+    return dict(
+        controller=loop.parts.controller_spec,
+        state_source="truth" if loop.truth_for_control else "sensors",
+        ticks=loop.control_ticks,
+        limited_commands=loop.limited,
+        controller_summary=summary,
     )

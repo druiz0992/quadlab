@@ -36,7 +36,7 @@ install -e .`.
 | Viewing and recording | Rerun world, sensor views, thrust plots, JSONL logs, `.rrd` replay |
 | Worlds | JSON scene generation, paused Gazebo editing, saved SDF reuse; surface friction zones and spawn points for wheeled robots |
 | Ground vehicles | `--robot rover/car/tractor`: ray-cast suspension, transient Magic Formula tyres, drive/brake/steering actuators, aerodynamics in Python; wheel encoders; keyboard driver; wheeled controller plug-ins ([8 Ground vehicles](8_ground_vehicles.md)) |
-| Bipeds | `--robot biped` in MuJoCo: MJCF models (built-in test biped, or Pollen Robotics' Microduck from a local checkout), held keyframe targets, IMU and joint encoders on the sensor bus, fall health check ([9 Bipeds](9_bipeds.md)); no controllers yet |
+| Bipeds | `--robot biped` in MuJoCo: MJCF models (built-in test biped, or Pollen Robotics' Microduck from a local checkout), IMU and joint encoders on the sensor bus, joint-level controller plug-ins (hold, template), fall health check ([9 Bipeds](9_bipeds.md)) |
 
 **Not implemented:** the full Gazebo session API (algorithms run serially
 on the mission thread, not in worker threads), obstacle avoidance,
@@ -58,7 +58,8 @@ src/robotlab/
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
 │                           #   measurement samples, rotor commands, JSON codec
 │                           #   (serialization.py), wheel commands (wheeled.py),
-│                           #   wheeled vehicle properties (wheeled_vehicle.py)
+│                           #   wheeled vehicle properties (wheeled_vehicle.py),
+│                           #   joint targets and legged properties (legged.py)
 ├── sensors/                # Synthetic models, Gazebo decoding, geodesy, in-process
 │                           #   streams, GPS dropout, accelerometer vibration,
 │                           #   IMU/GPS error models (imu_errors.py, gps_errors.py),
@@ -67,7 +68,7 @@ src/robotlab/
 │                           #   magnetometer errors, synthetic optical flow,
 │                           #   sensor bus (bus.py), IMU imperfections, GPS receiver
 │                           #   (velocity, status, RTK, heading), ESC telemetry,
-│                           #   magnetic anomalies, lidar returns, wheel encoders
+│                           #   magnetic anomalies, lidar returns, wheel and joint encoders
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
 │   ├── template.py         # Copyable template estimator (complementary filter)
@@ -80,7 +81,7 @@ src/robotlab/
 │       └── plugin.py       # The EKF as an estimator plug-in
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,
 │                           #   truth interpolation, effective IMU bias, run health
-│                           #   verdict (health.py)
+│                           #   verdict (health.py; bipeds: biped_health.py)
 ├── control/
 │   ├── interface.py        # RotorController plug-in contract, ControlState
 │   ├── template.py         # Copyable template controller (cascaded PD)
@@ -89,6 +90,9 @@ src/robotlab/
 │   ├── manual.py           # Position and attitude loops → four rotor thrusts
 │   ├── timing.py           # Fixed-rate ticks, state/command latency buffers
 │   ├── drone.py            # Exclusive thrust handle, receipts, publication worker
+│   ├── legged.py           # LeggedController plug-in contract, state, WalkCommand
+│   ├── legged_hold.py      # Built-in "hold": keep the start keyframe's targets
+│   ├── legged_template.py  # Copyable legged template (pose hold + lean feedback)
 │   ├── wheeled.py          # WheeledController plug-in contract, state, DriverCommand
 │   ├── wheeled_keyboard.py # Keyboard driver and steering geometry
 │   └── wheeled_template.py # Copyable template wheeled controller
@@ -154,7 +158,7 @@ src/robotlab/
 │   └── wheeled_summary.py  # Wheeled summary.json assembly
 ├── testing/
 │   ├── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo),
-│                           #   including check_wheeled_controller
+│                           #   including check_wheeled_controller, check_legged_controller
 │   ├── scenarios.py        # Estimator scenario suite: scenarios, sensor selection, scores
 │   ├── synthetic_scene.py  # Ray-cast ground + boxes for synthetic ray sensors
 │   ├── synthetic_sensors.py  # Truth → bus payloads for every sensor stream

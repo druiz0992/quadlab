@@ -10,10 +10,9 @@ from MuJoCo and the model file: results are not comparable with Gazebo
 physics, and the servos are MuJoCo position actuators (an approximation of
 the real ones, not a calibrated model).
 
-**Status:** the backend core is implemented (phase 1). While no controller
-exists, the initial keyframe's joint targets are held. The controller
-contract, Pollen's policies, more sensors, and an RL environment are planned
-([6 Roadmap](6_roadmap.md#bipeds)).
+**Status:** the backend core and the joint-level controller contract are
+implemented. Pollen's policies, more sensors, and an RL environment are
+planned ([6 Roadmap](6_roadmap.md#bipeds)).
 
 ## Running
 
@@ -46,6 +45,7 @@ options (`--world`, `--edit`, `--ekf`, `--keyboard`, `--rerun`,
 | `sensors.imu` | `enabled`, `rate_hz`, `error_model` (as the drone IMU) |
 | `sensors.joint_encoders` | `enabled`, `rate_hz`, `counts_per_revolution`, `velocity_resolution_rad_s`, `position_noise_std_rad` (per sample), `seed` |
 | `sensor_timing` | `imu`, `joint_encoders` latency/jitter/offset, `reorder_window_s`, `seed` |
+| `algorithms` | `controller`, `controller_options`, `control_state_source` (`truth` or `sensors`) |
 | `health` | `fall_tilt_deg`, `fall_height_fraction` |
 
 The model needs one free joint (the trunk), the IMU site, the keyframe, and
@@ -57,13 +57,34 @@ timestamps are exact integer nanoseconds. Joint encoders are read before
 the control update of their step; an IMU sample at time t depends on the
 command applied at t, so it reaches the bus one step later.
 
+## Controllers
+
+A controller (`control/legged.py`) is built as `cls(context, options)`;
+`context.legged` holds the joint names (MJCF actuator order), target
+bounds, servo gains, initial targets, and control rate, and
+`context.sensors` the IMU mount. Every control period the mission calls
+`update(state, request, dt_s)` and applies the returned `JointTargets`
+(rad per joint). `state` has the newest `joint_encoders` and `imu` bus
+samples and, with `algorithms.control_state_source: "truth"` (default), the
+trunk's true pose (`trunk`, a stand-in for an onboard attitude filter);
+`"sensors"` leaves it out. `request` (`WalkCommand`) is None until the
+keyboard arrives. Targets outside the bounds are clipped and counted per
+joint (`summary.json.control.limited_commands`); a wrong length or
+non-finite target fails the run.
+
+| `algorithms.controller` | Behaviour |
+| --- | --- |
+| empty or `hold` | hold the start keyframe's targets |
+| `template` (`control/legged_template.py`) | hold plus forward-lean feedback on the joints in `lean_gains` (rad/rad; not a balance controller) |
+| `package.module:Class` | your controller; test it with `robotlab.testing.plugins.check_legged_controller` |
+
 ## Outputs
 
 | File | Contents |
 | --- | --- |
-| `summary.json` | `completed`, `health` (`fallen`, `non_finite`, `simulator_warning`, `incomplete`, `interrupted`), `robot` (model provenance, joint names), `config`, `timing` (real-time factor), `sensors`, `bus` |
+| `summary.json` | `completed`, `health` (`fallen`, `non_finite`, `simulator_warning`, `incomplete`, `interrupted`), `robot` (model provenance, joint names), `control` (controller, state source, ticks, limited commands, its `summary()`), `config`, `timing` (real-time factor), `sensors`, `bus` |
 | `telemetry.jsonl` | trunk truth (position, quaternion xyzw, world velocity, body rates) and joint angles/velocities at `record_rate_hz`, plus the initial and final states |
-| `commands.jsonl` | joint targets (rad) per control period |
+| `commands.jsonl` | per control period: applied `joint_target_rad`, `requested_rad`, `limited` joint indices |
 | `scene.xml` | `--generate-only`: the edited model, loadable on its own |
 
 The `joint_encoders` bus stream comes only from MuJoCo runs; the synthetic

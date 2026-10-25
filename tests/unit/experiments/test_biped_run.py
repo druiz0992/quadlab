@@ -176,3 +176,100 @@ def test_run_biped_missing_model_explains_checkout(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="microduck_rl"):
         run_biped(args)
     assert BUILTIN_MODELS["test_biped"].exists()
+
+
+class _Recorder:
+    """Controller that records its inputs and requests out-of-range targets."""
+
+    def __init__(self, target: float = 0.0) -> None:
+        self.states: list[Any] = []
+        self.dts: list[float] = []
+        self.target = target
+
+    def update(self, state: Any, request: Any, dt_s: float) -> Any:
+        from robotlab.core.legged import JointTargets
+
+        self.states.append(state)
+        self.dts.append(dt_s)
+        return JointTargets((self.target,) * 6)
+
+    def summary(self) -> dict:
+        return {"calls": len(self.states)}
+
+
+def test_controller_sees_samples_truth_and_dt(tmp_path: Path) -> None:
+    loop = mission(tmp_path, duration_s=0.2)
+    recorder = _Recorder()
+    loop.parts.controller, loop.parts.controller_spec = recorder, "recorder"
+    summary = loop.run()
+    first, later = recorder.states[0], recorder.states[3]
+    # Encoders are read before control at t = 0; the first IMU sample
+    # (measured at 0) arrives one physics step later.
+    assert first.joints.sim_time_ns == 0 and first.imu is None
+    assert later.imu.sim_time_ns == later.sim_time_ns - 4_000_000
+    assert later.trunk is not None and later.source == "truth"
+    assert recorder.dts[:3] == [0.0, 0.02, 0.02]
+    assert summary["control"]["controller"] == "recorder"
+    assert summary["control"]["controller_summary"] == {"calls": 10}
+
+
+def test_sensors_only_source_hides_the_trunk(tmp_path: Path) -> None:
+    loop = mission(tmp_path, {"algorithms": {"control_state_source": "sensors"}}, 0.1)
+    recorder = _Recorder()
+    loop.parts.controller = recorder
+    summary = loop.run()
+    assert all(s.trunk is None and s.source == "sensors" for s in recorder.states)
+    assert summary["control"]["state_source"] == "sensors"
+
+
+def test_out_of_range_targets_are_clipped_and_counted(tmp_path: Path) -> None:
+    loop = mission(tmp_path, duration_s=0.1)
+    loop.parts.controller = _Recorder(target=2.0)
+    summary = loop.run()
+    assert set(summary["control"]["limited_commands"].values()) == {5}
+    line = lines(tmp_path / "out" / "commands.jsonl")[0]
+    assert line["joint_target_rad"] == [1.5] * 6
+    assert line["requested_rad"] == [2.0] * 6 and line["limited"] == list(range(6))
+
+
+def test_invalid_controller_output_fails_the_run(tmp_path: Path) -> None:
+    loop = mission(tmp_path, duration_s=0.1)
+
+    class WrongLength(_Recorder):
+        def update(self, state: Any, request: Any, dt_s: float) -> Any:
+            from robotlab.core.legged import JointTargets
+
+            return JointTargets((0.0,) * 5)
+
+    loop.parts.controller, loop.parts.controller_spec = WrongLength(), "wrong"
+    with pytest.raises(RuntimeError, match="wrong: invalid JointTargets"):
+        loop.run()
+    written = json.loads((tmp_path / "out" / "summary.json").read_text())
+    assert written["health"]["verdict"] == "failed"
+
+
+def test_template_controller_runs_from_config(tmp_path: Path) -> None:
+    layer = {
+        "algorithms": {
+            "controller": "template",
+            "controller_options": {"lean_gains": {"left_ankle_pitch": 0.5}},
+        }
+    }
+    summary = mission(tmp_path, layer, 0.5).run()
+    assert summary["control"]["controller"] == "template"
+    assert summary["health"]["verdict"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "spec, message",
+    [
+        ("nope.module:Class", "Cannot import"),
+        (  # Constructs from (context, options) but has no update().
+            "robotlab.testing.plugins:LeggedControllerReport",
+            "does not implement LeggedController",
+        ),
+    ],
+)
+def test_bad_controller_specs_raise(tmp_path: Path, spec: str, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        mission(tmp_path, {"algorithms": {"controller": spec}})
