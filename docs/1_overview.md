@@ -54,7 +54,8 @@ src/robotlab/
 ├── sensors/                # Sensor models, by sensor; Gazebo decoding (gazebo.py)
 │   ├── bus/                # Sensor bus (delivery delay, clock offsets) and streams
 │   ├── imu/                # Errors, imperfections (saturation, timing), temperature,
-│   │                       #   faults, vibration, applying a calibration
+│   │                       #   faults, vibration (each an ImuPerturbation, applied as
+│   │                       #   one ordered chain), applying a calibration
 │   ├── gnss/               # Position error, receiver (velocity, status, RTK, heading),
 │   │                       #   multipath, dropout, fault zones
 │   ├── magnetometer/       # Errors, magnetic anomalies, applying a calibration

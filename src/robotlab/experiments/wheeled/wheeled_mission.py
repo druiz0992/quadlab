@@ -442,7 +442,7 @@ class WheeledMissionLoop:
             return
         model = self.parts.model
         rows = model.rows(0)  # the ego's wheels (opponents follow)
-        self._encoder = self.parts.encoders.read(
+        self._encoder = self.parts.encoders.sample(
             stamp,
             model.wheel_angle_rad[rows],
             model.wheel_speed_rad_s[rows],

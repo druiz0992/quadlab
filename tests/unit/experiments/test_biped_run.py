@@ -135,7 +135,7 @@ def test_interrupt_and_error_still_write_summary(
 ) -> None:
     loop = mission(tmp_path)
     calls = {"n": 0}
-    original = loop.parts.encoders.read
+    original = loop.parts.encoders.sample
 
     def interrupt(*args: Any) -> Any:
         calls["n"] += 1
@@ -143,14 +143,14 @@ def test_interrupt_and_error_still_write_summary(
             raise KeyboardInterrupt
         return original(*args)
 
-    monkeypatch.setattr(loop.parts.encoders, "read", interrupt)
+    monkeypatch.setattr(loop.parts.encoders, "sample", interrupt)
     summary = loop.run()
     assert not summary["completed"] and summary["exit_reason"] == "interrupted"
     assert summary["health"]["verdict"] == "warning"
     assert summary["timing"]["steps"] == 90
 
     failing = mission(tmp_path / "f")
-    monkeypatch.setattr(failing.parts.encoders, "read", lambda *a: 1 / 0)
+    monkeypatch.setattr(failing.parts.encoders, "sample", lambda *a: 1 / 0)
     with pytest.raises(ZeroDivisionError):
         failing.run()
     written = json.loads((tmp_path / "f/out/summary.json").read_text())

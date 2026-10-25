@@ -504,7 +504,7 @@ class WheelEncoderSynthesizer:
         if self._last_ns is not None:
             self._angle = self._angle + speed * (sim_time_ns - self._last_ns) * 1e-9
         self._last_ns = sim_time_ns
-        return self._model.read(sim_time_ns, self._angle.copy(), speed, steer)
+        return self._model.sample(sim_time_ns, self._angle.copy(), speed, steer)
 
 
 # Construction ---------------------------------------------------------------------

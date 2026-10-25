@@ -3,7 +3,7 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from robotlab.sensors.gazebo import vibrate_imu_message
+from robotlab.sensors.gazebo import imu_errors_message
 from robotlab.sensors.imu.vibration import AccelerometerVibration
 from robotlab.simulation.gazebo.config import load_drone_config
 
@@ -17,10 +17,10 @@ def settings(**overrides):
 def test_disabled_is_passthrough_and_does_not_modify_input():
     model = AccelerometerVibration(settings())
     force = np.array([1.0, 2.0, 9.81])
-    np.testing.assert_array_equal(model.apply(force, 0), force)
+    np.testing.assert_array_equal(model.apply_force(force, 0), force)
     assert model.summary()["samples"] == 0
     message = NS(linear_acceleration=NS(x=1, y=2, z=9.81))
-    assert vibrate_imu_message(message, model, 0) is message
+    assert imu_errors_message(message, model, 0) is message
 
 
 def test_periodic_amplitude_phase_and_specific_force_clipping():
@@ -33,12 +33,12 @@ def test_periodic_amplitude_phase_and_specific_force_clipping():
             clip_limit_mps2=19.62,
         )
     )
-    np.testing.assert_allclose(model.apply([0, 0, 9.81], 0), [0, 3, 9.81])
+    np.testing.assert_allclose(model.apply_force([0, 0, 9.81], 0), [0, 3, 9.81])
     np.testing.assert_allclose(
-        model.apply([0, 0, 9.81], 250_000_000), [2, 0, 19.62], atol=1e-12
+        model.apply_force([0, 0, 9.81], 250_000_000), [2, 0, 19.62], atol=1e-12
     )
     np.testing.assert_allclose(
-        model.apply([0, 0, 9.81], 750_000_000), [-2, 0, -5.19], atol=1e-12
+        model.apply_force([0, 0, 9.81], 750_000_000), [-2, 0, -5.19], atol=1e-12
     )
     summary = model.summary()
     assert summary["clipped_samples"] == 1
@@ -55,7 +55,7 @@ def test_clipping_can_bias_average_accelerometer_measurement():
             clip_limit_mps2=19.62,
         )
     )
-    readings = [model.apply([0, 0, 9.81], i * 1_000_000)[2] for i in range(1000)]
+    readings = [model.apply_force([0, 0, 9.81], i * 1_000_000)[2] for i in range(1000)]
     assert np.mean(readings) < 9.0
     assert model.summary()["clipped_samples"] > 0
 
@@ -66,10 +66,12 @@ def test_seeded_correlated_noise_has_configured_stationary_scale():
     )
     first, second = AccelerometerVibration(config), AccelerometerVibration(config)
     before = np.random.get_state()
-    readings = np.array([first.apply([0, 0, 0], i * 5_000_000) for i in range(10000)])
+    readings = np.array(
+        [first.apply_force([0, 0, 0], i * 5_000_000) for i in range(10000)]
+    )
     for i in range(10):
         np.testing.assert_array_equal(
-            second.apply([0, 0, 0], i * 5_000_000), readings[i]
+            second.apply_force([0, 0, 0], i * 5_000_000), readings[i]
         )
     np.testing.assert_allclose(readings.std(axis=0), [1, 2, 3], rtol=0.12)
     assert np.corrcoef(readings[:-1, 0], readings[1:, 0])[0, 1] == pytest.approx(
@@ -89,10 +91,21 @@ def test_message_adapter_preserves_gyro_header_and_source_message():
         linear_acceleration=NS(x=0, y=0, z=9.81),
         angular_velocity=NS(x=0.1, y=0.2, z=0.3),
     )
-    result = vibrate_imu_message(source, model, 0)
+    result = imu_errors_message(source, model, 0)
     assert source.linear_acceleration.x == 0
     assert result.linear_acceleration.x == 2
     assert result.header == source.header
     assert result.angular_velocity == source.angular_velocity
     with pytest.raises(ValueError, match="strictly increasing"):
-        model.apply([0, 0, 0], 0)
+        model.apply_force([0, 0, 0], 0)
+
+
+def test_imu_perturbation_vibrates_force_and_keeps_the_rate():
+    """As an ImuPerturbation in the pipeline's chain, vibration changes only
+    the specific force, exactly as apply_force does."""
+    on = settings(enabled=True, accel_amplitude_mps2=[0.0, 3.0, 0.0])
+    force, rate = AccelerometerVibration(on).apply([0, 0, 9.81], [0.1, -0.2, 0.3], 0)
+    np.testing.assert_allclose(
+        force, AccelerometerVibration(on).apply_force([0, 0, 9.81], 0)
+    )
+    np.testing.assert_array_equal(rate, [0.1, -0.2, 0.3])

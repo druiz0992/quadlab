@@ -52,7 +52,6 @@ from ...sensors.gazebo import (
     magnetometer_anomaly_message,
     magnetometer_errors_message,
     rgb_image,
-    vibrate_imu_message,
 )
 from ...sensors.gnss.errors import GpsErrorModel
 from ...sensors.gnss.receiver import (
@@ -62,6 +61,7 @@ from ...sensors.gnss.receiver import (
     GpsVelocityErrors,
     RtkErrorModel,
 )
+from ...sensors.imu import ImuPerturbation
 from ...sensors.imu.errors import ImuErrorModel
 from ...sensors.imu.faults import ImuFaults
 from ...sensors.imu.imperfections import ImuImperfections, ImuSaturation, ImuTiming
@@ -196,6 +196,16 @@ class SensorPipeline:
         self.imu_saturation = ImuSaturation(imu["imperfections"])
         self.imu_timing = ImuTiming(imu["imperfections"], imu["rate_hz"])
         self.imu_temperature = ImuTemperatureModel(imu["temperature"], ambient_c)
+        # Physical order: device imperfections, noise and bias, temperature
+        # drift, mechanical vibration, range limits, then injected faults.
+        self.imu_chain: tuple[ImuPerturbation, ...] = (
+            self.imu_imperfections,
+            self.imu_errors,
+            self.imu_temperature,
+            self.vibration,
+            self.imu_saturation,
+            self.imu_faults,
+        )
         calibration = imu["calibration"]
         self.imu_driver = (
             ImuCalibrationDriver(ImuCalibration.from_config(calibration))
@@ -265,12 +275,8 @@ class SensorPipeline:
         if self.imu_timing.drop(stamp):
             return None  # sample lost: never recorded or delivered
         ideal = message  # error-free reading, evaluation only
-        message = imu_errors_message(message, self.imu_imperfections, stamp)
-        message = imu_errors_message(message, self.imu_errors, stamp)
-        message = imu_errors_message(message, self.imu_temperature, stamp)
-        message = vibrate_imu_message(message, self.vibration, stamp)
-        message = imu_errors_message(message, self.imu_saturation, stamp)
-        message = imu_errors_message(message, self.imu_faults, stamp)
+        for model in self.imu_chain:
+            message = imu_errors_message(message, model, stamp)
         if self.imu_timing.enabled:
             message = with_timestamp_ns(message, self.imu_timing.stamp(stamp))
         self.calibrated_imu = self._calibrate_imu(message)

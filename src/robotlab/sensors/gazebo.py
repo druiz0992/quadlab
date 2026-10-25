@@ -1,32 +1,15 @@
 """Decode Gazebo camera/lidar data and adapt IMU/GPS measurements."""
 
-from typing import Protocol
-
 import numpy as np
 from copy import deepcopy
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 from scipy.spatial.transform import Rotation
 from ..core.measurements import GpsReading
 from .barometer import BaroErrorModel, altitude_to_pressure, pressure_to_altitude
 from .gnss.errors import GpsErrorModel
 from .magnetometer.errors import MagnetometerErrorModel
 from .gnss.multipath import GpsMultipath
-from .imu.vibration import AccelerometerVibration
-
-
-class ImuPerturbation(Protocol):
-    """Any IMU model mapping (specific force, angular rate, time) to new values,
-    e.g. ImuErrorModel or ImuFaults."""
-
-    @property
-    def enabled(self) -> bool: ...
-
-    def apply(
-        self,
-        specific_force_mps2: ArrayLike,
-        angular_rate_rad_s: ArrayLike,
-        sim_time_ns: int,
-    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]: ...
+from .imu import ImuPerturbation
 
 
 def _xyz(vector) -> list[float]:
@@ -51,9 +34,8 @@ def _fix(message) -> GpsReading:
 
 
 def imu_errors_message(message, model: ImuPerturbation, sim_time_ns: int):
-    """Copy an IMU message with a model applied to acceleration and gyro.
-
-    Used for both sensor errors and faults. Header, orientation, and the
+    """Copy an IMU message with an ``ImuPerturbation`` applied to acceleration
+    and gyro (sensors/imu/). Header, orientation, and the
     source message are unchanged. A disabled model returns the original
     message object.
     """
@@ -137,23 +119,6 @@ def gps_multipath_message(message, model: GpsMultipath, sim_time_ns: int, positi
     if not model.affects_fixes:
         return message
     return _replace_fix(message, model.apply(_fix(message), sim_time_ns, position_m))
-
-
-def vibrate_imu_message(message, model: AccelerometerVibration, sim_time_ns: int):
-    """Copy an IMU message, modifying only acceleration in sensor axes."""
-    if not model.enabled:
-        return message
-    acceleration = message.linear_acceleration
-    measured = model.apply(
-        [acceleration.x, acceleration.y, acceleration.z], sim_time_ns
-    )
-    result = deepcopy(message)
-    (
-        result.linear_acceleration.x,
-        result.linear_acceleration.y,
-        result.linear_acceleration.z,
-    ) = map(float, measured)
-    return result
 
 
 def rgb_image(message):

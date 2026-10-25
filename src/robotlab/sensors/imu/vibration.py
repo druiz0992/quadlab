@@ -34,7 +34,18 @@ class AccelerometerVibration:
         self._clipped_axes = np.zeros(3, dtype=int)
         self._peak = np.zeros(3)
 
-    def apply(self, specific_force: ArrayLike, sim_time_ns: int) -> NDArray[np.float64]:
+    def apply(
+        self, specific_force: ArrayLike, angular_rate: ArrayLike, sim_time_ns: int
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """``ImuPerturbation``: vibrate the specific force; the rate is
+        unchanged (vibration here is accelerometer-only)."""
+        rate = readonly_array(angular_rate, (3,))
+        return self.apply_force(specific_force, sim_time_ns), rate
+
+    def apply_force(
+        self, specific_force: ArrayLike, sim_time_ns: int
+    ) -> NDArray[np.float64]:
+        """Vibrated and clipped specific force (m/s², sensor axes)."""
         force = readonly_array(specific_force, (3,))
         if not self.enabled:
             return force

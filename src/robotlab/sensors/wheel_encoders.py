@@ -37,7 +37,7 @@ class WheelEncoderModel:
         self._count = wheel_count
         self.readings = 0
 
-    def read(
+    def sample(
         self,
         sim_time_ns: int,
         wheel_angle_rad: NDArray[np.float64],

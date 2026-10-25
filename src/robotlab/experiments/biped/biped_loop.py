@@ -198,7 +198,7 @@ class BipedLoop:
         mujoco.mj_step1(scene.model, data)
         truth = read_truth(scene, data, t_ns)
         if self.enabled["joint_encoders"] and self._due("joint_encoders", step):
-            reading = self.parts.encoders.read(
+            reading = self.parts.encoders.sample(
                 t_ns, truth.joint_position_rad, truth.joint_velocity_rad_s
             )
             bus.submit("joint_encoders", reading, t_ns)

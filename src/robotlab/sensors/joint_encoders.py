@@ -33,7 +33,7 @@ class JointEncoderModel:
         self._names = names
         self.readings = 0
 
-    def read(
+    def sample(
         self, sim_time_ns: int, position_rad: ArrayLike, velocity_rad_s: ArrayLike
     ) -> JointStateReading:
         """Reading from the true joint positions and velocities; raises
