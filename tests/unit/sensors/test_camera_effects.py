@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
-from robotlab.sensors.camera_effects import (
+from robotlab.sensors.imaging.camera_effects import (
     CameraEffects,
     distortion_map,
     focal_length_px,

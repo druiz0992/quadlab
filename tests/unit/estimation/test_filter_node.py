@@ -8,8 +8,8 @@ from robotlab.core.algorithms import SensorDescription
 from robotlab.core.measurements import EstimatedState, GpsReading, ImuReading
 from robotlab.estimation.gps_imu_ekf import GpsImuEkf
 from robotlab.estimation.filter import FilterNode
-from robotlab.sensors.streams import Publisher
-from robotlab.sensors.geodesy import gps_to_enu
+from robotlab.sensors.bus.streams import Publisher
+from robotlab.core.geodesy import gps_to_enu
 
 
 def test_rotated_imu_output_fanout_and_explicit_gps_timing():

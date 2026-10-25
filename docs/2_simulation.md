@@ -28,7 +28,7 @@ measured values.
 | --- | --- | --- | --- |
 | Gravity | `<gravity>0 0 -9.81</gravity>` | 9.81 m/s² everywhere | Consistent (project convention; normal gravity at the 40.4° N, 650 m site is ≈ 9.800 m/s², 0.1 % lower) |
 | Site | WGS84, 40.4168° N, 3.7038° W, 650 m, ENU, heading 0 | Live EKF requires exactly this frame form | Consistent |
-| GPS | NavSat converts with gz-math `LOCAL2` → WGS84 and adds the 650 m elevation | `sensors/geodesy.py` (exact ECEF → ENU) | Agrees to < 1 mm out to 28 km; GPS altitude = 650 m + z to 1 mm |
+| GPS | NavSat converts with gz-math `LOCAL2` → WGS84 and adds the 650 m elevation | `core/geodesy.py` (exact ECEF → ENU) | Agrees to < 1 mm out to 28 km; GPS altitude = 650 m + z to 1 mm |
 | Barometer | Standard atmosphere (101 325 Pa, 288.15 K, 6.5 K/km) at 650 m + z | `sensors/barometer.py`, same model | Pressure agrees to 0.001 Pa; pressure altitude = GPS altitude to 1 mm |
 | Magnetic field | Internal table from latitude/longitude (world `<magnetic_field>` ignored): 25.613 µT north, 37.152 µT down | `sensors.magnetometer.calibration` defaults 45.1 µT, inclination 55.4°, declination 0° | Consistent with Gazebo; the real field here has about +1° declination |
 | Air density | Not used: rotor thrust is `motorConstant · ω²` | `aerodynamics.air_density_kg_m3` | Was 1.225 kg/m³ (sea level, 15 °C), 6–12 % denser than the site. **Now** `"site"` by default: 1.095 kg/m³ from the 650 m standard-atmosphere pressure and the 25 °C ambient ([3 Configuration](3_configuration.md#aerodynamics-aerodynamics)) |

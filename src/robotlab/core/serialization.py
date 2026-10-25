@@ -11,7 +11,8 @@ context's debug log) are skipped and take their defaults when decoded.
 
 Decoding imports dataclasses by name, so it only accepts classes from the
 ``robotlab`` package (a recorded file cannot name arbitrary code) and
-raises ValueError otherwise.
+raises ValueError otherwise. Classes that moved keep decoding from older
+recordings through ``RENAMED``.
 """
 
 from collections.abc import Mapping
@@ -22,6 +23,18 @@ from typing import Any
 import numpy as np
 
 ALLOWED_PREFIX = "robotlab."
+# Recorded "module:Class" names of classes that moved (2026-10-26, sensors/
+# regrouped; reading types moved to core.measurements) -> current name.
+RENAMED = {
+    f"robotlab.sensors.{module}:{name}": f"robotlab.core.measurements:{name}"
+    for module, name in (
+        ("airspeed", "AirspeedReading"),
+        ("battery_monitor", "BatteryReading"),
+        ("joint_encoders", "JointStateReading"),
+        ("optical_flow", "OpticalFlowReading"),
+        ("wheel_encoders", "EncoderReading"),
+    )
+}
 
 
 def encode(value: Any) -> Any:
@@ -78,6 +91,7 @@ def decode(value: Any) -> Any:
 
 
 def _dataclass(name: str) -> type:
+    name = RENAMED.get(name, name)
     module_name, _, qualname = name.partition(":")
     if not module_name.startswith(ALLOWED_PREFIX) or not qualname:
         raise ValueError(f"Refusing to decode {name!r}: not a robotlab type")

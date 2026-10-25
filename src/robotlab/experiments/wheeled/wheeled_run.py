@@ -53,13 +53,12 @@ from .opponents import (
 )
 from ...simulation.gazebo.odometry import OdometryVelocityFix
 from ...simulation.gazebo.plugins import lockstep_barrier
-from ...simulation.gazebo.world import world_elevation_m
+from ...simulation.gazebo.world import world_elevation_m, reference_from_world
 from ...simulation.powertrain import Powertrain
 from ...simulation.wheeled.ground import GroundModel
 from ...simulation.wheeled.model import WheeledVehicleModel
 from ..harness.algorithm_debug import AlgorithmDebugLog
 from ..harness.algorithms import build_algorithm_stack, load_class
-from ...simulation.gazebo.world import reference_from_world
 from ..common.mission import MissionRunner
 from ..harness.run_evaluation import RunEvaluation
 from ..common.run_setup import prepare_world

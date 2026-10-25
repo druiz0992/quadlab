@@ -29,19 +29,16 @@ from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
 from ...control.timing import DelayLine
-from ...core.measurements import CameraFrame, LidarPoints
-from ...sensors.calibration import (
-    ImuCalibration,
-    ImuCalibrationDriver,
-    MagnetometerCalibration,
-)
+from ...core.measurements import CameraFrame, LidarPoints, BatteryReading
+from ...sensors.imu.calibration import ImuCalibration, ImuCalibrationDriver
+from ...sensors.magnetometer.calibration import MagnetometerCalibration
 from ...evaluation.imu_bias import EffectiveImuBias
 from ...sensors.airspeed import AirspeedSensor
 from ...sensors.barometer import BaroErrorModel
-from ...sensors.battery_monitor import BatteryMonitor, BatteryReading
+from ...sensors.battery_monitor import BatteryMonitor
 from ...sensors.bus import STREAMS, SensorBus
-from ...sensors.camera_effects import CameraEffects
-from ...sensors.dropout import GpsDropout
+from ...sensors.imaging.camera_effects import CameraEffects
+from ...sensors.gnss.dropout import GpsDropout
 from ...sensors.esc_telemetry import EscTelemetryModel
 from ...sensors.gazebo import (
     baro_datum_message,
@@ -57,24 +54,24 @@ from ...sensors.gazebo import (
     rgb_image,
     vibrate_imu_message,
 )
-from ...sensors.gps_errors import GpsErrorModel
-from ...sensors.gps_receiver import (
+from ...sensors.gnss.errors import GpsErrorModel
+from ...sensors.gnss.receiver import (
     GpsHeading,
     GpsStatusModel,
     configured_position_sigma_m,
     GpsVelocityErrors,
     RtkErrorModel,
 )
-from ...sensors.imu_errors import ImuErrorModel
-from ...sensors.imu_faults import ImuFaults
-from ...sensors.imu_imperfections import ImuImperfections, ImuSaturation, ImuTiming
-from ...sensors.imu_temperature import ImuTemperatureModel
-from ...sensors.lidar_effects import LidarEffects
-from ...sensors.magnetic_anomalies import MagneticAnomalies, scene_dipoles
-from ...sensors.magnetometer import MagnetometerErrorModel
-from ...sensors.multipath import GpsMultipath
+from ...sensors.imu.errors import ImuErrorModel
+from ...sensors.imu.faults import ImuFaults
+from ...sensors.imu.imperfections import ImuImperfections, ImuSaturation, ImuTiming
+from ...sensors.imu.temperature import ImuTemperatureModel
+from ...sensors.imaging.lidar_effects import LidarEffects
+from ...sensors.magnetometer.anomalies import MagneticAnomalies, scene_dipoles
+from ...sensors.magnetometer.errors import MagnetometerErrorModel
+from ...sensors.gnss.multipath import GpsMultipath
 from ...sensors.optical_flow import OpticalFlowModel
-from ...sensors.vibration import AccelerometerVibration
+from ...sensors.imu.vibration import AccelerometerVibration
 from ...simulation.aerodynamics import hover_induced_velocity
 from ...simulation.battery import BatteryState
 from ...simulation.gazebo.config import sensor_fingerprint

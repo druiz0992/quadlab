@@ -23,23 +23,13 @@ simulation-time grid at ``rate_hz``; each uses the latest truth state.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 import math
 from typing import Any
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 from scipy.spatial.transform import Rotation
-
-
-@dataclass(frozen=True)
-class OpticalFlowReading:
-    """One flow sample; flow is NaN when invalid."""
-
-    sim_time_ns: int
-    flow_rad_s: NDArray[np.float64]  # Image-axis angular rates (sensor y, z)
-    distance_m: float  # Along the optical axis to the ground (NaN if none)
-    valid: bool
+from ..core.measurements import OpticalFlowReading
 
 
 class OpticalFlowModel:

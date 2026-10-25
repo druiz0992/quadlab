@@ -150,7 +150,7 @@ def test_calibration_priors_override_ekf_defaults_only_when_enabled():
 def test_filter_node_predicts_with_calibrated_imu_values():
     from robotlab.core.measurements import GpsReading, ImuReading
     from robotlab.estimation.filter import FilterNode
-    from robotlab.sensors.streams import Publisher
+    from robotlab.sensors.bus.streams import Publisher
 
     class Recorder:
         """Filter stub recording what prediction receives."""

@@ -9,7 +9,7 @@ rotation between them is ``SENSOR_FROM_OPTICAL``.
 
 Projection (``project``) is pinhole plus Brown–Conrady distortion
 (k1, k2, k3 radial; p1, p2 tangential), the model RobotLab applies to
-rendered frames (``sensors/camera_effects.py``):
+rendered frames (``sensors/imaging/camera_effects.py``):
 
     x = X/Z, y = Y/Z,  r² = x² + y²
     x_d = x (1 + k1 r² + k2 r⁴ + k3 r⁶) + 2 p1 x y + p2 (r² + 2x²)

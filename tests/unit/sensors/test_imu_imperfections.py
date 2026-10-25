@@ -6,7 +6,7 @@ import math
 import numpy as np
 import pytest
 
-from robotlab.sensors.imu_imperfections import (
+from robotlab.sensors.imu.imperfections import (
     ImuImperfections,
     ImuSaturation,
     ImuTiming,

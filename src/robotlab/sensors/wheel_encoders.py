@@ -14,21 +14,11 @@ Reading arrays are read-only (bus samples are immutable).
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-
-
-@dataclass(frozen=True)
-class EncoderReading:
-    """One reading per wheel (wheel order), at ``sim_time_ns``."""
-
-    sim_time_ns: int
-    counts: tuple[int, ...]
-    wheel_speed_rad_s: NDArray[np.float64]
-    steer_angle_rad: NDArray[np.float64]
+from ..core.measurements import EncoderReading
 
 
 class WheelEncoderModel:

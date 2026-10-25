@@ -1,7 +1,7 @@
 """Shared scenario suite: every estimator in CANDIDATES runs every scenario.
 
 To test your own filter, add a ``Candidate`` with its options builder, the
-sensors it should get (any streams of ``sensors/bus.py``; the context holds
+sensors it should get (any streams of ``sensors/bus/__init__.py``; the context holds
 exactly these), and limits for each scenario in
 ``robotlab.testing.scenarios.SCENARIOS``; a new scenario without limits
 fails until every candidate declares them. Scenarios a candidate's sensors

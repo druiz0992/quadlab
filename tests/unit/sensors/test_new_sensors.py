@@ -11,7 +11,7 @@ from robotlab.sensors.gazebo import (
     magnetometer_errors_message,
     rangefinder_distance,
 )
-from robotlab.sensors.magnetometer import MagnetometerErrorModel
+from robotlab.sensors.magnetometer.errors import MagnetometerErrorModel
 from robotlab.sensors.optical_flow import OpticalFlowModel
 from robotlab.simulation.gazebo.config import load_drone_config
 

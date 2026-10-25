@@ -1,7 +1,7 @@
 """Generate a portable Gazebo Harmonic world from editable JSON boxes."""
 
 import json
-from ...sensors.lidar_returns import RETRO_PER_REFLECTIVITY
+from ...sensors.imaging.lidar_returns import RETRO_PER_REFLECTIVITY
 from pathlib import Path
 import xml.etree.ElementTree as ET
 

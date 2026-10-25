@@ -38,7 +38,7 @@ from scipy.spatial.transform import Rotation
 
 from ...core.algorithms import AlgorithmContext
 from ...core.measurements import EstimatedState, Sample
-from ...sensors.geodesy import gps_to_enu
+from ...core.geodesy import gps_to_enu
 from ..interface import Innovation
 
 DEFAULTS = dict(

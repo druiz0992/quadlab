@@ -3,7 +3,7 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from robotlab.sensors.lidar_effects import LidarEffects, sensor_frame_scan
+from robotlab.sensors.imaging.lidar_effects import LidarEffects, sensor_frame_scan
 from robotlab.simulation.gazebo.config import load_drone_config
 
 

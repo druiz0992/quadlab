@@ -9,7 +9,7 @@ import threading
 import time
 from typing import Generic, TypeVar
 
-from ..core.measurements import Sample
+from ...core.measurements import Sample
 
 T = TypeVar("T")
 

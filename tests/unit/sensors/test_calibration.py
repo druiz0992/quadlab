@@ -6,11 +6,8 @@ import json
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from robotlab.sensors.calibration import (
-    ImuCalibration,
-    ImuCalibrationDriver,
-    MagnetometerCalibration,
-)
+from robotlab.sensors.imu.calibration import ImuCalibration, ImuCalibrationDriver
+from robotlab.sensors.magnetometer.calibration import MagnetometerCalibration
 
 MS = 1_000_000
 A = np.eye(3) + np.diag([0.005, -0.004, 0.006])

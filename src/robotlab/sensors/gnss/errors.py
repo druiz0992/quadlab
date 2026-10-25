@@ -26,7 +26,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from ..core.measurements import GpsReading
+from ...core.measurements import GpsReading
 
 _EQUATORIAL_RADIUS_M = 6378137.0
 _ECCENTRICITY_SQUARED = 6.6943799901413165e-3

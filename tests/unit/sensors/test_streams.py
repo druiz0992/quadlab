@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from robotlab.core.measurements import ImuReading
-from robotlab.sensors.streams import (
+from robotlab.sensors.bus.streams import (
     Publisher,
     ReadTimeout,
     SessionClosed,

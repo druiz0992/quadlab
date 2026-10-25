@@ -14,22 +14,11 @@ for slide joints). Reading arrays are read-only (bus samples are immutable).
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-
-
-@dataclass(frozen=True)
-class JointStateReading:
-    """One reading per actuated joint (``names`` order) at ``sim_time_ns``."""
-
-    sim_time_ns: int
-    names: tuple[str, ...]
-    counts: tuple[int, ...]
-    position_rad: NDArray[np.float64]
-    velocity_rad_s: NDArray[np.float64]
+from ..core.measurements import JointStateReading
 
 
 class JointEncoderModel:

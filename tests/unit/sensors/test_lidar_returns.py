@@ -6,8 +6,8 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from robotlab.sensors.lidar_effects import LidarEffects
-from robotlab.sensors.lidar_returns import (
+from robotlab.sensors.imaging.lidar_effects import LidarEffects
+from robotlab.sensors.imaging.lidar_returns import (
     decode_scan,
     detected,
     extinction_per_m,

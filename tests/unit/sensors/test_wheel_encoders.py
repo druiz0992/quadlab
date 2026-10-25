@@ -90,3 +90,16 @@ def test_wheeled_runs_carry_encoders_and_drones_do_not():
 
     assert "wheel_encoders" in kinds(load_drone_config(robot="car"))
     assert "wheel_encoders" not in kinds(load_drone_config())
+
+
+def test_recordings_from_before_the_move_still_decode() -> None:
+    """Encoder readings recorded as robotlab.sensors.wheel_encoders types
+    decode to the current core.measurements type."""
+    from robotlab.core.measurements import EncoderReading
+    from robotlab.core.serialization import decode, encode
+
+    reading = EncoderReading(5, (1, 2), np.zeros(2), np.ones(2))
+    old = encode(reading)
+    old["__dataclass__"] = "robotlab.sensors.wheel_encoders:EncoderReading"
+    restored = decode(old)
+    assert isinstance(restored, EncoderReading) and restored.counts == (1, 2)

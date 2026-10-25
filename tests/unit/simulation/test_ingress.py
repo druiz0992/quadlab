@@ -10,6 +10,8 @@ from robotlab.simulation.gazebo.ingress import (
     MessageIngress,
     gz_sim_command,
     subscriptions,
+    LockstepOrderer,
+    scheduled_stamp_ns,
 )
 
 
@@ -65,8 +67,6 @@ def test_gz_sim_command():
 # Lockstep ordering -------------------------------------------------------------
 
 from types import SimpleNamespace
-
-from robotlab.simulation.gazebo.ingress import LockstepOrderer, scheduled_stamp_ns
 
 STEP = 2_000_000
 

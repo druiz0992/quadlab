@@ -345,7 +345,7 @@ and sensor-fusion mistakes, not tuning.
 
 ## Sensor bus and delivery timing (`sensor_timing`)
 
-`sensors/bus.py` turns each processed measurement into an immutable
+`sensors/bus/__init__.py` turns each processed measurement into an immutable
 `Sample` on `sensors/<kind>`:
 
 | Stream | Payload | Frame ID |

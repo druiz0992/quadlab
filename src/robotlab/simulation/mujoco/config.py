@@ -41,7 +41,7 @@ BUILTIN_PREFIX = "builtin:"
 ASSETS_DIR = Path(__file__).parent / "assets"
 BUILTIN_MODELS = {"test_biped": ASSETS_DIR / "test_biped.xml"}
 
-# Sensor streams a biped publishes on the sensor bus (sensors/bus.py).
+# Sensor streams a biped publishes on the sensor bus (sensors/bus/__init__.py).
 BIPED_STREAMS = ("imu", "joint_encoders")
 
 BIPED_DEFAULTS: dict[str, Any] = {
@@ -74,7 +74,7 @@ BIPED_DEFAULTS: dict[str, Any] = {
             "enabled": True,
             "rate_hz": 250.0,
             # Same Allan-variance-style model as the drone IMU
-            # (sensors/imu_errors.py); ideal by default.
+            # (sensors/imu/errors.py); ideal by default.
             "error_model": deepcopy(DRONE_DEFAULTS["sensors"]["imu"]["error_model"]),
         },
         # Servo position encoders (sensors/joint_encoders.py); the defaults

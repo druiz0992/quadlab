@@ -69,7 +69,7 @@ def sensor_fingerprint(sensors, kind):
 
 
 def stream_timing():
-    """Per-stream delivery timing (sensors/bus.py), ideal by default."""
+    """Per-stream delivery timing (sensors/bus/__init__.py), ideal by default."""
     return {"latency_s": 0.0, "jitter_s": 0.0, "timestamp_offset_s": 0.0}
 
 
@@ -159,7 +159,7 @@ DEFAULTS: dict[str, Any] = {
                 "clip_limit_mps2": None,
                 "seed": 0,
             },
-            # Seeded Allan-variance-style errors; see sensors/imu_errors.py.
+            # Seeded Allan-variance-style errors; see sensors/imu/errors.py.
             "error_model": {
                 "enabled": False,
                 "seed": 0,
@@ -171,7 +171,7 @@ DEFAULTS: dict[str, Any] = {
                 "gyro_turn_on_bias_std_rad_s": [0.0, 0.0, 0.0],
             },
             # Self-heating and bias drift with temperature; see
-            # sensors/imu_temperature.py. Ambient comes from environment.
+            # sensors/imu/temperature.py. Ambient comes from environment.
             "temperature": {
                 "enabled": False,
                 "warmup_rise_c": 10.0,
@@ -182,7 +182,7 @@ DEFAULTS: dict[str, Any] = {
             },
             # Scale factor, cross-coupling, g-sensitivity, bias instability,
             # saturation, sample drops/outages, timestamp jitter; see
-            # sensors/imu_imperfections.py.
+            # sensors/imu/imperfections.py.
             "imperfections": {
                 "enabled": False,
                 "seed": 0,
@@ -241,7 +241,7 @@ DEFAULTS: dict[str, Any] = {
                 # Settings the calibration was made for (sensor_fingerprint).
                 "fingerprint": "",
             },
-            # Scheduled malfunctions; see sensors/imu_faults.py.
+            # Scheduled malfunctions; see sensors/imu/faults.py.
             "faults": {"seed": 0, "events": []},
         },
         "gps": {
@@ -250,7 +250,7 @@ DEFAULTS: dict[str, Any] = {
             "rate_hz": 10.0,
             # zones: world boxes where every fix is lost (GPS blockout).
             "dropout": {"probability": 0.0, "seed": 0, "outages_s": [], "zones": []},
-            # Position-jump episodes; see sensors/multipath.py.
+            # Position-jump episodes; see sensors/gnss/multipath.py.
             "multipath": {
                 "enabled": False,
                 "seed": 0,
@@ -260,7 +260,7 @@ DEFAULTS: dict[str, Any] = {
                 "horizontal_std_m": 0.0,
                 "vertical_std_m": 0.0,
             },
-            # Seeded time-correlated ENU position error; see sensors/gps_errors.py.
+            # Seeded time-correlated ENU position error; see sensors/gnss/errors.py.
             "error_model": {
                 "enabled": False,
                 "seed": 0,
@@ -274,7 +274,7 @@ DEFAULTS: dict[str, Any] = {
             "vertical_position_m": noise(),
             "horizontal_velocity_mps": noise(),
             "vertical_velocity_mps": noise(),
-            # Receiver models; see sensors/gps_receiver.py.
+            # Receiver models; see sensors/gnss/receiver.py.
             "velocity_error": {
                 "enabled": False,
                 "seed": 0,
@@ -365,7 +365,7 @@ DEFAULTS: dict[str, Any] = {
             "min_range_m": 0.15,
             "max_range_m": 50.0,
             "range_m": noise(),
-            # Range noise, dropouts, motion distortion; see sensors/lidar_effects.py.
+            # Range noise, dropouts, motion distortion; see sensors/imaging/lidar_effects.py.
             "effects": {
                 "seed": 0,
                 "noise_std_m": 0.0,
@@ -373,7 +373,7 @@ DEFAULTS: dict[str, Any] = {
                 "dropout_probability": 0.0,
                 "far_dropout_exponent": 0.0,
                 "scan_time_s": 0.0,
-                # Mixed-pixel ghosts at depth edges; see sensors/lidar_returns.py.
+                # Mixed-pixel ghosts at depth edges; see sensors/imaging/lidar_returns.py.
                 "beam_divergence_rad": 0.0,
                 # Surfaces closer than this merge into one (ghost) return;
                 # null: always merge. Farther ones become separate returns.
@@ -393,7 +393,7 @@ DEFAULTS: dict[str, Any] = {
                 },
             },
         },
-        # Gazebo magnetometer; see sensors/magnetometer.py. Field in µT.
+        # Gazebo magnetometer; see sensors/magnetometer/errors.py. Field in µT.
         "magnetometer": {
             "mount": mount(),
             "enabled": False,
@@ -411,7 +411,7 @@ DEFAULTS: dict[str, Any] = {
                 "white_std_ut": [0.0, 0.0, 0.0],
             },
             # Point-dipole anomalies (structures, pipes); see
-            # sensors/magnetic_anomalies.py. Scene obstacles may add their own.
+            # sensors/magnetometer/anomalies.py. Scene obstacles may add their own.
             "dipoles": [],
             # Calibration the autopilot applies and filters use (not truth);
             # produced by `robotlab-magcal`. See
@@ -549,7 +549,7 @@ DEFAULTS: dict[str, Any] = {
     # Shared environment: ambient temperature for battery and IMU models.
     "environment": {
         "ambient_temperature_c": 25.0,
-        # Rain, dust, fog for the lidar; see sensors/lidar_returns.py.
+        # Rain, dust, fog for the lidar; see sensors/imaging/lidar_returns.py.
         "weather": {
             "visibility_m": None,  # null: clear air
             "lidar_clutter_per_m": 0.0,  # false returns per beam per metre
@@ -725,7 +725,7 @@ DEFAULTS: dict[str, Any] = {
         "tracking_lost_m": 2.0,
         "tracking_lost_s": 3.0,
     },
-    # Delivery of processed measurements to algorithms; see sensors/bus.py.
+    # Delivery of processed measurements to algorithms; see sensors/bus/__init__.py.
     "sensor_timing": {
         "seed": 0,
         "reorder_window_s": 0.004,
@@ -1074,7 +1074,7 @@ def validate_motor_fault_events(events, name):
 
 def validate_imu_fault_events(events, name):
     """Check type-specific keys, instrument, window, and parameter ranges."""
-    from ...sensors.imu_faults import EVENT_TYPES, INSTRUMENTS
+    from ...sensors.imu.faults import EVENT_TYPES, INSTRUMENTS
 
     if not isinstance(events, list):
         raise ValueError(f"{name} must be a list of fault events")
@@ -1689,7 +1689,7 @@ def load_drone_config(
         if any(imperfections[key][i][i] for i in range(3)):
             raise ValueError(f"imu imperfections {key} diagonal must be zero")
     lidar = data["sensors"]["lidar"]
-    from ...sensors.lidar_returns import RETURN_MODES
+    from ...sensors.imaging.lidar_returns import RETURN_MODES
 
     if lidar["effects"]["return_mode"] not in RETURN_MODES:
         raise ValueError(

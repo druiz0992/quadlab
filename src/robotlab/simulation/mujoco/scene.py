@@ -7,7 +7,7 @@ edits it before compiling:
   (AGENTS.md §4); the model's own values are reported in
   ``BipedScene.overrides`` rather than replaced silently;
 - an accelerometer and a gyro are added on ``biped.imu_site`` (noise-free;
-  RobotLab's IMU error model perturbs them, sensors/imu_errors.py);
+  RobotLab's IMU error model perturbs them, sensors/imu/errors.py);
 - a z = 0 ground plane is added when ``biped.add_floor`` is set and the
   world body has no plane.
 

@@ -44,9 +44,9 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from ...estimation.imu_calibration import fit_static
-from ...sensors.imu_errors import ImuErrorModel
-from ...sensors.imu_imperfections import ImuImperfections, ImuSaturation
-from ...sensors.imu_temperature import ImuTemperatureModel
+from ...sensors.imu.errors import ImuErrorModel
+from ...sensors.imu.imperfections import ImuImperfections, ImuSaturation
+from ...sensors.imu.temperature import ImuTemperatureModel
 from ...simulation.gazebo.config import (
     DroneConfig,
     load_drone_config,

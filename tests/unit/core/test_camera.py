@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation
 from robotlab.core.algorithms import SensorDescription, extrinsics
 from robotlab.core.camera import CameraCalibration
 from robotlab.core.serialization import decode, encode
-from robotlab.sensors.camera_effects import distortion_map
+from robotlab.sensors.imaging.camera_effects import distortion_map
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.testing.scenarios import SCENARIOS, scenario_context, scenario_samples
 from robotlab.testing.synthetic_scene import BOX_RGB, SceneBox, SyntheticScene

@@ -1,6 +1,6 @@
 """Magnetometer calibration fits: hard iron, soft iron, and current/throttle
 compensation; the result is a ``MagnetometerCalibration``
-(sensors/calibration.py), applied there.
+(sensors/imu/calibration.py, sensors/magnetometer/calibration.py), applied there.
 
 A distorted magnetometer measures (sensor axes, µT)
 

@@ -14,7 +14,7 @@ slope), a linear least-squares problem per axis. Six axis-aligned poses fix
 A and b; extra tilted poses improve conditioning; poses at several
 temperatures make k identifiable (otherwise it is reported as zero).
 
-``fit_static`` returns an ``ImuCalibration`` (sensors/calibration.py),
+``fit_static`` returns an ``ImuCalibration`` (sensors/imu/calibration.py, sensors/magnetometer/calibration.py),
 which also documents the correction a driver applies and the startup gyro
 bias measured at power-up. Rate-table quantities (gyro scale and
 misalignment) need a turntable and are not calibrated here. Raises
@@ -24,7 +24,7 @@ ValueError when the poses do not span all axes.
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from ..sensors.calibration import ImuCalibration
+from ..sensors.imu.calibration import ImuCalibration
 
 
 def _regress(

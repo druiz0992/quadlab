@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from robotlab.sensors.gazebo import imu_errors_message
-from robotlab.sensors.imu_errors import ImuErrorModel
+from robotlab.sensors.imu.errors import ImuErrorModel
 from robotlab.simulation.gazebo.config import load_drone_config
 
 RATE_HZ = 200.0

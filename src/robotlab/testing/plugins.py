@@ -83,7 +83,7 @@ from ..core.wheeled_vehicle import WheeledProperties
 from ..estimation.interface import Innovation
 from ..experiments.harness.algorithm_debug import validate_debug_entry
 from ..sensors.bus import STREAMS
-from ..sensors.geodesy import gps_to_enu
+from ..core.geodesy import gps_to_enu
 
 GRAVITY_MPS2 = 9.81
 HOVER_POSITION_M = (0.0, 0.0, 1.0)
@@ -145,7 +145,7 @@ def synthetic_context(
 
 def enu_to_gps(position_m: tuple[float, float, float]) -> GpsReading:
     """Fix at an ENU offset from ``REFERENCE``: the exact inverse of
-    ``sensors.geodesy.gps_to_enu`` (Newton iterations from a spherical guess;
+    ``core.geodesy.gps_to_enu`` (Newton iterations from a spherical guess;
     converges to well below a millimetre for local offsets)."""
     target = np.asarray(position_m, float)
     east, north, up = target
@@ -628,7 +628,7 @@ def legged_context(properties: LeggedProperties) -> AlgorithmContext:
 def _legged_probes(properties: LeggedProperties) -> list[tuple[Any, Any]]:
     """(state, request) pairs (see module docs)."""
     from ..control.legged import LeggedControlState, TrunkState, WalkCommand
-    from ..sensors.joint_encoders import JointStateReading
+    from ..core.measurements import JointStateReading
 
     n = properties.joint_count
     probes: list[tuple[Any, Any]] = []

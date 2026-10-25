@@ -1,6 +1,6 @@
 """Synthetic bus payloads from truth, one synthesizer per sensor kind.
 
-Each synthesizer has a ``kind`` (a ``sensors/bus.py`` stream), a sampling
+Each synthesizer has a ``kind`` (a ``sensors/bus/__init__.py`` stream), a sampling
 ``period_ns`` (samples at k · period from t = 0), and ``sample(t_ns,
 truth)``, which returns the payload measured at that time or None (no
 sample: an outage, or the first GPS epoch). ``build_synthesizer`` makes one
@@ -177,7 +177,7 @@ class GpsHeadingSynthesizer:
     period_ns = _period_ns(GPS_RATE_HZ)
 
     def __init__(self, inputs: SynthesisInputs, settings: Mapping[str, Any]) -> None:
-        from ..sensors.gps_receiver import GpsHeading
+        from ..sensors.gnss.receiver import GpsHeading
 
         self._inputs = inputs
         self._model = GpsHeading(settings)

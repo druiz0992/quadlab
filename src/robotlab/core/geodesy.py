@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ..core.measurements import GpsReading
+from .measurements import GpsReading
 
 
 def ecef(fix: GpsReading):

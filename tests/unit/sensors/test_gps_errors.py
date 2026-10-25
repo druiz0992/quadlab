@@ -5,8 +5,8 @@ import pytest
 
 from robotlab.core.measurements import GpsReading
 from robotlab.sensors.gazebo import gps_errors_message
-from robotlab.sensors.geodesy import gps_to_enu
-from robotlab.sensors.gps_errors import GpsErrorModel, offset_fix
+from robotlab.core.geodesy import gps_to_enu
+from robotlab.sensors.gnss.errors import GpsErrorModel, offset_fix
 from robotlab.simulation.gazebo.config import load_drone_config
 
 REFERENCE = GpsReading(40.4168, -3.7038, 650.0)

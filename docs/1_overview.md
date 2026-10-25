@@ -45,20 +45,22 @@ src/robotlab/
 │                           #   (magcal.py), `robotlab-imucal` (imucal.py); shared exit
 │                           #   statuses and SIGTERM handling (common.py)
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
-│                           #   measurement samples, rotor commands, JSON codec
-│                           #   (serialization.py), wheel commands (wheeled.py),
-│                           #   wheeled vehicle properties (wheeled_vehicle.py),
-│                           #   joint targets and legged properties (legged.py)
-├── sensors/                # Synthetic models, Gazebo decoding, geodesy, in-process
-│                           #   streams, GPS dropout, accelerometer vibration,
-│                           #   IMU/GPS error models (imu_errors.py, gps_errors.py),
-│                           #   faults (imu_faults.py, multipath.py, zones.py),
-│                           #   barometer conversion and errors (barometer.py),
-│                           #   magnetometer errors, synthetic optical flow,
-│                           #   sensor bus (bus.py), IMU imperfections, GPS receiver
-│                           #   (velocity, status, RTK, heading), ESC telemetry,
-│                           #   magnetic anomalies, lidar returns, wheel and joint encoders,
-│                           #   applying IMU/magnetometer calibrations (calibration.py)
+│                           #   measurement samples and every bus payload type
+│                           #   (measurements.py), WGS84 ↔ local ENU (geodesy.py), rotor
+│                           #   commands, JSON codec (serialization.py), wheel commands
+│                           #   (wheeled.py), wheeled vehicle properties
+│                           #   (wheeled_vehicle.py), joint targets and legged properties
+│                           #   (legged.py)
+├── sensors/                # Sensor models, by sensor; Gazebo decoding (gazebo.py)
+│   ├── bus/                # Sensor bus (delivery delay, clock offsets) and streams
+│   ├── imu/                # Errors, imperfections (saturation, timing), temperature,
+│   │                       #   faults, vibration, applying a calibration
+│   ├── gnss/               # Position error, receiver (velocity, status, RTK, heading),
+│   │                       #   multipath, dropout, fault zones
+│   ├── magnetometer/       # Errors, magnetic anomalies, applying a calibration
+│   ├── imaging/            # Camera and lidar effects Gazebo does not render
+│   └── barometer.py, airspeed.py, optical_flow.py, battery_monitor.py,
+│                           #   esc_telemetry.py, wheel_encoders.py, joint_encoders.py
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
 │   ├── examples/           # Example estimators, one per contract: complementary_estimator

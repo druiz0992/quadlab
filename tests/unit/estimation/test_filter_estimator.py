@@ -13,13 +13,13 @@ from robotlab.core.measurements import (
     ImuReading,
     MagnetometerReading,
     RangeReading,
+    EncoderReading,
 )
 from robotlab.estimation.filter.estimator import FilterEstimator
 from robotlab.estimation.filter.protocol import predict_kind, update_kinds
 from robotlab.estimation.filter.measurements import MeasurementConverter
 from robotlab.estimation.examples.imu_gps_filter import ImuGpsFilter
 from robotlab.testing.plugins import check_estimator, synthetic_context
-from robotlab.sensors.wheel_encoders import EncoderReading
 from robotlab.testing.scenarios import SCENARIOS, run_scenario, scenario_context
 
 EXAMPLE = "robotlab.estimation.examples.imu_gps_filter:ImuGpsFilter"

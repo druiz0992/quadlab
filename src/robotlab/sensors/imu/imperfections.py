@@ -36,7 +36,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from ..core.measurements import readonly_array
+from ...core.measurements import readonly_array
 
 
 def _matrix(values: Any) -> NDArray[np.float64]:

@@ -53,10 +53,10 @@ from ...core.measurements import (
     ImuReading,
     MagnetometerReading,
     readonly_array,
+    EncoderReading,
 )
 from ...core.wheeled_vehicle import WheeledProperties
-from ...sensors.geodesy import gps_to_enu
-from ...sensors.wheel_encoders import EncoderReading
+from ...core.geodesy import gps_to_enu
 
 CONVERTER_DEFAULTS: dict[str, Any] = dict(
     gps_std_m=[0.5, 0.5, 0.8],

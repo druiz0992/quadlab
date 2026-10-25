@@ -5,9 +5,9 @@ import pytest
 
 from robotlab.core.measurements import GpsReading
 from robotlab.experiments.multirotor.effect_toggles import EffectToggles
-from robotlab.sensors.dropout import GpsDropout
-from robotlab.sensors.imu_faults import ImuFaults
-from robotlab.sensors.multipath import GpsMultipath
+from robotlab.sensors.gnss.dropout import GpsDropout
+from robotlab.sensors.imu.faults import ImuFaults
+from robotlab.sensors.gnss.multipath import GpsMultipath
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.simulation.gazebo.wind import WindProfile
 from robotlab.simulation.powertrain import Powertrain
@@ -204,7 +204,7 @@ def test_battery_actions_need_a_battery_and_log_charge():
 
 
 def test_ambient_keys_need_a_temperature_model_and_move_pack_and_imu():
-    from robotlab.sensors.imu_temperature import ImuTemperatureModel
+    from robotlab.sensors.imu.temperature import ImuTemperatureModel
 
     toggles, models = setup()
     assert not toggles.action_available("colder")

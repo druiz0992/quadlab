@@ -28,8 +28,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ..core.legged import JointTargets
-from ..core.measurements import ImuReading, Sample
-from ..sensors.joint_encoders import JointStateReading
+from ..core.measurements import ImuReading, Sample, JointStateReading
 
 CONTROL_STATE_SOURCES = ("truth", "sensors")
 

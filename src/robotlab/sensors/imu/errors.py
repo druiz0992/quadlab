@@ -25,7 +25,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from ..core.measurements import readonly_array
+from ...core.measurements import readonly_array
 
 
 @dataclass(frozen=True)

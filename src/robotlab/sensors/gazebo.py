@@ -8,10 +8,10 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.spatial.transform import Rotation
 from ..core.measurements import GpsReading
 from .barometer import BaroErrorModel, altitude_to_pressure, pressure_to_altitude
-from .gps_errors import GpsErrorModel
-from .magnetometer import MagnetometerErrorModel
-from .multipath import GpsMultipath
-from .vibration import AccelerometerVibration
+from .gnss.errors import GpsErrorModel
+from .magnetometer.errors import MagnetometerErrorModel
+from .gnss.multipath import GpsMultipath
+from .imu.vibration import AccelerometerVibration
 
 
 class ImuPerturbation(Protocol):

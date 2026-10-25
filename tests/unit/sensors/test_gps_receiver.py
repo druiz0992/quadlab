@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 
 from robotlab.core.measurements import GpsReading
-from robotlab.sensors.geodesy import gps_to_enu
-from robotlab.sensors.gps_receiver import (
+from robotlab.core.geodesy import gps_to_enu
+from robotlab.sensors.gnss.receiver import (
     GpsHeading,
     GpsStatusModel,
     GpsVelocityErrors,
@@ -114,7 +114,7 @@ def test_rtk_and_standard_error_model_are_exclusive(tmp_path):
 
 
 def test_auto_accuracy_follows_configured_error():
-    from robotlab.sensors.gps_receiver import configured_position_sigma_m
+    from robotlab.sensors.gnss.receiver import configured_position_sigma_m
 
     section = load_drone_config().data["sensors"]["gps"]
     # Error-free default GPS: the receiver reports its floor, not 1.35 m.

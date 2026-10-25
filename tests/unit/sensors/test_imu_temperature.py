@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from robotlab.sensors.imu_temperature import ImuTemperatureModel
+from robotlab.sensors.imu.temperature import ImuTemperatureModel
 from robotlab.simulation.gazebo.config import load_drone_config
 
 HOVER = np.array([0.0, 0.0, 9.81])

@@ -14,7 +14,7 @@ the sensors it chooses and be scored against the known truth::
 A scenario is a truth trajectory (``testing/trajectories.py``), a vehicle
 (``multirotor`` or a wheeled ``rover``/``car``/``tractor``), a ray-cast
 scene, and sensor settings. ``scenario_samples`` synthesizes bus samples for
-any selection of the streams in ``sensors/bus.py`` (see
+any selection of the streams in ``sensors/bus/__init__.py`` (see
 ``testing/synthetic_sensors.py`` for how each is made):
 
 - IMU at 200 Hz from t = 0 and GPS at 10 Hz from 0.1 s are set by the
@@ -468,10 +468,7 @@ def _drift(
     scored: list[Sample[EstimatedState]], scenario: EstimatorScenario
 ) -> tuple[float | None, float | None, float | None]:
     """Aligned ATE RMSE and RPE RMSEs (see ``ScenarioReport``)."""
-    from ..evaluation.trajectory import (
-        absolute_trajectory_error,
-        relative_pose_error,
-    )
+    from ..evaluation.trajectory import absolute_trajectory_error, relative_pose_error
 
     # The newest estimate per timestamp (a filter may publish after the
     # prediction and again after a measurement update at the same time).

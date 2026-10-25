@@ -10,7 +10,11 @@ from scipy.spatial.transform import Rotation
 
 from .takeoff import TakeoffSequence
 from .failsafe import BatteryFailsafe
-from ...simulation.gazebo.world import reference_from_world
+from ...simulation.gazebo.world import (
+    reference_from_world,
+    WORLD_ELEVATION_M,
+    world_elevation_m,
+)
 from ..common.mission import MissionRunner
 from ..harness.run_evaluation import RunEvaluation
 from ..common.run_setup import prepare_world, validate_run
@@ -39,7 +43,6 @@ from ...simulation.gazebo.payload import PayloadControl, Winch
 from ...simulation.powertrain import Powertrain
 from ...simulation.esc import EscModel
 from ...simulation.gazebo.environment import gazebo_environment
-from ...simulation.gazebo.world import WORLD_ELEVATION_M, world_elevation_m
 from ..common.gazebo_helpers import (
     edit_world,
     print_health,

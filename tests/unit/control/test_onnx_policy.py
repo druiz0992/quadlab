@@ -13,9 +13,8 @@ from robotlab.control.onnx_policy import (
     projected_gravity,
 )
 from robotlab.core.algorithms import AlgorithmContext, SensorDescription
-from robotlab.core.measurements import ImuReading, Sample
+from robotlab.core.measurements import ImuReading, Sample, JointStateReading
 from robotlab.sensors.bus import STREAMS
-from robotlab.sensors.joint_encoders import JointStateReading
 from robotlab.testing.plugins import (
     check_legged_controller,
     legged_context,

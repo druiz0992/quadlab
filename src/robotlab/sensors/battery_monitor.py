@@ -17,21 +17,12 @@ generates the measurement; nothing else reaches consumers.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
 from ..simulation.battery import BatteryState
-
-
-@dataclass(frozen=True)
-class BatteryReading:
-    sim_time_ns: int
-    voltage_v: float
-    current_a: float
-    consumed_mah: float
-    remaining_pct: float
+from ..core.measurements import BatteryReading
 
 
 class BatteryMonitor:

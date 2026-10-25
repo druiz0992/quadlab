@@ -24,8 +24,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from ..core.measurements import GpsReading
-from .gps_errors import offset_fix
+from ...core.measurements import GpsReading
+from .errors import offset_fix
 from .zones import inside_any, zones_from_settings
 
 _MAX_LOGGED_EPISODES = 1000

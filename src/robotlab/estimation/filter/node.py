@@ -33,7 +33,7 @@ from ...core.algorithms import SensorDescription
 from ...core.measurements import EstimatedState, GpsReading, Sample
 from ...core.wheeled_vehicle import WheeledProperties
 from ...sensors.bus import STREAMS
-from ...sensors.streams import Channel, Publisher
+from ...sensors.bus.streams import Channel, Publisher
 from ..interface import Innovation
 from .measurements import MeasurementConverter
 from .protocol import PREDICT_PREFIX, UPDATE_PREFIX, predict_kind, update_kinds

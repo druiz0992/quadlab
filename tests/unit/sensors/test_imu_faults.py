@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from robotlab.sensors.imu_faults import ImuFaults
+from robotlab.sensors.imu.faults import ImuFaults
 
 PERIOD_NS = 5_000_000
 HOVER = np.array([0.0, 0.0, 9.81])

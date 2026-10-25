@@ -21,8 +21,8 @@ sensor bus samples (imu, gps)
 | `experiments/harness/algorithms.py` | `gps_imu_ekf`: the `filter` plug-in running `GpsImuEkf` (`gps_imu_ekf_options`, calibrated bias priors) |
 | `estimation/filter/` | Reusable for any recursive filter: `FilterNode` (sample checks, held driving readings, timing, publication), measurement conversion (mounts, ENU, wheel geometry), the `filter` plug-in, IMU and wheel-odometry examples ([Writing your own](#writing-your-own-filter)) |
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
-| `sensors/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
-| `sensors/geodesy.py` | WGS84 ↔ ECEF ↔ local ENU conversion |
+| `sensors/bus/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
+| `core/geodesy.py` | WGS84 ↔ ECEF ↔ local ENU conversion |
 
 None of the numerical modules depend on Gazebo transport or Rerun.
 

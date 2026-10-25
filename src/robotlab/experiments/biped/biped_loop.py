@@ -46,7 +46,7 @@ from ...core.legged import JointTargets, LeggedProperties
 from ...core.measurements import ImuReading, Sample
 from ...evaluation.biped_health import BipedHealth
 from ...sensors.bus import SensorBus
-from ...sensors.imu_errors import ImuErrorModel
+from ...sensors.imu.errors import ImuErrorModel
 from ...sensors.joint_encoders import JointEncoderModel
 from ...simulation.mujoco.config import BipedConfig, period_steps
 from ...simulation.mujoco.scene import BipedScene

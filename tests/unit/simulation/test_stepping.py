@@ -8,6 +8,7 @@ from robotlab.simulation.gazebo.stepping import (
     WORLD_CONTROL_SERVICE,
     LockstepStepper,
     steps_per_period,
+    RELEASE_NS,
 )
 
 MS = 1_000_000
@@ -92,8 +93,6 @@ def test_resend_only_after_barrier_timeout():
 
 
 # Plugin barrier ------------------------------------------------------------------
-
-from robotlab.simulation.gazebo.stepping import RELEASE_NS
 
 
 class Recorder:

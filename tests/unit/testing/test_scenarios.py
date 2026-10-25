@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from robotlab.core.measurements import EstimatedState, Sample
-from robotlab.sensors.geodesy import gps_to_enu
+from robotlab.core.geodesy import gps_to_enu
 from robotlab.testing.plugins import REFERENCE
 from robotlab.testing.scenarios import (
     SCENARIOS,

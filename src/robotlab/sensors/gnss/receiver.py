@@ -37,8 +37,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from ..core.measurements import GpsHeadingReading, GpsReading, GpsStatus
-from .gps_errors import offset_fix
+from ...core.measurements import GpsHeadingReading, GpsReading, GpsStatus
+from .errors import offset_fix
 
 
 def _gauss_markov(previous, sigma, tau_s, dt_s, rng, size=3):

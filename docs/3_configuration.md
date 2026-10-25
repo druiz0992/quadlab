@@ -324,7 +324,7 @@ stress parameters, **not** a calibrated sensor.
 
 ### IMU (`sensors.imu.error_model`)
 
-`sensors/imu_errors.py` adds, per axis in IMU sensor axes, for the
+`sensors/imu/errors.py` adds, per axis in IMU sensor axes, for the
 accelerometer and the gyro:
 `measured = input + turn_on_bias + bias_walk(t) + white(t)`.
 
@@ -352,7 +352,7 @@ All are three-element per-axis lists, default zero (term disabled).
 
 ### IMU imperfections (`sensors.imu.imperfections`)
 
-`sensors/imu_imperfections.py`; off by default. The IMU pipeline runs, in
+`sensors/imu/imperfections.py`; off by default. The IMU pipeline runs, in
 order:
 1. imperfections, on the true signal,
 2. Allan-variance errors,
@@ -435,7 +435,7 @@ squares on static samples:
 The temperature slopes are only identifiable when temperatures vary;
 otherwise they are zero.
 
-**3. Use** (`sensors/calibration.py`). f̂ = A⁻¹(a − b_a − k_a ΔT) and
+**3. Use** (`sensors/imu/calibration.py, sensors/magnetometer/calibration.py`). f̂ = A⁻¹(a − b_a − k_a ΔT) and
 ω̂ = ω − b_g − k_g ΔT − G f̂ − b_startup:
 
 | Key | Units | Meaning |
@@ -509,7 +509,7 @@ configuration, so the calibration stays valid.
 
 ### GPS (`sensors.gps.error_model`)
 
-`sensors/gps_errors.py` adds a local east/north/up position error to each
+`sensors/gnss/errors.py` adds a local east/north/up position error to each
 fix: `error = correlated(t) + white(t)`. Real GPS error is dominated by
 slowly varying components, so consecutive fixes are not independent.
 
@@ -537,7 +537,7 @@ only and are never given to the EKF.
 
 ### GPS receiver: velocity, status, RTK, heading
 
-`sensors/gps_receiver.py` models four more receiver outputs. The GPS fix on
+`sensors/gnss/receiver.py` models four more receiver outputs. The GPS fix on
 the sensor bus carries the ENU velocity and a `GpsStatus`.
 
 - **Velocity** (`velocity_error`, off by default): Doppler velocity error
@@ -608,7 +608,7 @@ estimator.
 
 ### GPS multipath (`sensors.gps.multipath`)
 
-`sensors/multipath.py` adds sudden position jumps that persist and then
+`sensors/gnss/multipath.py` adds sudden position jumps that persist and then
 clear, approximating reflections near structures. It runs after the GPS
 error model and before dropout, on every fix.
 
@@ -629,7 +629,7 @@ start times and offsets. This is a statistical stand-in, not geometry-based
 
 ### IMU faults (`sensors.imu.faults`)
 
-`sensors/imu_faults.py` applies scheduled malfunctions after IMU errors and
+`sensors/imu/faults.py` applies scheduled malfunctions after IMU errors and
 vibration/clipping, as digital output faults (spikes can exceed the clip
 limit). Format: `{"seed": 0, "events": [...]}`. Each event has `type`,
 `instrument` (`accel` in m/s² or `gyro` in rad/s, sensor axes), `start_s`,
@@ -782,7 +782,7 @@ from its losses I²R and cools towards ambient:
 | `resistance_coefficient_per_c` | 1/°C | 0.028 | k_R; resistance doubles at about 0 °C |
 | `capacity_coefficient_per_c` | 1/°C | 0.006 | k_C; 15 % less capacity at 0 °C |
 
-**IMU (`sensors.imu.temperature`, `sensors/imu_temperature.py`).** The die
+**IMU (`sensors.imu.temperature`, `sensors/imu/temperature.py`).** The die
 warms after power-on, `T = T_ambient + rise · (1 − exp(−t/τ))` with t from
 the first sample, and each axis gains a bias `coefficient · (T − calibration_c)`.
 It is applied after the Allan-variance errors and before vibration and
@@ -1210,7 +1210,7 @@ gains are not retuned.
 ## Camera realism (`sensors.camera`)
 
 Lens projection is rendered by Gazebo; other effects are applied in Python
-to each frame before recording (`sensors/camera_effects.py`).
+to each frame before recording (`sensors/imaging/camera_effects.py`).
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -1258,11 +1258,11 @@ declination** here (the real value is about +1°).
 | `error_model.drift_std_ut`, `drift_correlation_s` | µT, s | 0, 300 | Slow Gauss–Markov offset per axis (magnetization, temperature) |
 | `dipoles` | list | [] | Point-dipole anomalies `{position_m, moment_am2}` (world); scene obstacles add `magnetic_moment_am2` |
 | `error_model.white_std_ut` | µT, 3 axes | 0 | Per-sample white noise |
-| `error_model.enabled`, `seed` | | off, 0 | Seeded Python model (`sensors/magnetometer.py`) |
+| `error_model.enabled`, `seed` | | off, 0 | Seeded Python model (`sensors/magnetometer/errors.py`) |
 
 `measured = S @ field + hard_iron + k_T·total_thrust + k_I·battery_current + drift(t) + white`.
 
-**Anomalies near structures** (`sensors/magnetic_anomalies.py`): each
+**Anomalies near structures** (`sensors/magnetometer/anomalies.py`): each
 dipole adds `B = μ₀/4π · (3r̂(m·r̂) − m)/|r|³` at the sensor's true position,
 rotated into sensor axes with the true attitude, before the sensor errors.
 Distances are clamped to 0.5 m. A 1000 A·m² moment, about a parked car,
@@ -1320,7 +1320,7 @@ robotlab ... --drone configs/sensors/magnetometer.json --drone outputs/magcal/ma
 - **Interference:** a per-axis linear regression of readings on current or
   thrust.
 
-**3. Use** (`sensors/calibration.py`). Corrected field b̂ = C (m − o − k_I·I − k_T·T):
+**3. Use** (`sensors/imu/calibration.py, sensors/magnetometer/calibration.py`). Corrected field b̂ = C (m − o − k_I·I − k_T·T):
 
 | Key | Units | Meaning |
 | --- | --- | --- |
@@ -1412,7 +1412,7 @@ lay exactly at the true height, confirming the row ordering.
 
 ### Lidar realism (`sensors.lidar.effects`)
 
-Gazebo's gpu_lidar is close to ideal, so `sensors/lidar_effects.py` adds, in
+Gazebo's gpu_lidar is close to ideal, so `sensors/imaging/lidar_effects.py` adds, in
 the lidar's own axes before recording:
 
 | Key | Default | Meaning |
@@ -1430,7 +1430,7 @@ the lidar's own axes before recording:
 | `detection.default_reflectivity` | 0.5 | Surfaces without a scene reflectivity |
 | `seed` | 0 | Local RNG |
 
-Before noise, dropouts and distortion, `sensors/lidar_returns.py` handles
+Before noise, dropouts and distortion, `sensors/imaging/lidar_returns.py` handles
 per-beam return physics on the full scan grid, including beams that hit
 nothing:
 
@@ -1604,7 +1604,7 @@ Both are off by default. `configs/scenarios/disturbances.json`:
 
 ### GPS dropout
 
-Applied by `sensors/dropout.py` to Gazebo fixes at the Python mission
+Applied by `sensors/gnss/dropout.py` to Gazebo fixes at the Python mission
 boundary, before Rerun and the EKF; the raw Gazebo topic is unchanged and no
 replacement fixes are created.
 
@@ -1709,7 +1709,7 @@ and recorded in `wind-commands.jsonl`.
 
 ## Accelerometer vibration
 
-`sensors.imu.vibration` (`sensors/vibration.py`) perturbs Gazebo
+`sensors.imu.vibration` (`sensors/imu/vibration.py`) perturbs Gazebo
 accelerometer readings before Rerun and the EKF. Off by default.
 `configs/sensors/imu_vibration.json`:
 

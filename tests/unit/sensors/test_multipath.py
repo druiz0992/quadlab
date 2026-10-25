@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from robotlab.core.measurements import GpsReading
-from robotlab.sensors.geodesy import gps_to_enu
-from robotlab.sensors.multipath import GpsMultipath
+from robotlab.core.geodesy import gps_to_enu
+from robotlab.sensors.gnss.multipath import GpsMultipath
 from robotlab.simulation.gazebo.config import load_drone_config
 
 REFERENCE = GpsReading(40.4168, -3.7038, 650.0)

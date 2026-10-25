@@ -2,7 +2,7 @@
 
 An estimator is constructed as ``cls(context, options)`` with an
 ``AlgorithmContext`` and its ``algorithms.estimator_options`` mapping. It
-receives bus samples (``sensors/<kind>`` streams, see sensors/bus.py) in
+receives bus samples (``sensors/<kind>`` streams, see sensors/bus/__init__.py) in
 delivery order, serially on the mission thread, which is deterministic in
 lockstep. Samples of one stream arrive in time order; different streams may
 interleave out of time order when latencies differ. It never sees truth.

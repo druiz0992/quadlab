@@ -15,23 +15,14 @@ noise. Sampled at ``rate_hz`` on simulation time; seeded local RNG.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 import math
 from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike
+from ..core.measurements import AirspeedReading
 
 SEA_LEVEL_DENSITY_KG_M3 = 1.225
-
-
-@dataclass(frozen=True)
-class AirspeedReading:
-    """Differential pressure (Pa) and indicated airspeed (m/s)."""
-
-    sim_time_ns: int
-    differential_pressure_pa: float
-    indicated_airspeed_mps: float
 
 
 class AirspeedSensor:

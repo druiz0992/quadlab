@@ -23,11 +23,10 @@ from ...core.algorithms import AlgorithmContext, SensorDescription
 from ...core.measurements import GpsReading
 from ...core.vehicle import DroneProperties
 from ...evaluation.biped_health import BipedHealth
-from ...sensors.bus import SensorBus
-from ...sensors.imu_errors import ImuErrorModel
+from ...sensors.bus import SensorBus, STREAMS
+from ...sensors.imu.errors import ImuErrorModel
 from ...sensors.joint_encoders import JointEncoderModel
 from ...simulation.mujoco.config import BIPED_STREAMS, BipedConfig, load_biped_config
-from ...sensors.bus import STREAMS
 from ...simulation.gazebo.world import WORLD_ELEVATION_M
 from ..harness.algorithms import load_class
 from .biped_loop import BipedLoop, BipedParts

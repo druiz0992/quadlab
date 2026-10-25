@@ -2,7 +2,7 @@
 
 import xml.etree.ElementTree as ET
 
-from ...sensors.lidar_returns import RETRO_PER_REFLECTIVITY
+from ...sensors.imaging.lidar_returns import RETRO_PER_REFLECTIVITY
 
 
 def element(parent, tag, text=None, **attrs):

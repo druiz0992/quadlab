@@ -18,9 +18,9 @@ from robotlab.testing.plugins import (
     check_controller,
     check_estimator,
     enu_to_gps,
+    REFERENCE,
 )
-from robotlab.sensors.geodesy import gps_to_enu
-from robotlab.testing.plugins import REFERENCE
+from robotlab.core.geodesy import gps_to_enu
 
 
 def test_examples_and_builtins_pass():

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from robotlab.sensors.gazebo import vibrate_imu_message
-from robotlab.sensors.vibration import AccelerometerVibration
+from robotlab.sensors.imu.vibration import AccelerometerVibration
 from robotlab.simulation.gazebo.config import load_drone_config
 
 

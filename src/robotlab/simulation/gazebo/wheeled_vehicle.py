@@ -23,8 +23,7 @@ import xml.etree.ElementTree as ET
 
 from ...core.wheeled_vehicle import WheeledProperties
 from ..wheeled.spawn import SpawnPose
-from .sdf import box, element
-from .sdf import plugin
+from .sdf import box, element, plugin
 from .vehicle import add_body_sensors
 
 KIND_COLORS = {

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 import numpy as np
+from numpy.typing import NDArray
 
 T = TypeVar("T")
 
@@ -264,3 +265,55 @@ class EscTelemetry:
         object.__setattr__(
             self, "rotor_speed_rad_s", readonly_array(values, values.shape)
         )
+
+
+# Readings of sensors simulated in Python (models in sensors/).
+
+
+@dataclass(frozen=True)
+class AirspeedReading:
+    """Differential pressure (Pa) and indicated airspeed (m/s)."""
+
+    sim_time_ns: int
+    differential_pressure_pa: float
+    indicated_airspeed_mps: float
+
+
+@dataclass(frozen=True)
+class BatteryReading:
+    sim_time_ns: int
+    voltage_v: float
+    current_a: float
+    consumed_mah: float
+    remaining_pct: float
+
+
+@dataclass(frozen=True)
+class JointStateReading:
+    """One reading per actuated joint (``names`` order) at ``sim_time_ns``."""
+
+    sim_time_ns: int
+    names: tuple[str, ...]
+    counts: tuple[int, ...]
+    position_rad: NDArray[np.float64]
+    velocity_rad_s: NDArray[np.float64]
+
+
+@dataclass(frozen=True)
+class OpticalFlowReading:
+    """One flow sample; flow is NaN when invalid."""
+
+    sim_time_ns: int
+    flow_rad_s: NDArray[np.float64]  # Image-axis angular rates (sensor y, z)
+    distance_m: float  # Along the optical axis to the ground (NaN if none)
+    valid: bool
+
+
+@dataclass(frozen=True)
+class EncoderReading:
+    """One reading per wheel (wheel order), at ``sim_time_ns``."""
+
+    sim_time_ns: int
+    counts: tuple[int, ...]
+    wheel_speed_rad_s: NDArray[np.float64]
+    steer_angle_rad: NDArray[np.float64]

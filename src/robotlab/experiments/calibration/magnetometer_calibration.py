@@ -41,9 +41,9 @@ from ...estimation.magnetometer_calibration import (
     fit_interference,
     heading_error_deg,
 )
-from ...sensors.calibration import MagnetometerCalibration
+from ...sensors.magnetometer.calibration import MagnetometerCalibration
 from ...sensors.battery_monitor import BatteryMonitor
-from ...sensors.magnetometer import MagnetometerErrorModel
+from ...sensors.magnetometer.errors import MagnetometerErrorModel
 from ...simulation.gazebo.config import (
     DroneConfig,
     load_drone_config,
