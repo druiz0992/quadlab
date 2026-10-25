@@ -8,7 +8,7 @@ import pytest
 from scipy.spatial.transform import Rotation
 
 from robotlab.control.manual import FlightCommand
-from robotlab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.run import GazeboConfig, run
 
 
 @pytest.mark.skipif(

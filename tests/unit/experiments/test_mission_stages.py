@@ -13,13 +13,13 @@ import numpy as np
 import pytest
 
 from robotlab.control.manual import FlightCommand
-from robotlab.experiments.algorithms import StaleEstimate
-from robotlab.experiments.gazebo import GazeboConfig
-from robotlab.experiments.keyboard_flight import apply_keyboard_effects
-from robotlab.experiments.rotor_mission import RotorMission, control_state
-from robotlab.experiments.run_setup import validate_run
-from robotlab.experiments.run_summary import final_exit_reason
-from robotlab.experiments.vehicle_forces import ExternalForces
+from robotlab.experiments.harness.algorithms import StaleEstimate
+from robotlab.experiments.run import GazeboConfig
+from robotlab.experiments.multirotor.keyboard_flight import apply_keyboard_effects
+from robotlab.experiments.multirotor.rotor_mission import RotorMission, control_state
+from robotlab.experiments.common.run_setup import validate_run
+from robotlab.experiments.common.exit_reason import final_exit_reason
+from robotlab.experiments.multirotor.vehicle_forces import ExternalForces
 from robotlab.simulation.aerodynamics import quadratic_body_drag_world
 from robotlab.simulation.gazebo.config import load_drone_config
 
@@ -246,8 +246,8 @@ def test_final_exit_reason():
 
 
 def test_keyboard_polled_at_most_every_period(monkeypatch):
-    from robotlab.experiments import mission_loop
-    from robotlab.experiments.mission_loop import (
+    from robotlab.experiments.multirotor import mission_loop
+    from robotlab.experiments.multirotor.mission_loop import (
         KEYBOARD_POLL_PERIOD_WALL_S,
         MissionLoop,
     )
@@ -281,7 +281,7 @@ def test_keyboard_polled_at_most_every_period(monkeypatch):
 def test_calibration_session_fails_fast_when_gazebo_exits(tmp_path):
     from queue import Queue
 
-    from robotlab.experiments.calibration_session import CalibrationSession
+    from robotlab.experiments.calibration.calibration_session import CalibrationSession
 
     session = CalibrationSession.__new__(CalibrationSession)
     session.messages = Queue()
@@ -296,8 +296,8 @@ def test_calibration_session_fails_fast_when_gazebo_exits(tmp_path):
 
 def test_controller_tracking_reference_replaces_the_mission():
     from robotlab.control.references import ReferencePoint
-    from robotlab.experiments.mission import MissionRunner
-    from robotlab.experiments.run_evaluation import RunEvaluation
+    from robotlab.experiments.common.mission import MissionRunner
+    from robotlab.experiments.harness.run_evaluation import RunEvaluation
 
     data = settings()
     calls = []

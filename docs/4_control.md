@@ -49,7 +49,7 @@ KeyboardWindow ─→ FlightCommand ─↗    position loop ─→ attitude loop
   and adjusts the published motor speeds (see
   [3 Configuration](3_configuration.md#battery-and-powertrain-battery)); the
   speeds in `commands.jsonl` are the controller's nominal conversion.
-- `experiments/rotor_loop.py` (`RotorControlLoop`) schedules the controller;
+- `experiments/multirotor/rotor_loop.py` (`RotorControlLoop`) schedules the controller;
   see [Controller timing and latency](#controller-timing-and-latency).
 - `visualization/keyboard.py` owns only Tk key, focus, and window state.
   Keys can combine; opposite keys cancel; release or focus loss requests
@@ -66,7 +66,7 @@ KeyboardWindow ─→ FlightCommand ─↗    position loop ─→ attitude loop
 ### Keyboard effect toggles
 
 During keyboard flight, number keys switch effects on and off
-(`experiments/effect_toggles.py`); the keyboard window lists them with their
+(`experiments/multirotor/effect_toggles.py`); the keyboard window lists them with their
 current state. Each switch drives a manual override in an existing model,
 alongside anything scheduled in the configuration.
 

@@ -16,7 +16,7 @@ Gazebo IMU/GPS → decode → (dropout, vibration) → typed channels
 | --- | --- |
 | `estimation/gps_imu_ekf/ekf.py` | Numerical prediction and correction (`GpsImuEkf`) |
 | `estimation/gps_imu_ekf/node.py` | Frame/timestamp adaptation, WGS84 reference, state output (`GpsImuEkfNode`) |
-| `experiments/live_ekf.py` | Gazebo decoding to channels, bounded reordering, watchdogs (`LiveEkf`) |
+| `experiments/harness/live_ekf.py` | Gazebo decoding to channels, bounded reordering, watchdogs (`LiveEkf`) |
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
 | `sensors/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
 | `sensors/geodesy.py` | WGS84 ↔ ECEF ↔ local ENU conversion |
@@ -94,7 +94,7 @@ repropagation are not implemented.
 
 ## Live operation
 
-`experiments/live_ekf.py` decodes Gazebo measurements on the mission thread
+`experiments/harness/live_ekf.py` decodes Gazebo measurements on the mission thread
 into typed channels. A bounded adapter waits until both streams reach a
 timestamp, then dispatches buffered samples in source-time order (IMU before
 GPS at equal times). This tolerates asynchronous arrival and different rates

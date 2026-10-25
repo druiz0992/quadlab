@@ -1,5 +1,5 @@
 from robotlab.cli import gazebo as cli
-from robotlab.experiments import gazebo
+from robotlab.experiments import run as mission_entry
 from robotlab.visualization import keyboard
 
 
@@ -14,11 +14,13 @@ def test_headless_keyboard_allowed(monkeypatch):
     window = Window()
     monkeypatch.setattr(keyboard, "KeyboardWindow", lambda: window)
     seen = []
-    # _run opens the window itself, after validation, through the opener.
+    # The mission opens the window itself, after validation, through the opener.
     monkeypatch.setattr(
-        gazebo, "_run", lambda args, opener, source: seen.append((args, opener()))
+        mission_entry,
+        "_dispatch",
+        lambda args, opener, source: seen.append((args, opener())),
     )
-    gazebo.run(gazebo.GazeboConfig(keyboard=True, headless=True))
+    mission_entry.run(mission_entry.GazeboConfig(keyboard=True, headless=True))
     assert seen[0][0].headless and seen[0][1] is window
     assert window.closed
 

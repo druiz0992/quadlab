@@ -21,7 +21,7 @@ import sys
 import numpy as np
 import pytest
 
-from robotlab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.run import GazeboConfig, run
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("ROBOTLAB_TEST_GAZEBO") != "1",
@@ -195,7 +195,9 @@ def test_dipole_beside_hover_changes_vertical_field(tmp_path, monkeypatch):
 
 
 def test_magnetometer_calibration_recovers_injected_errors(tmp_path):
-    from robotlab.experiments.magnetometer_calibration import run_calibration
+    from robotlab.experiments.calibration.magnetometer_calibration import (
+        run_calibration,
+    )
 
     report = run_calibration(["configs/sensors/magnetometer.json"], tmp_path)
     layer = json.loads((tmp_path / "magnetometer-calibration.json").read_text())
@@ -211,7 +213,7 @@ def test_magnetometer_calibration_recovers_injected_errors(tmp_path):
 
 
 def test_imu_calibration_recovers_scale_and_writes_priors(tmp_path):
-    from robotlab.experiments.imu_calibration import run_imu_calibration
+    from robotlab.experiments.calibration.imu_calibration import run_imu_calibration
 
     report = run_imu_calibration(
         ["configs/sensors/imu_consumer_mems.json"], tmp_path, startup_gyro_s=2
@@ -386,7 +388,7 @@ def test_quadplane_full_mission(tmp_path):
 
 def test_replay_reproduces_live_estimates(tmp_path):
     """Recorded bus deliveries replayed offline give the live EKF output."""
-    from robotlab.experiments.replay import replay
+    from robotlab.experiments.harness.replay import replay
 
     live = fly(
         tmp_path,

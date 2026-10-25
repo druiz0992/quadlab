@@ -1,5 +1,5 @@
 from robotlab.control.manual import FlightCommand
-from robotlab.experiments.takeoff import TakeoffSequence
+from robotlab.experiments.multirotor.takeoff import TakeoffSequence
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.simulation.gazebo.vehicle import spawn_position
 

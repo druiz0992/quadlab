@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from robotlab.core.measurements import GpsReading
-from robotlab.experiments.effect_toggles import EffectToggles
+from robotlab.experiments.multirotor.effect_toggles import EffectToggles
 from robotlab.sensors.dropout import GpsDropout
 from robotlab.sensors.imu_faults import ImuFaults
 from robotlab.sensors.multipath import GpsMultipath
@@ -125,7 +125,10 @@ def test_wind_profile_off_publishes_still_air_once_then_resumes():
 
 
 def test_flying_object_spawns_circle_and_removes_with_fresh_names():
-    from robotlab.experiments.flying_object import FlyingObjectSpawner, circle_entry
+    from robotlab.experiments.multirotor.flying_object import (
+        FlyingObjectSpawner,
+        circle_entry,
+    )
 
     calls = []
 

@@ -77,7 +77,7 @@ def test_encoder_readings_travel_on_the_sensor_bus():
 def test_wheeled_runs_carry_encoders_and_drones_do_not():
     from types import SimpleNamespace
 
-    from robotlab.experiments.sensor_pipeline import SensorPipeline
+    from robotlab.experiments.common.sensor_pipeline import SensorPipeline
     from robotlab.simulation.gazebo.config import load_drone_config
 
     def kinds(config):

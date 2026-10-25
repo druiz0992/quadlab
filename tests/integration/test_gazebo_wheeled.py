@@ -16,7 +16,7 @@ import pytest
 
 from robotlab.control.wheeled import WheeledControlState
 from robotlab.control.wheeled_template import TemplateWheeledController
-from robotlab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.run import GazeboConfig, run
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.simulation.gazebo.world import load_scene
 from robotlab.simulation.wheeled.ground import GroundModel

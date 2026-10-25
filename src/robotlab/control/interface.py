@@ -2,7 +2,7 @@
 
 A controller is constructed as ``cls(context, options)`` with an
 ``AlgorithmContext`` and its ``algorithms.controller_options`` mapping. The
-control loop (experiments/rotor_loop.py) calls ``update_position`` every
+control loop (experiments/multirotor/rotor_loop.py) calls ``update_position`` every
 position-loop tick and ``update_attitude`` every control tick, with a
 ``ControlState`` that comes from simulator truth or from the estimator
 (``algorithms.control_state_source``), and submits the returned rotor

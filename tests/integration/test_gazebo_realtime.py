@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from robotlab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.run import GazeboConfig, run
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("ROBOTLAB_TEST_GAZEBO") != "1",

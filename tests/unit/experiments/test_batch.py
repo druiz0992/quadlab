@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from robotlab.experiments.batch import (
+from robotlab.experiments.harness.batch import (
     aggregate,
     baseline_from,
     check_baseline,
@@ -145,7 +145,7 @@ def test_failed_health_runs_are_excluded_from_aggregates(tmp_path):
 
 
 def test_comparison_markdown_marks_best_by_direction():
-    from robotlab.experiments.comparison import comparison_markdown, stats
+    from robotlab.experiments.harness.comparison import comparison_markdown, stats
 
     columns = {
         "ekf": {"err": stats([0.1, 0.3]), "nees": stats([15.0])},
@@ -166,7 +166,7 @@ def test_comparison_markdown_marks_best_by_direction():
 
 
 def test_batch_comparison_uses_tolerance_directions(tmp_path):
-    from robotlab.experiments.batch import batch_comparison
+    from robotlab.experiments.harness.batch import batch_comparison
 
     runs = expand_runs(EXPERIMENT, [])
     table = aggregate(
@@ -183,7 +183,7 @@ def test_batch_comparison_uses_tolerance_directions(tmp_path):
 
 
 def test_wheeled_experiments_pass_the_robot_and_its_seeds(tmp_path):
-    from robotlab.experiments.batch import load_experiment, resolved_seed_paths
+    from robotlab.experiments.harness.batch import load_experiment, resolved_seed_paths
 
     experiment = dict(name="w", robot="car", drone=[], duration_s=5)
     command = run_command(experiment, tmp_path / "o.json", tmp_path)

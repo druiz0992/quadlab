@@ -20,7 +20,7 @@ noise) and checks the ``StateEstimator`` contract (estimation/interface.py):
   symmetric positive semi-definite covariance over the present blocks;
 - innovations have finite, non-negative NIS and positive degrees of freedom;
 - ``summary()`` is a JSON-serializable dict;
-- ``context.log`` entries are valid (see experiments/algorithm_debug.py);
+- ``context.log`` entries are valid (see experiments/harness/algorithm_debug.py);
 - two runs give identical estimates (no hidden global randomness).
 
 ``check_controller`` checks the ``RotorController`` contract
@@ -81,7 +81,7 @@ from ..core.legged import JointTargets, LeggedProperties
 from ..core.wheeled import WheelCommands
 from ..core.wheeled_vehicle import WheeledProperties
 from ..estimation.interface import Innovation
-from ..experiments.algorithm_debug import validate_debug_entry
+from ..experiments.harness.algorithm_debug import validate_debug_entry
 from ..sensors.bus import STREAMS
 from ..sensors.geodesy import gps_to_enu
 

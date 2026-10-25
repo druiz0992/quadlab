@@ -404,7 +404,7 @@ follows the same pattern:
   because the turn-on bias changes each time.
 - **In flight:** the EKF estimates what is left.
 
-**1. Procedure: `robotlab-imucal`** (`experiments/imu_calibration.py`):
+**1. Procedure: `robotlab-imucal`** (`experiments/calibration/imu_calibration.py`):
 
 ```bash
 robotlab-imucal --drone configs/sensors/imu_consumer_mems.json --startup-gyro-s 2 --output outputs/imucal
@@ -818,7 +818,7 @@ loaded voltage 12.7 V, then loss of lift.
 
 ## Low-battery failsafe (`failsafe.low_battery`)
 
-Mission logic (`experiments/failsafe.py`) for rotor-thrust and keyboard
+Mission logic (`experiments/multirotor/failsafe.py`) for rotor-thrust and keyboard
 modes; requires `battery.enabled`. It reads the **measured** battery state
 like a real flight controller: the battery monitor's remaining percentage
 and voltage when `sensors.battery_monitor` is enabled (so its counting
@@ -1288,7 +1288,7 @@ wiring), or anomalies in the environment, so filters should still treat the
 compass as imperfect. Real autopilots split the work three ways, and so does
 RobotLab:
 
-**1. Procedure: `robotlab-magcal`** (`experiments/magnetometer_calibration.py`),
+**1. Procedure: `robotlab-magcal`** (`experiments/calibration/magnetometer_calibration.py`),
 the simulated ground-station compass calibration:
 
 ```bash

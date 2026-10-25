@@ -5,7 +5,7 @@ robots stay in Gazebo, so no vehicle is modelled twice. A biped run shares
 the sensor bus, the IMU error model, the health-verdict shape, and the
 output conventions with the Gazebo robots, but has its own settings
 (`simulation/mujoco/config.py`) and its own step-based loop
-(`experiments/biped_loop.py`). Contact, friction, and servo behaviour come
+(`experiments/biped/biped_loop.py`). Contact, friction, and servo behaviour come
 from MuJoCo and the model file: results are not comparable with Gazebo
 physics, and the servos are MuJoCo position actuators (an approximation of
 the real ones, not a calibrated model).

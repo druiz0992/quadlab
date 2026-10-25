@@ -1,6 +1,6 @@
 import pytest
 
-from robotlab.experiments.schedule import next_due_ns
+from robotlab.experiments.common.schedule import next_due_ns
 
 MS = 1_000_000
 

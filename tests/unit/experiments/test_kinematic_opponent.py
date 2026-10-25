@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation
 from robotlab.control.track_follower import KinematicTrackDriver
 from robotlab.core.track import Track
 from robotlab.evaluation.laps import LapTimer
-from robotlab.experiments.opponents import (
+from robotlab.experiments.wheeled.opponents import (
     HEIGHT_GAIN_PER_S,
     LEVEL_GAIN_PER_S,
     MAX_VERTICAL_SPEED_MPS,

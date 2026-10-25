@@ -9,7 +9,7 @@ from robotlab.core.vehicle import DEFAULT_DRONE
 from robotlab.simulation.gazebo.actuators import thrust_to_motor_speeds
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.simulation.gazebo.world import build_world
-from robotlab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.run import GazeboConfig, run
 
 
 def config_file(tmp_path, data):

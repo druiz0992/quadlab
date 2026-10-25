@@ -141,7 +141,7 @@ def test_lockstep_needs_two_steps_per_period(tmp_path):
 
 
 def test_opponent_options_merge():
-    from robotlab.experiments.opponents import opponent_options
+    from robotlab.experiments.wheeled.opponents import opponent_options
 
     settings = {
         "ground_vehicle": {

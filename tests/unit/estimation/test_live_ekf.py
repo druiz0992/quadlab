@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from robotlab.core.measurements import GpsReading
-from robotlab.experiments.live_ekf import LiveEkf
+from robotlab.experiments.harness.live_ekf import LiveEkf
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.sensors.streams import ReadTimeout
 

@@ -7,9 +7,9 @@ from typing import Any
 import numpy as np
 import pytest
 
-from robotlab.experiments.biped_loop import BipedLoop
-from robotlab.experiments.biped_run import _parts, run_biped
-from robotlab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.biped.biped_loop import BipedLoop
+from robotlab.experiments.biped.biped_run import _parts, run_biped
+from robotlab.experiments.run import GazeboConfig, run
 from robotlab.simulation.mujoco.config import BUILTIN_MODELS, load_biped_config
 
 

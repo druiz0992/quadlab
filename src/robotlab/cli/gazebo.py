@@ -2,7 +2,7 @@
 
 import argparse
 
-from ..experiments.gazebo import GazeboConfig, run
+from ..experiments.run import GazeboConfig, run
 from .common import run_reporting_errors
 
 

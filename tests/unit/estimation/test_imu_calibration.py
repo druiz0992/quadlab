@@ -9,8 +9,8 @@ from scipy.spatial.transform import Rotation
 
 from robotlab.estimation.imu_calibration import ImuCalibration, ImuCalibrationDriver
 from robotlab.evaluation.imu_bias import EffectiveImuBias
-from robotlab.experiments.sensor_pipeline import calibration_warnings
-from robotlab.experiments.imu_calibration import (
+from robotlab.experiments.common.sensor_pipeline import calibration_warnings
+from robotlab.experiments.calibration.imu_calibration import (
     AXIS_POSES,
     imu_calibration_config,
     write_static_world,
@@ -163,7 +163,7 @@ def test_live_ekf_uses_calibrated_imu_values():
     from types import SimpleNamespace as NS
 
     from robotlab.core.measurements import GpsReading
-    from robotlab.experiments.live_ekf import LiveEkf
+    from robotlab.experiments.harness.live_ekf import LiveEkf
 
     settings = load_drone_config().data
     live = LiveEkf(settings, GpsReading(40.4168, -3.7038, 650.0), monotonic=lambda: 0.0)

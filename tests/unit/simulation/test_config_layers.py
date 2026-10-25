@@ -150,7 +150,7 @@ def test_all_example_configs_load_and_combine():
 def test_example_experiments_expand():
     from pathlib import Path
 
-    from robotlab.experiments.batch import (
+    from robotlab.experiments.harness.batch import (
         expand_runs,
         load_experiment,
         resolved_seed_paths,

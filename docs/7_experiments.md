@@ -540,7 +540,7 @@ ground impact at 3.5 s.
 
 Estimators can be developed and compared without Gazebo. A run with
 `algorithms.record_bus` set to `light` (`configs/algorithms/record_replay.json`)
-or `all` writes `replay.jsonl` (`experiments/replay_log.py`):
+or `all` writes `replay.jsonl` (`experiments/harness/replay_log.py`):
 
 - a header with the resolved settings, the true weight, and the
   `AlgorithmContext` the plug-ins were given;
@@ -568,7 +568,7 @@ rotation error (lowest marked), and NEES. `--set` applies to all of
 them, so give estimator-specific options only when comparing one at a
 time.
 
-`robotlab-replay` (`experiments/replay.py`) builds the estimator from the
+`robotlab-replay` (`experiments/harness/replay.py`) builds the estimator from the
 recorded settings plus `--set` overrides (dotted keys, JSON values,
 validated like any config layer) and the recorded context, feeds it the
 samples in order, and scores it against the recorded truth with the same
@@ -593,7 +593,7 @@ robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch -
 robotlab-batch configs/experiments/step_wind_seeds.json --output outputs/batch-2 --check   # exit 1 on regression or failed run
 ```
 
-An experiment file (`experiments/batch.py` documents every key) names:
+An experiment file (`experiments/harness/batch.py` documents every key) names:
 - the scene, `drone` layers, control mode, and duration (or `robot`:
   `rover`, `car`, or `tractor` for wheeled robots, without a control mode;
   see [8 Ground vehicles](8_ground_vehicles.md#routes-randomization-and-batch-runs)),

@@ -429,7 +429,7 @@ class GazeboRerunRecorder:
         )
 
     def log_status(self, name, t, value):
-        """Sensor health indicator time series (see experiments/gazebo.py)."""
+        """Sensor health indicator time series (see experiments/common/sensor_pipeline.py)."""
         self._set_time(t)
         self._scalar(f"status/{name}", float(value))
 

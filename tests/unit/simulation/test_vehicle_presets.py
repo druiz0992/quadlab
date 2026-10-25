@@ -58,7 +58,7 @@ def test_racing_fpv_scenario_composes_airframe_camera_and_no_gps():
 
 
 def test_battery_presets_are_rejected_in_velocity_mode(tmp_path):
-    from robotlab.experiments.gazebo import GazeboConfig, run
+    from robotlab.experiments.run import GazeboConfig, run
 
     with pytest.raises(ValueError, match="rotor-thrust"):
         run(

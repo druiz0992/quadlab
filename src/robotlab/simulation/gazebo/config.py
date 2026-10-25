@@ -530,7 +530,7 @@ DEFAULTS: dict[str, Any] = {
             "length_schedule": [],  # [{"time_s", "length_m"}, ...]
         },
     },
-    # Low-battery failsafe (rotor-thrust mode); see experiments/failsafe.py.
+    # Low-battery failsafe (rotor-thrust mode); see experiments/multirotor/failsafe.py.
     "failsafe": {
         "low_battery": {
             "enabled": False,
@@ -664,7 +664,7 @@ DEFAULTS: dict[str, Any] = {
         "angular_rate_gain": [0.4, 0.4, 0.18],
         "max_acceleration_mps2": [2.0, 2.0, 2.0],
     },
-    # What keys 1-9 and 0 do during keyboard flight; see experiments/effect_toggles.py.
+    # What keys 1-9 and 0 do during keyboard flight; see experiments/multirotor/effect_toggles.py.
     "keyboard_effects": {
         "motor_stop_rotor": 0,
         "damaged_rotor": 1,
@@ -696,7 +696,7 @@ DEFAULTS: dict[str, Any] = {
         "imu_mount_rotation_std_deg": 0.0,
     },
     # Estimator/controller plug-ins and what the controller flies on; see
-    # experiments/algorithms.py. Names: "" (none / built-in controller), a
+    # experiments/harness/algorithms.py. Names: "" (none / built-in controller), a
     # built-in name, or "package.module:Class".
     "algorithms": {
         "estimator": "",
@@ -709,7 +709,7 @@ DEFAULTS: dict[str, Any] = {
         "evaluation_rate_hz": 50.0,
         "evaluation_start_s": 2.0,
         # Record bus deliveries and truth for robotlab-replay:
-        # off | light (all but camera/lidar) | all; see experiments/replay_log.py.
+        # off | light (all but camera/lidar) | all; see experiments/harness/replay_log.py.
         "record_bus": "off",
     },
     # Run health verdict thresholds (summary.json.health); see
@@ -1662,7 +1662,7 @@ def load_drone_config(
         aero["air_density_kg_m3"] = site_air_density_kg_m3(
             site_elevation_m, data["environment"]["ambient_temperature_c"]
         )
-    from ...simulation.fixed_wing import DEFAULT_COEFFICIENTS
+    from ..fixed_wing import DEFAULT_COEFFICIENTS
 
     coefficients = data["fixed_wing"]["coefficients"]
     unknown = set(coefficients) - set(DEFAULT_COEFFICIENTS)
@@ -1714,7 +1714,7 @@ def load_drone_config(
 
     HealthThresholds.from_settings(data["health"])
     algorithms = data["algorithms"]
-    from ...experiments.replay_log import RECORD_MODES
+    from ...experiments.harness.replay_log import RECORD_MODES
     from .plugins import BARRIERS
 
     if data["simulation"]["lockstep_barrier"] not in BARRIERS:
@@ -1728,7 +1728,7 @@ def load_drone_config(
         raise ValueError("Estimate-driven control needs algorithms.estimator")
     failsafe = data["failsafe"]["low_battery"]
     if failsafe["enabled"]:
-        from ...experiments.failsafe import ACTIONS as FAILSAFE_ACTIONS
+        from ...experiments.multirotor.failsafe import ACTIONS as FAILSAFE_ACTIONS
 
         if failsafe["action"] not in FAILSAFE_ACTIONS:
             raise ValueError(f"failsafe action must be one of {FAILSAFE_ACTIONS}")

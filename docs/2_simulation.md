@@ -39,7 +39,8 @@ measured values.
 
 ## Mission lifecycle
 
-`cli.gazebo` builds a `GazeboConfig` and calls `experiments.gazebo.run`. It
+`cli.gazebo` builds a `GazeboConfig` and calls `experiments.run.run`, which
+picks the robot; a drone mission is `experiments/multirotor/mission_run.py`. It
 loads the JSON scene (also when `--world` is given) and either generates SDF
 or uses the saved world.
 
@@ -52,7 +53,7 @@ or uses the saved world.
 
 Transport callbacks only enqueue messages into a bounded queue (4,000
 entries; overflows are counted, `simulation/gazebo/ingress.py`). The mission
-loop (`experiments/mission_loop.py`) drains it serially, one message at a
+loop (`experiments/multirotor/mission_loop.py`) drains it serially, one message at a
 time, through these stages:
 
 1. **Housekeeping:** live-EKF and thrust-worker health, keyboard input and
@@ -87,7 +88,7 @@ Now:
 
 | Event | What happens |
 | --- | --- |
-| Ctrl-C or SIGTERM to `robotlab`, `robotlab-magcal`, `robotlab-imucal` | Treated alike (`experiments/interrupts.py`): the mission saves `summary.json` (`exit_reason: interrupted`, health warning), Gazebo is stopped; exit status 130 (Ctrl-C) or 143 (SIGTERM). A second signal during this cleanup is ignored, so it cannot leave Gazebo or half-written results behind. |
+| Ctrl-C or SIGTERM to `robotlab`, `robotlab-magcal`, `robotlab-imucal` | Treated alike (`experiments/common/interrupts.py`): the mission saves `summary.json` (`exit_reason: interrupted`, health warning), Gazebo is stopped; exit status 130 (Ctrl-C) or 143 (SIGTERM). A second signal during this cleanup is ignored, so it cannot leave Gazebo or half-written results behind. |
 | Python killed (SIGKILL, out of memory) | Gazebo is launched under `setpriv --pdeathsig TERM` (util-linux), so the kernel sends it SIGTERM and it exits. No summary is written. Without `setpriv` (non-Linux) Gazebo keeps running. |
 | Gazebo ignores SIGTERM for 10 s | The launcher and every descendant process are killed. |
 | Gazebo exits during start-up | Lockstep runs fail at once ("Gazebo exited during start-up") instead of after the 60 s subscriber timeout; real-time runs already checked liveness every loop iteration. |
@@ -106,7 +107,7 @@ its motors stopped, so every run begins with a brief sag (up to 0.65 m for
 the heavy-lift preset). With `simulation.start_on_ground: true`
 (`configs/scenarios/ground_start.json`) it rests on the ground at the spawn
 x, y, its body box on the ground plane. In rotor-thrust and keyboard modes an
-automatic take-off (`experiments/takeoff.py`, mission logic) then replaces
+automatic take-off (`experiments/multirotor/takeoff.py`, mission logic) then replaces
 pilot or scripted commands with a climb at `pilot.takeoff_climb_mps` until
 the controller's altitude setpoint reaches `pilot.takeoff_altitude_m`, and
 hands over. Velocity mode needs no sequence: the native controller climbs to
@@ -141,7 +142,7 @@ each simulated second of messages in less than a wall second. When it
 cannot, messages queue up, control acts on older and older states, and
 rotor-thrust missions abort with "Stale odometry in rotor-control queue"
 once odometry is 0.25 s old when processed. `summary.json.loop_timing`
-measures this on every run (`experiments/loop_timing.py`):
+measures this on every run (`experiments/common/loop_timing.py`):
 
 | Field | Meaning |
 | --- | --- |

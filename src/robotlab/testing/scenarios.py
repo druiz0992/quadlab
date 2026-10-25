@@ -329,7 +329,7 @@ def scenario_context(
 ) -> AlgorithmContext:
     """The context a Gazebo run with these settings and sensors would give."""
     from ..core.algorithms import ignore_debug
-    from ..experiments.algorithms import build_context
+    from ..experiments.harness.algorithms import build_context
 
     _check_sensors(scenario, sensors)
     config = _base_config(scenario.vehicle)

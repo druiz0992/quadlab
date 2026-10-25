@@ -21,6 +21,16 @@ Gazebo world is named `robotlab`, and the lockstep plugin is
 `replay.jsonl` to replay it. Reinstall with `pip uninstall dronelab && pip
 install -e .`.
 
+*Migration (2026-10-25):* `robotlab.experiments` is grouped into
+subpackages (`harness`, `common`, `multirotor`, `wheeled`, `biped`,
+`calibration`); module names are unchanged except `experiments/gazebo.py`,
+split into `experiments/run.py` (`GazeboConfig`, `run`),
+`experiments/multirotor/mission_run.py`, and
+`experiments/common/gazebo_helpers.py`. Update imports such as
+`robotlab.experiments.gazebo` → `robotlab.experiments.run` and
+`robotlab.experiments.algorithms` → `robotlab.experiments.harness.algorithms`.
+Commands, configs, plug-in specs, and outputs are unchanged.
+
 ## Status
 
 | Area | Implemented today |
@@ -129,36 +139,25 @@ src/robotlab/
 │       ├── stepping.py     # Lockstep stepping, start-up subscriber barrier
 │       ├── plugins.py      # RobotLab Gazebo plugins: location, build, barrier choice
 │       └── messages.py     # Gazebo timestamp/vector adapters
-├── experiments/
-│   ├── gazebo.py           # Compose a Gazebo mission (run entry point, wiring)
-│   ├── biped_run.py        # Compose a MuJoCo biped mission (--robot biped)
-│   ├── biped_loop.py       # Step-based biped loop: sensors, control, recording
-│   ├── biped_keyboard.py   # Keyboard operator: key window, real-time pacing
-│   ├── run_setup.py        # Option checks, true vehicle draw, world and resolved config
-│   ├── mission_loop.py     # The running mission: message loop, truth step, shutdown
-│   ├── sensor_pipeline.py  # Error/fault models → recording → sensor bus; synthetic sensors
-│   ├── rotor_mission.py    # Rotor-thrust tick: powertrain, state source, failsafe, pilot
-│   ├── vehicle_forces.py   # Python body drag and fixed-wing wrench
-│   ├── keyboard_flight.py  # Keyboard effect toggles wiring and log
-│   ├── run_summary.py      # summary.json assembly
-│   ├── loop_timing.py      # Mission-loop wall cost and queue age (loop_timing)
-│   ├── replay_log.py       # Record bus deliveries and truth (replay.jsonl)
-│   ├── replay.py           # Offline estimator replay and scoring (robotlab-replay)
-│   ├── algorithm_debug.py  # Plug-in debug channel (algorithm-debug.jsonl, Rerun)
-│   ├── comparison.py       # Side-by-side metric tables (comparison.md)
-│   ├── rotor_loop.py       # Fixed-rate rotor-thrust control loop with latency
-│   ├── algorithms.py       # Plug-in loading, context, runner, estimate-driven state
-│   ├── mission.py          # Mission clock and reference sampling
-│   ├── run_evaluation.py   # Per-run metrics (metrics.json)
-│   ├── batch.py            # Seed/parameter sweeps, aggregation, baselines
-│   ├── interrupts.py       # SIGTERM as Ctrl-C; cleanup shielded from repeated signals
-│   ├── magnetometer_calibration.py  # Automated calibration run (robotlab-magcal)
-│   ├── imu_calibration.py  # Automated IMU calibration run (robotlab-imucal)
-│   ├── calibration_session.py  # Shared Gazebo pose/sensor session for calibrations
-│   ├── live_ekf.py         # Bounded live IMU/GPS ordering and EKF composition
-│   ├── wheeled_run.py      # Compose a wheeled-robot mission
-│   ├── wheeled_mission.py  # The running wheeled mission (lockstep loop)
-│   └── wheeled_summary.py  # Wheeled summary.json assembly
+├── experiments/            # Orchestration (see experiments/__init__.py for the map)
+│   ├── run.py              # Entry point: run settings (GazeboConfig), dispatch by robot kind
+│   ├── harness/            # What plug-in authors use: algorithms.py (loading, context,
+│   │                       #   runner, estimate-driven state), algorithm_debug.py,
+│   │                       #   run_evaluation.py (metrics.json), replay.py and
+│   │                       #   replay_log.py (robotlab-replay), comparison.py,
+│   │                       #   batch.py (robotlab-batch), live_ekf.py (--ekf observer)
+│   ├── common/             # Shared by several robots: run_setup.py (option checks, world),
+│   │                       #   sensor_pipeline.py (error/fault models → recording → bus),
+│   │                       #   gazebo_helpers.py, mission.py (reference clock),
+│   │                       #   schedule.py, loop_timing.py, interrupts.py, exit_reason.py
+│   ├── multirotor/         # Drone missions: mission_run.py (composition), mission_loop.py,
+│   │                       #   rotor_mission.py, rotor_loop.py, takeoff.py, failsafe.py,
+│   │                       #   vehicle_forces.py, run_summary.py, keyboard_flight.py,
+│   │                       #   effect_toggles.py, flying_object.py
+│   ├── wheeled/            # Rover/car/tractor: wheeled_run.py, wheeled_mission.py,
+│   │                       #   wheeled_summary.py, opponents.py, trailer.py
+│   ├── biped/              # MuJoCo bipeds: biped_run.py, biped_loop.py, biped_keyboard.py
+│   └── calibration/        # robotlab-imucal / robotlab-magcal procedures and their session
 ├── testing/
 │   ├── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo),
 │                           #   including check_wheeled_controller, check_legged_controller

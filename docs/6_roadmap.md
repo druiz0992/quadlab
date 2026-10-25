@@ -126,7 +126,7 @@ document and update the status below.
 | Deterministic contacts in lockstep (the `moving.json` collision diverges between identical runs from the contact on) | Proposed (found 2026-10-22) |
 | Batched telemetry/command JSONL writes | Dropped (measured 2026-10-22): JSON serialization and writes cost about 0.09 ms per 250 Hz tick and Python already buffers the files; batching would save about 1 %. The lockstep thrust heartbeat costs 0.05 ms per tick (a cProfile figure of 1.9 ms was an artifact around Gazebo's C++ transport calls). Message handling averages 1.1 ms in lockstep |
 | Typed `MissionParts` (about 40 `Any` fields hide the mission wiring from mypy) | Proposed (review 2026-10-22) |
-| Split `simulation/gazebo/config.py` (defaults, schema, validation per section) and the mission set-up in `experiments/gazebo.py` | Proposed (review 2026-10-22) |
+| Split `simulation/gazebo/config.py` (defaults, schema, validation per section) and the drone mission set-up in `experiments/multirotor/mission_run.py` | Proposed (review 2026-10-22; `experiments/` itself was regrouped 2026-10-25) |
 | Short "Sensors and noise assumptions" section for plug-in authors, and an optional per-sensor `datasheet` (`context.sensors[kind].datasheet`) with a covariance helper | Proposed (review 2026-10-22; datasheet is a schema addition, needs approval) |
 | Generated API reference for the plug-in contract (context, samples, protocols) | Proposed (review 2026-10-22) |
 
@@ -150,7 +150,7 @@ Experiment / mission / user controller
 | --- | --- |
 | `simulation/gazebo/transport.py` | Native subscriptions, ingress times/sequences, dispatch |
 | `simulation/gazebo/session.py` | Launch, readiness, clock, cleanup, sensor/truth namespaces |
-| `experiments/algorithms.py` | Runner, serial workers, connections, health, outputs |
+| `experiments/harness/algorithms.py` | Runner, serial workers, connections, health, outputs |
 | `control/allocation.py` | Explicit body-wrench → rotor-thrust allocation |
 
 ```python

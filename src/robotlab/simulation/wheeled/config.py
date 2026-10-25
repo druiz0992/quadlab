@@ -163,7 +163,7 @@ GROUND_VEHICLE_DEFAULTS: dict[str, Any] = {
         "start_lowered": False,
     },
     # Towed trailer on a drawbar hitch (tractor); see
-    # experiments/trailer.py. hitch_position_m: hitch point on the tractor
+    # experiments/wheeled/trailer.py. hitch_position_m: hitch point on the tractor
     # (body axes from its centre of mass); drawbar_m: hitch to trailer
     # centre of mass along the trailer's −x; cg_below_hitch_m: trailer
     # centre of mass below the hitch; wheel positions in trailer axes (hub
@@ -202,7 +202,7 @@ GROUND_VEHICLE_DEFAULTS: dict[str, Any] = {
     },
     # Other cars of the same kind on the scene's next spawn points, each
     # with its own controller (default: the centreline follower); see
-    # experiments/opponents.py. per_opponent_options (one dict per
+    # experiments/wheeled/opponents.py. per_opponent_options (one dict per
     # opponent, optional) merge over controller_options. mode "kinematic"
     # (moving obstacles: Gazebo velocity commands from the track
     # follower's guidance at update_rate_hz, no wheel model) or "dynamic"

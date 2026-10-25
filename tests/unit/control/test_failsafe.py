@@ -3,7 +3,7 @@ import math
 import pytest
 
 from robotlab.control.manual import FlightCommand, ManualController
-from robotlab.experiments.failsafe import BatteryFailsafe
+from robotlab.experiments.multirotor.failsafe import BatteryFailsafe
 from robotlab.simulation.gazebo.config import load_drone_config
 
 

@@ -1,11 +1,11 @@
-"""Command line for offline estimator replay (see experiments/replay.py)."""
+"""Command line for offline estimator replay (see experiments/harness/replay.py)."""
 
 import argparse
 import json
 from pathlib import Path
 import sys
 
-from ..experiments.replay import compare_estimators, replay
+from ..experiments.harness.replay import compare_estimators, replay
 
 
 def parse_overrides(items: list[str]) -> dict:

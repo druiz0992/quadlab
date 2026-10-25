@@ -6,14 +6,14 @@ import signal
 import sys
 from typing import TypeVar
 
-from ..experiments.interrupts import sigterm_as_interrupt
+from ..experiments.common.interrupts import sigterm_as_interrupt
 
 T = TypeVar("T")
 
 
 def run_reporting_errors(parser: argparse.ArgumentParser, action: Callable[[], T]) -> T:
     """Run ``action`` with SIGTERM treated like Ctrl-C (see
-    experiments/interrupts.py) and map failures to exit statuses:
+    experiments/common/interrupts.py) and map failures to exit statuses:
 
     - ValueError (invalid options or configuration): usage message, 2;
     - RuntimeError (a run that failed): the message without usage, 1;

@@ -14,8 +14,8 @@ from robotlab.estimation.magnetometer_calibration import (
     fit_interference,
     heading_error_deg,
 )
-from robotlab.experiments.algorithms import build_context
-from robotlab.experiments.magnetometer_calibration import (
+from robotlab.experiments.harness.algorithms import build_context
+from robotlab.experiments.calibration.magnetometer_calibration import (
     calibration_config,
     write_world,
 )

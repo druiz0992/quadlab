@@ -1,6 +1,6 @@
 import pytest
 
-from robotlab.experiments.loop_timing import LATE_ODOMETRY_WALL_S, LoopTiming
+from robotlab.experiments.common.loop_timing import LATE_ODOMETRY_WALL_S, LoopTiming
 
 
 class FakeClock:

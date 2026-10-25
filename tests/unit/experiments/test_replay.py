@@ -17,9 +17,9 @@ from robotlab.core.measurements import (
 )
 from robotlab.core.serialization import decode, encode
 from robotlab.core.vehicle import DroneProperties
-from robotlab.experiments.algorithm_debug import AlgorithmDebugLog
-from robotlab.experiments.replay import replay
-from robotlab.experiments.replay_log import ReplayRecorder
+from robotlab.experiments.harness.algorithm_debug import AlgorithmDebugLog
+from robotlab.experiments.harness.replay import replay
+from robotlab.experiments.harness.replay_log import ReplayRecorder
 from robotlab.simulation.gazebo.config import load_drone_config
 
 
@@ -215,7 +215,7 @@ def test_cli_override_parsing():
 
 
 def test_compare_estimators_side_by_side(recorded, tmp_path):
-    from robotlab.experiments.replay import compare_estimators, estimator_label
+    from robotlab.experiments.harness.replay import compare_estimators, estimator_label
 
     taken = set()
     assert estimator_label("a.b:Echo", taken) == "Echo"

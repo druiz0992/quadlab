@@ -1,7 +1,7 @@
 import pytest
 
-from robotlab.experiments.gazebo import GazeboConfig, run
-from robotlab.experiments.wheeled_run import build_wheeled_controller
+from robotlab.experiments.run import GazeboConfig, run
+from robotlab.experiments.wheeled.wheeled_run import build_wheeled_controller
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.testing.plugins import synthetic_context
 
@@ -74,7 +74,7 @@ def test_multirotor_sections_point_to_the_wheeled_ones(tmp_path, layer, message)
 
 
 def test_route_replaces_the_scene_track():
-    from robotlab.experiments.wheeled_run import reference_track
+    from robotlab.experiments.wheeled.wheeled_run import reference_track
     from robotlab.simulation.gazebo.world import load_scene
 
     settings = load_drone_config(robot="car").data

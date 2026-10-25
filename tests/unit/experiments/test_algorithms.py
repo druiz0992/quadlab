@@ -11,7 +11,7 @@ from robotlab.control.manual import FlightCommand
 from robotlab.control.references import ReferencePoint
 from robotlab.core.measurements import EstimatedState, GpsReading, ImuReading, Sample
 from robotlab.estimation.interface import StateEstimator
-from robotlab.experiments.algorithms import (
+from robotlab.experiments.harness.algorithms import (
     AlgorithmRunner,
     EstimateStateSource,
     StaleEstimate,

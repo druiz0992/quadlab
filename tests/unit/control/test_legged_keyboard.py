@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from robotlab.control.legged_keyboard import WalkInput
-from robotlab.experiments.biped_keyboard import KeyboardOperator
+from robotlab.experiments.biped.biped_keyboard import KeyboardOperator
 
 
 def walk() -> WalkInput:

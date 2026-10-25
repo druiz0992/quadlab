@@ -3,7 +3,7 @@
 import argparse
 import json
 
-from ..experiments.magnetometer_calibration import run_calibration
+from ..experiments.calibration.magnetometer_calibration import run_calibration
 from .common import run_reporting_errors
 
 

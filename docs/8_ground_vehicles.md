@@ -217,7 +217,7 @@ Verified: lowered at 5 s from 40 km/h with 4000 N·m per wheel, the tractor
 ploughs at 0.20 m depth and 2.15 m/s against 21.5 kN, with 16 % front and
 6 % rear wheel slip; wheel loads sum to tractor plus implement weight.
 
-**Trailer** (`ground_vehicle.trailer`, `experiments/trailer.py`). A link in
+**Trailer** (`ground_vehicle.trailer`, `experiments/wheeled/trailer.py`). A link in
 the tractor's model on revolute yaw and pitch joints at the drawbar hitch
 (roll follows the tractor: a simplification). Gazebo publishes the joint
 angles and rates every physics step; Python computes the trailer's state by

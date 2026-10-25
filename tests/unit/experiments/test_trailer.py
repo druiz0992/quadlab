@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from robotlab.experiments.trailer import Trailer, trailer_state
+from robotlab.experiments.wheeled.trailer import Trailer, trailer_state
 from robotlab.simulation.gazebo.config import load_drone_config
 from robotlab.simulation.wheeled.ground import GroundModel
 from robotlab.simulation.wheeled.model import ChassisState

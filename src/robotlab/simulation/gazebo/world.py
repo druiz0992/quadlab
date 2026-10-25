@@ -414,7 +414,7 @@ def build_world(
     element(physics, "max_step_size", config.data["simulation"]["step_s"])
     # Wheeled robots: Gazebo runs bursts unthrottled and Python paces the
     # run to real_time_factor (its own processing would otherwise add to
-    # Gazebo's paced time; experiments/wheeled_mission.py).
+    # Gazebo's paced time; experiments/wheeled/wheeled_mission.py).
     element(
         physics,
         "real_time_factor",

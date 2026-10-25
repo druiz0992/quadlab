@@ -1,11 +1,11 @@
-"""Command line for batch experiments (see experiments/batch.py)."""
+"""Command line for batch experiments (see experiments/harness/batch.py)."""
 
 import argparse
 import json
 from pathlib import Path
 import sys
 
-from ..experiments.batch import (
+from ..experiments.harness.batch import (
     aggregate,
     baseline_from,
     batch_comparison,

@@ -3,7 +3,7 @@
 import argparse
 import json
 
-from ..experiments.imu_calibration import run_imu_calibration
+from ..experiments.calibration.imu_calibration import run_imu_calibration
 from .common import run_reporting_errors
 
 

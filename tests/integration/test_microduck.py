@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from robotlab.experiments.gazebo import GazeboConfig, run
+from robotlab.experiments.run import GazeboConfig, run
 
 MODEL = os.environ.get("ROBOTLAB_MICRODUCK_MODEL")
 POLICY = os.environ.get("ROBOTLAB_MICRODUCK_POLICY")

@@ -1,7 +1,7 @@
 """IMU imperfections beyond white noise and random-walk bias.
 
 Three parts, applied at different stages of the IMU pipeline (see
-experiments/gazebo.py: imperfections → Allan errors → temperature →
+experiments/common/sensor_pipeline.py: imperfections → Allan errors → temperature →
 vibration → saturation → faults → timing):
 
 ``ImuImperfections`` (sensor-level, on the input signal), per instrument::

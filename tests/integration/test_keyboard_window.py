@@ -47,9 +47,9 @@ def test_biped_keyboard_walk_paced(tmp_path):
     """Key window on the test biped, paced to real time; closing ends the run."""
     pytest.importorskip("mujoco")
     from robotlab.control.legged_keyboard import WalkInput
-    from robotlab.experiments.biped_keyboard import open_keyboard_operator
-    from robotlab.experiments.biped_loop import BipedLoop
-    from robotlab.experiments.biped_run import _parts
+    from robotlab.experiments.biped.biped_keyboard import open_keyboard_operator
+    from robotlab.experiments.biped.biped_loop import BipedLoop
+    from robotlab.experiments.biped.biped_run import _parts
     from robotlab.simulation.mujoco.config import load_biped_config
     from robotlab.simulation.mujoco.scene import build_scene
 

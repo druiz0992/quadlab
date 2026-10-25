@@ -3,7 +3,7 @@ import pytest
 
 from robotlab.control.drone import RotorThrustControl
 from robotlab.control.manual import FlightCommand, ManualController
-from robotlab.experiments.rotor_loop import RotorControlLoop, TruthState
+from robotlab.experiments.multirotor.rotor_loop import RotorControlLoop, TruthState
 from robotlab.simulation.gazebo.config import load_drone_config
 
 MS = 1_000_000

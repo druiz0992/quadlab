@@ -383,7 +383,7 @@ class RunHealth:
             )
 
     def on_jackknife(self, sim_time_ns: int, yaw_deg: float) -> None:
-        """Trailer hitch yaw near its joint limit (experiments/trailer.py)."""
+        """Trailer hitch yaw near its joint limit (experiments/wheeled/trailer.py)."""
         self._report(
             "jackknife",
             WARNING,
