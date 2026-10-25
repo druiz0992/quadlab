@@ -60,13 +60,13 @@ src/robotlab/
 │                           #   magnetic anomalies, lidar returns, wheel and joint encoders
 ├── estimation/
 │   ├── interface.py        # StateEstimator plug-in contract, Innovation
-│   ├── template.py         # Copyable template estimator (complementary filter)
+│   ├── template.py         # Full estimator plug-in template (complementary filter)
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
 │   ├── imu_calibration.py  # Static IMU fit and calibration driver
 │   ├── dead_reckoning.py   # Retained IMU dead-reckoning baseline
 │   ├── inertial/           # Reusable for any inertial filter: node (timing, mounts,
 │   │                       #   held IMU), measurement conversion, the `inertial`
-│   │                       #   plug-in, template.py (copy to start a filter)
+│   │                       #   plug-in, template.py (example filter)
 │   └── gps_imu_ekf/
 │       └── ekf.py          # The EKF: only an InertialFilter (run by inertial/)
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,
@@ -201,16 +201,25 @@ outputs/                    # Generated worlds, recordings, telemetry (not commi
 
 ## Adding an algorithm
 
-Copy `estimation/template.py` or `control/template.py`, following the
-plug-in contracts in
-[7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms); put it in
-`estimation/<name>.py` or `control/<name>.py` (or any importable package)
+- **IMU-driven estimator:** write only the filter, a class with `predict`,
+  `state`, and one `update_<kind>` per fused sensor
+  ([5 Estimation](5_estimation.md#writing-your-own-inertial-filter));
+  `estimation/inertial/template.py` is an optional starting point. Select
+  it with `algorithms.estimator: inertial` and
+  `estimator_options.filter: "package.module:Class"`; the built-in
+  `gps_imu_ekf` works this way.
+- **Other estimators** (no IMU propagation) and **controllers:** write a
+  full plug-in following the contracts in
+  [7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms), starting
+  from `estimation/template.py` or `control/template.py`, and select it
+  with `algorithms.estimator`/`algorithms.controller` as
+  `package.module:Class`.
+
+Put the code in `estimation/` or `control/` (or any importable package)
 with tests in `tests/unit/<package>/` that call
-`robotlab.testing.plugins.check_estimator`/`check_controller` (and, for
-an estimator, add it to the
-[scenario suite](7_experiments.md#estimator-scenario-suite)), and select
-it with `algorithms.estimator`/`algorithms.controller` as
-`package.module:Class`. Develop estimators against recorded runs with
+`robotlab.testing.plugins.check_estimator` (with `InertialEstimator` and
+its options for a filter) or `check_controller`, and add estimators to the
+[scenario suite](7_experiments.md#estimator-scenario-suite). Develop estimators against recorded runs with
 `robotlab-replay` (several at once for a comparison table), then confirm
 in Gazebo and with batches.
 At the algorithm boundary use the bus samples (decoded measurements with

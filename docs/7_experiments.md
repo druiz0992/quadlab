@@ -172,7 +172,9 @@ on the sensor bus, scored and replayable.
 
 ### Writing a plug-in: templates and the contract test kit
 
-Start from a template; both are short and commented, and pass the kit:
+Start from a template; they are short and commented, and pass the kit. An
+IMU-driven estimator needs only an `InertialFilter` class (the second
+row); nothing has to be copied:
 
 | Template | Selects with | What it does |
 | --- | --- | --- |
