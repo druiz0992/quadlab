@@ -10,48 +10,6 @@ organization, and shared conventions. Following documents:
 [6 Roadmap](6_roadmap.md) · [7 Experiments](7_experiments.md) ·
 [8 Ground vehicles](8_ground_vehicles.md) · [9 Bipeds](9_bipeds.md).
 
-*Migration (2026-10-22):* the project was renamed from DroneLab to RobotLab
-with no compatibility alias, in preparation for ground vehicles. The Python
-package is `robotlab`, the commands are `robotlab`, `robotlab-batch`,
-`robotlab-replay`, … , environment variables start with `ROBOTLAB_`, the
-Gazebo world is named `robotlab`, and the lockstep plugin is
-`RobotlabLockstep` (`librobotlab-lockstep.so`; rebuild with
-`robotlab-build-plugins`). Recordings now carry the replay format tag
-`robotlab-replay`; replace `dronelab-replay` in the first line of an older
-`replay.jsonl` to replay it. Reinstall with `pip uninstall dronelab && pip
-install -e .`.
-
-*Migration (2026-10-25):* `robotlab.experiments` is grouped into
-subpackages (`harness`, `common`, `multirotor`, `wheeled`, `biped`,
-`calibration`); module names are unchanged except `experiments/gazebo.py`,
-split into `experiments/run.py` (`GazeboConfig`, `run`),
-`experiments/multirotor/mission_run.py`, and
-`experiments/common/gazebo_helpers.py`. Update imports such as
-`robotlab.experiments.gazebo` → `robotlab.experiments.run` and
-`robotlab.experiments.algorithms` → `robotlab.experiments.harness.algorithms`.
-Commands, configs, plug-in specs, and outputs are unchanged.
-
-*Migration (2026-10-25, later):* `--ekf` and its live observer
-(`experiments/harness/live_ekf.py`) were removed; run the same EKF with
-`--drone configs/algorithms/ekf_observer.json`. `summary.json` no longer
-has an `ekf` entry (the plug-in's is `algorithms.estimator_summary`), the
-`ekf` keys `reorder_capacity`, `max_sensor_lag_sim_s`, and
-`sensor_watchdog_wall_s` are gone (old recordings still replay), and
-`reference_from_world` moved to `simulation/gazebo/world.py`.
-
-*Migration (2026-10-25, EKF on the inertial estimator):*
-`estimation/gps_imu_ekf/plugin.py` (`GpsImuEkfEstimator`) was removed;
-`gps_imu_ekf` is now the `inertial` estimator running
-`GpsImuEkf.from_options` (`gps_imu_ekf_options` in
-`experiments/harness/algorithms.py`). Estimates are unchanged. Its
-`estimator_summary` has the generic layout: `gps_updates` → `updates.gps`,
-`gps_outliers` → `outliers.gps`, `rejected_gps_timing` →
-`rejected_timing.gps`, `position_initialized_from_gps_s` →
-`initialized_s.gps`; `initialization` and `priors` moved under
-`filter_summary` (`priors.calibrated_imu` dropped: the settings record the
-calibration). Debug channels `ekf/gps` and `ekf/bias` are now
-`gps_imu_ekf/gps` and `gps_imu_ekf/bias`.
-
 ## Status
 
 | Area | Implemented today |
