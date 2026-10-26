@@ -68,9 +68,11 @@ src/robotlab/
 │   │                       #   (full plug-in), imu_gps_filter, wheel_odometry_filter
 │   ├── magnetometer_calibration.py  # Hard/soft iron and interference fits
 │   ├── imu_calibration.py  # Static IMU calibration fit
+│   ├── lie.py              # SO(3) helpers: skew, right Jacobian and its inverse
 │   ├── filter/             # Reusable for any predict/update filter: node (timing, held
 │   │                       #   driving readings), measurement conversion, the `filter`
-│   │                       #   plug-in
+│   │                       #   plug-in; math: state_layout (named blocks), models
+│   │                       #   (GPS, baro, magnetometer), kalman (gated update)
 │   └── gps_imu_ekf/
 │       └── ekf.py          # The EKF: only a RecursiveFilter (run by filter/)
 ├── evaluation/             # Scoring against truth: estimation (NEES/NIS), control,

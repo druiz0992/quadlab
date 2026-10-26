@@ -20,35 +20,16 @@ from scipy.spatial.transform import Rotation
 
 from ...core.frames import GRAVITY
 from ...core.measurements import EstimatedState, readonly_array
+from ..filter.kalman import checked_covariance, kalman_update
 from ..filter.measurements import GpsFix, ImuInput
+from ..filter.models import gps_position
+from ..filter.state_layout import StateLayout
 from ..interface import Innovation
+from ..lie import right_jacobian, skew
 
-
-def skew(v: ArrayLike) -> NDArray[np.float64]:
-    x, y, z = np.asarray(v, float)
-    return np.array([[0.0, -z, y], [z, 0.0, -x], [-y, x, 0.0]])
-
-
-def right_jacobian(v: ArrayLike) -> NDArray[np.float64]:
-    theta = np.linalg.norm(v)
-    cross = skew(v)
-    if theta < 1e-6:
-        return np.eye(3) - 0.5 * cross + cross @ cross / 6
-    return (
-        np.eye(3)
-        - (1 - np.cos(theta)) / theta**2 * cross
-        + (theta - np.sin(theta)) / theta**3 * cross @ cross
-    )
-
-
-def covariance(value: ArrayLike, size: int) -> NDArray[np.float64]:
-    result = readonly_array(value, (size, size)).copy()
-    if (
-        not np.allclose(result, result.T, atol=1e-12, rtol=0)
-        or np.linalg.eigvalsh(result).min() <= 0
-    ):
-        raise ValueError("Covariance must be symmetric positive definite")
-    return result
+LAYOUT = StateLayout.of("position", "velocity", "attitude", "accel_bias", "gyro_bias")
+POS, VEL, ATT, ACCEL_BIAS, GYRO_BIAS = (LAYOUT.index(name) for name in LAYOUT.names)
+N = LAYOUT.size  # 15 error states
 
 
 # ``ekf`` section keys the filter reads (the rest configure the converter).
@@ -141,7 +122,7 @@ class GpsImuEkf:
         self.rotation = Rotation.from_quat(quaternion)
         self.accel_bias = readonly_array(accel_bias_mps2, (3,)).copy()
         self.gyro_bias = readonly_array(gyro_bias_rad_s, (3,)).copy()
-        self.P = covariance(initial_covariance, 15)
+        self.P = checked_covariance(initial_covariance, N)
         self.noise = np.array(
             [accel_std_mps2, gyro_std_rad_s, accel_bias_walk, gyro_bias_walk],
             dtype=float,
@@ -153,8 +134,12 @@ class GpsImuEkf:
         self.gps_gate_squared = gps_gate_squared
         # Initial bias standard deviations, reported by summary().
         self.bias_priors = dict(
-            accel_bias_std_mps2=float(np.sqrt(self.P[9, 9])),
-            gyro_bias_std_rad_s=float(np.sqrt(self.P[12, 12])),
+            accel_bias_std_mps2=float(
+                np.sqrt(self.P[ACCEL_BIAS.start, ACCEL_BIAS.start])
+            ),
+            gyro_bias_std_rad_s=float(
+                np.sqrt(self.P[GYRO_BIAS.start, GYRO_BIAS.start])
+            ),
         )
         self.accepted_gps = self.rejected_gps = 0
         # Normalized innovation squared of the latest GPS update (3 dof),
@@ -178,20 +163,21 @@ class GpsImuEkf:
         R = self.rotation.as_matrix()
         increment = omega * dt
         Jr = right_jacobian(increment)
-        F = np.eye(15)
-        F[0:3, 3:6] = np.eye(3) * dt
-        F[0:3, 6:9] = -0.5 * R @ skew(force) * dt**2
-        F[3:6, 6:9] = -R @ skew(force) * dt
-        F[0:3, 9:12] = -0.5 * R * dt**2
-        F[3:6, 9:12] = -R * dt
-        F[6:9, 6:9] = Rotation.from_rotvec(-increment).as_matrix()
-        F[6:9, 12:15] = -Jr * dt
-        G = np.zeros((15, 12))
-        G[0:3, 0:3] = 0.5 * R * dt**2
-        G[3:6, 0:3] = R * dt
-        G[6:9, 3:6] = Jr * dt
-        G[9:12, 6:9] = np.eye(3) * np.sqrt(dt)
-        G[12:15, 9:12] = np.eye(3) * np.sqrt(dt)
+        F = np.eye(N)
+        F[POS, VEL] = np.eye(3) * dt
+        F[POS, ATT] = -0.5 * R @ skew(force) * dt**2
+        F[VEL, ATT] = -R @ skew(force) * dt
+        F[POS, ACCEL_BIAS] = -0.5 * R * dt**2
+        F[VEL, ACCEL_BIAS] = -R * dt
+        F[ATT, ATT] = Rotation.from_rotvec(-increment).as_matrix()
+        F[ATT, GYRO_BIAS] = -Jr * dt
+        # Noise inputs: accel, gyro, accel-bias walk, gyro-bias walk.
+        G = np.zeros((N, 12))
+        G[POS, 0:3] = 0.5 * R * dt**2
+        G[VEL, 0:3] = R * dt
+        G[ATT, 3:6] = Jr * dt
+        G[ACCEL_BIAS, 6:9] = np.eye(3) * np.sqrt(dt)
+        G[GYRO_BIAS, 9:12] = np.eye(3) * np.sqrt(dt)
         Q = (G * np.repeat(self.noise**2, 3)) @ G.T
         world_accel = R @ force + GRAVITY
         self.position += self.velocity * dt + 0.5 * world_accel * dt**2
@@ -221,11 +207,11 @@ class GpsImuEkf:
         """
         observation = readonly_array(position_enu_m, (3,))
         lever = readonly_array(receiver_position_body_m, (3,))
-        noise = covariance(measurement_covariance, 3)
+        noise = checked_covariance(measurement_covariance, 3)
         self.position = observation - self.rotation.as_matrix() @ lever
-        self.P[:3, :] = 0.0
-        self.P[:, :3] = 0.0
-        self.P[:3, :3] = noise
+        self.P[POS, :] = 0.0
+        self.P[:, POS] = 0.0
+        self.P[POS, POS] = noise
 
     def correct_gps(
         self,
@@ -235,35 +221,44 @@ class GpsImuEkf:
         receiver_position_body_m: ArrayLike = (0, 0, 0),
     ) -> bool:
         """Correct with local ENU antenna position; return False for a gated outlier."""
-        observation = readonly_array(position_enu_m, (3,))
-        lever = readonly_array(receiver_position_body_m, (3,))
-        noise = covariance(measurement_covariance, 3)
-        R = self.rotation.as_matrix()
-        H = np.zeros((3, 15))
-        H[:, :3] = np.eye(3)
-        H[:, 6:9] = -R @ skew(lever)
-        innovation = observation - self.position - R @ lever
-        S = H @ self.P @ H.T + noise
-        distance = innovation @ np.linalg.solve(S, innovation)
-        self.last_gps_nis = float(distance)
-        if distance > self.gps_gate_squared:
+        fix = GpsFix(
+            position_enu_m=readonly_array(position_enu_m, (3,)),
+            covariance_m2=checked_covariance(measurement_covariance, 3),
+            lever_arm_body_m=readonly_array(receiver_position_body_m, (3,)),
+        )
+        measurement = gps_position(
+            LAYOUT,
+            fix,
+            position_m=self.position,
+            rotation_matrix=self.rotation.as_matrix(),
+        )
+        correction = kalman_update(self.P, measurement, self.gps_gate_squared)
+        self.last_gps_nis = correction.innovation.nis
+        if correction.delta is None:
             self.rejected_gps += 1
             return False
-        K = np.linalg.solve(S, H @ self.P).T
-        delta = K @ innovation
-        A = np.eye(15) - K @ H
-        posterior = A @ self.P @ A.T + K @ noise @ K.T
-        self.position += delta[:3]
-        self.velocity += delta[3:6]
-        self.rotation = self.rotation * Rotation.from_rotvec(delta[6:9])
-        self.accel_bias += delta[9:12]
-        self.gyro_bias += delta[12:15]
-        reset = np.eye(15)
-        reset[6:9, 6:9] = right_jacobian(delta[6:9])
-        self.P = reset @ posterior @ reset.T
-        self.P = (self.P + self.P.T) / 2
+        self._inject(correction.delta, correction.covariance)
         self.accepted_gps += 1
         return True
+
+    def _inject(
+        self, delta: NDArray[np.float64], posterior: NDArray[np.float64]
+    ) -> None:
+        """Apply an error-state correction and reset the covariance.
+
+        The attitude error is folded in on the right, R ← R · Exp(δθ); the
+        covariance is then expressed about the corrected attitude with the
+        Jacobian of that reset (J_r(δθ) on the attitude block).
+        """
+        self.position += delta[POS]
+        self.velocity += delta[VEL]
+        self.rotation = self.rotation * Rotation.from_rotvec(delta[ATT])
+        self.accel_bias += delta[ACCEL_BIAS]
+        self.gyro_bias += delta[GYRO_BIAS]
+        reset = np.eye(N)
+        reset[ATT, ATT] = right_jacobian(delta[ATT])
+        self.P = reset @ posterior @ reset.T
+        self.P = (self.P + self.P.T) / 2
 
     def update_gps(self, fix: GpsFix) -> Innovation | None:
         """``RecursiveFilter`` GPS update: the first fix initializes the
@@ -283,13 +278,13 @@ class GpsImuEkf:
         return Innovation("gps", self.last_gps_nis, 3, accepted)
 
     def state(self) -> EstimatedState:
-        return EstimatedState(
-            self.position,
-            self.velocity,
-            self.rotation.as_quat(),
-            self.accel_bias,
-            self.gyro_bias,
+        return LAYOUT.estimated_state(
             self.P,
+            position_m=self.position,
+            velocity_mps=self.velocity,
+            quaternion_xyzw=self.rotation.as_quat(),
+            accel_bias_mps2=self.accel_bias,
+            gyro_bias_rad_s=self.gyro_bias,
         )
 
     def summary(self) -> dict[str, Any]:

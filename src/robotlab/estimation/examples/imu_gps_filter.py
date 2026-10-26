@@ -31,13 +31,15 @@ from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
 from ...core.frames import GRAVITY
 from ...core.measurements import EstimatedState
 from ..interface import Innovation
+from ..filter.kalman import kalman_update
 from ..filter.measurements import BaroAltitude, GpsFix, ImuInput
+from ..filter.models import LinearizedMeasurement, baro_altitude, gps_position
+from ..filter.state_layout import StateLayout
 
 DEFAULTS: dict[str, Any] = dict(
     initial_position_m=[0.0, 0.0, 0.0],
@@ -47,6 +49,9 @@ DEFAULTS: dict[str, Any] = dict(
     gps_gate_squared=25.0,
     baro_gate_squared=25.0,
 )
+# The state x: ENU position and velocity. The shared measurement models
+# (filter/models.py) place their Jacobian columns by these block names.
+LAYOUT = StateLayout.of("position", "velocity")
 
 
 class ImuGpsFilter:
@@ -57,7 +62,7 @@ class ImuGpsFilter:
         if unknown:
             raise ValueError(f"ImuGpsFilter: unknown options {sorted(unknown)}")
         o = {**DEFAULTS, **options}
-        self.x = np.zeros(6)  # [p (3), v (3)], ENU
+        self.x = np.zeros(LAYOUT.size)
         self.x[:3] = np.asarray(o["initial_position_m"], dtype=float)
         self.P = np.diag(
             [o["initial_position_std_m"] ** 2] * 3
@@ -82,35 +87,27 @@ class ImuGpsFilter:
         )
 
     def update_gps(self, fix: GpsFix) -> Innovation:
-        H = np.hstack([np.eye(3), np.zeros((3, 3))])
-        predicted = self.x[:3] + self.rotation.apply(fix.lever_arm_body_m)
-        return self._correct(
-            "gps", fix.position_enu_m - predicted, H, fix.covariance_m2
+        measurement = gps_position(
+            LAYOUT,
+            fix,
+            position_m=self.x[:3],
+            rotation_matrix=self.rotation.as_matrix(),
         )
+        return self._correct(measurement, self.gates["gps"])
 
     def update_baro(self, baro: BaroAltitude) -> Innovation:
-        H = np.zeros((1, 6))
-        H[0, 2] = 1.0
-        residual = np.array([baro.altitude_m - self.x[2]])
-        return self._correct("baro", residual, H, np.array([[baro.variance_m2]]))
+        measurement = baro_altitude(LAYOUT, baro, position_m=self.x[:3])
+        return self._correct(measurement, self.gates["baro"])
 
     def _correct(
-        self,
-        name: str,
-        residual: NDArray[np.float64],
-        H: NDArray[np.float64],
-        R: NDArray[np.float64],
+        self, measurement: LinearizedMeasurement, gate_squared: float
     ) -> Innovation:
-        """Gated Kalman update (Joseph form); returns the innovation."""
-        S = H @ self.P @ H.T + R
-        nis = float(residual @ np.linalg.solve(S, residual))
-        accepted = nis <= self.gates[name]
-        if accepted:
-            K = np.linalg.solve(S, H @ self.P).T
-            self.x = self.x + K @ residual
-            A = np.eye(6) - K @ H
-            self.P = A @ self.P @ A.T + K @ R @ K.T
-        return Innovation(name, nis, len(residual), accepted)
+        """Gated Kalman update (filter/kalman.py); returns the innovation."""
+        correction = kalman_update(self.P, measurement, gate_squared)
+        if correction.delta is not None:
+            self.x = self.x + correction.delta
+            self.P = correction.covariance
+        return correction.innovation
 
     def state(self) -> EstimatedState:
         return EstimatedState(

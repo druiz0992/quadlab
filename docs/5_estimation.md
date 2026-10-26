@@ -19,7 +19,8 @@ sensor bus samples (imu, gps)
 | --- | --- |
 | `estimation/gps_imu_ekf/ekf.py` | The filter only (`GpsImuEkf`, an IMU-driven `RecursiveFilter`); `from_options` builds it from the `ekf` section |
 | `experiments/harness/algorithms.py` | `gps_imu_ekf`: the `filter` plug-in running `GpsImuEkf` (`gps_imu_ekf_options`, calibrated bias priors) |
-| `estimation/filter/` | Reusable for any recursive filter: `FilterNode` (sample checks, held driving readings, timing, publication), measurement conversion (mounts, ENU, wheel geometry), the `filter` plug-in, IMU and wheel-odometry examples ([Writing your own](#writing-your-own-filter)) |
+| `estimation/filter/` | Reusable for any recursive filter: `FilterNode` (sample checks, held driving readings, timing, publication), measurement conversion (mounts, ENU, wheel geometry), the `filter` plug-in, and the shared math ([building blocks](#shared-building-blocks)) |
+| `estimation/lie.py` | SO(3) helpers: `skew`, `right_jacobian`, `right_jacobian_inverse` |
 | `core/measurements.py` | Immutable `Sample`, `ImuReading`, `GpsReading`, `EstimatedState` |
 | `sensors/bus/streams.py` | Bounded in-process `Publisher`/`Channel`/`Subscription` fanout |
 | `core/geodesy.py` | WGS84 ↔ ECEF ↔ local ENU conversion |
@@ -151,6 +152,42 @@ IMU example replayed with 2.0 m position and 0.85° attitude RMSE (EKF: 1.6 m,
 and 0.09° heading RMSE with mean NIS 0.96 per degree of freedom; its
 sideways speed is observable only through the steering angle, so quantized
 encoder speeds make its velocity noisy (0.6 m/s RMS).
+
+### Shared building blocks
+
+A filter need not write its own Kalman algebra. `estimation/filter/` holds
+the pieces the EKF and both examples are built from:
+
+- `StateLayout` (`state_layout.py`): named blocks of the error state, e.g.
+  `StateLayout.of("position", "velocity", "attitude", ("baro_offset", 1))`.
+  Standard names fix the conventions (`attitude`: right body-axes rotation
+  vector; `yaw`: heading error about world up; biases in body axes);
+  `index(name)` gives a block's slice, and `estimated_state(P, ...)` builds
+  the `EstimatedState` with the covariance marginalized to the reported
+  blocks.
+- Measurement models (`models.py`): `gps_position`, `gps_velocity`,
+  `baro_altitude`, `magnetometer_field`. Each takes the layout, the
+  converted measurement, and the nominal values, and returns a
+  `LinearizedMeasurement` (residual, Jacobian placed by block name, noise),
+  so one model serves any state that has the blocks it needs.
+- `kalman_update(P, measurement, gate_squared)` (`kalman.py`): NIS gate,
+  gain, and Joseph-form posterior; returns the correction δx (None when
+  gated) for the filter to apply to its own state (⊕ for rotations), and
+  the `Innovation` to return. `checked_covariance` validates priors.
+
+Adding a sensor to a filter is then one method, e.g.
+
+```python
+def update_baro(self, baro: BaroAltitude) -> Innovation:
+    z = baro_altitude(LAYOUT, baro, position_m=self.position)
+    correction = kalman_update(self.P, z, self.baro_gate_squared)
+    if correction.delta is not None:
+        self._inject(correction.delta, correction.covariance)
+    return correction.innovation
+```
+
+Jacobians are checked against finite differences in
+`tests/unit/estimation/test_measurement_models.py`.
 
 ## Running it
 

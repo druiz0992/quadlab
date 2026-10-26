@@ -49,7 +49,10 @@ from scipy.spatial.transform import Rotation
 
 from ...core.measurements import EstimatedState
 from ..interface import Innovation
+from ..filter.kalman import kalman_update
 from ..filter.measurements import GpsFix, WheelMotion
+from ..filter.models import gps_position
+from ..filter.state_layout import StateLayout
 
 DEFAULTS: dict[str, Any] = dict(
     initial_position_m=[0.0, 0.0, 0.0],
@@ -62,6 +65,9 @@ DEFAULTS: dict[str, Any] = dict(
     lateral_weight=0.0,
     gps_gate_squared=25.0,
 )
+# The state x = [east, north, up, yaw]; the shared GPS model
+# (filter/models.py) finds the position and yaw columns by name.
+LAYOUT = StateLayout.of("position", "yaw")
 
 
 def body_velocity(motion: WheelMotion, lateral_weight: float) -> NDArray[np.float64]:
@@ -91,7 +97,7 @@ class WheelOdometryFilter:
         if unknown:
             raise ValueError(f"WheelOdometryFilter: unknown options {sorted(unknown)}")
         o = {**DEFAULTS, **options}
-        self.x = np.zeros(4)  # [east, north, up, yaw]
+        self.x = np.zeros(LAYOUT.size)
         self.x[:3] = np.asarray(o["initial_position_m"], dtype=float)
         self.x[3] = np.deg2rad(float(o["initial_yaw_deg"]))
         self.P = np.diag(
@@ -129,23 +135,17 @@ class WheelOdometryFilter:
         self.velocity_enu_mps = np.array([velocity[0], velocity[1], 0.0])
 
     def update_gps(self, fix: GpsFix) -> Innovation:
-        """Gated Kalman update with the antenna position (Joseph form)."""
-        lever = fix.lever_arm_body_m
-        R = _yaw_matrix(self.x[3])
-        predicted = self.x[:3] + np.append(R @ lever[:2], lever[2])
-        H = np.zeros((3, 4))
-        H[:, :3] = np.eye(3)
-        H[:2, 3] = np.array([[0.0, -1.0], [1.0, 0.0]]) @ R @ lever[:2]
-        residual = fix.position_enu_m - predicted
-        S = H @ self.P @ H.T + fix.covariance_m2
-        nis = float(residual @ np.linalg.solve(S, residual))
-        accepted = nis <= self.gps_gate_squared
-        if accepted:
-            K = np.linalg.solve(S, H @ self.P).T
-            self.x = self.x + K @ residual
-            A = np.eye(4) - K @ H
-            self.P = A @ self.P @ A.T + K @ fix.covariance_m2 @ K.T
-        return Innovation("gps", nis, 3, accepted)
+        """Gated Kalman update with the antenna position (filter/kalman.py)."""
+        rotation = np.eye(3)
+        rotation[:2, :2] = _yaw_matrix(self.x[3])
+        measurement = gps_position(
+            LAYOUT, fix, position_m=self.x[:3], rotation_matrix=rotation
+        )
+        correction = kalman_update(self.P, measurement, self.gps_gate_squared)
+        if correction.delta is not None:
+            self.x = self.x + correction.delta
+            self.P = correction.covariance
+        return correction.innovation
 
     def state(self) -> EstimatedState:
         return EstimatedState(
