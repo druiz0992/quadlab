@@ -24,6 +24,7 @@ robotlab-batch = "robotlab.cli.batch:main"
 robotlab-magcal = "robotlab.cli.magcal:main"
 robotlab-imucal = "robotlab.cli.imucal:main"
 robotlab-replay = "robotlab.cli.replay:main"
+robotlab-eval-estimators = "robotlab.cli.eval_estimators:main"
 robotlab-build-plugins = "robotlab.cli.build_plugins:main"
 
 [tool.setuptools.packages.find]

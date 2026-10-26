@@ -12,6 +12,7 @@ import json
 import math
 from numbers import Real
 from pathlib import Path
+import re
 from typing import Any
 
 import numpy as np
@@ -702,6 +703,10 @@ DEFAULTS: dict[str, Any] = {
         "controller_options": {},
         "control_state_source": "truth",  # truth | estimate
         "max_estimate_age_s": 0.1,
+        # Extra estimators run beside "estimator" on the same deliveries and
+        # scored the same way, never driving control: a list of {"name",
+        # "estimator", "estimator_options"}; see experiments/harness/observers.py.
+        "observers": [],
         # Scoring against truth (evaluation/), after initial convergence.
         "evaluation_rate_hz": 50.0,
         "evaluation_start_s": 2.0,
@@ -1013,6 +1018,34 @@ def validate_dipoles(dipoles, name):
         if not isinstance(dipole, dict) or set(dipole) != {"position_m", "moment_am2"}:
             raise ValueError(f"{name} entries need exactly position_m and moment_am2")
         validate_points([dipole["position_m"], dipole["moment_am2"]], name)
+
+
+OBSERVER_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_-]*$")
+
+
+def validate_observers(observers, name):
+    """``algorithms.observers``: objects with a unique directory-safe
+    ``name``, a nonempty ``estimator`` spec, and optional
+    ``estimator_options`` (an object, validated by the estimator)."""
+    if not isinstance(observers, list):
+        raise ValueError(f"{name} must be a list of observer estimators")
+    names = set()
+    for observer in observers:
+        if not isinstance(observer, dict) or not {"name", "estimator"} <= set(observer):
+            raise ValueError(f"{name} entries need name and estimator")
+        unknown = set(observer) - {"name", "estimator", "estimator_options"}
+        if unknown:
+            raise ValueError(f"Unknown {name} keys: {', '.join(sorted(unknown))}")
+        label = observer["name"]
+        if not isinstance(label, str) or not OBSERVER_NAME.match(label):
+            raise ValueError(f"{name} name {label!r}: use letters, digits, _ -")
+        if label in names or label == "primary":
+            raise ValueError(f"{name} names must be unique, not primary: {label!r}")
+        names.add(label)
+        if not isinstance(observer["estimator"], str) or not observer["estimator"]:
+            raise ValueError(f"{name} {label}: estimator must be a nonempty string")
+        if not isinstance(observer.get("estimator_options", {}), dict):
+            raise ValueError(f"{name} {label}: estimator_options must be an object")
 
 
 def validate_points(points, name):
@@ -1338,6 +1371,9 @@ def validate_tree(value, template, path="config"):
                 continue
             if key == "dipoles":
                 validate_dipoles(item, name)
+                continue
+            if key == "observers":
+                validate_observers(item, name)
                 continue
             if key == "waypoints_m":
                 validate_points(item, name)

@@ -42,7 +42,8 @@ truth; it is used only to synthesize measurements and to score runs.
 src/robotlab/
 ├── cli/                    # Argument parsing: `robotlab` (gazebo.py), `robotlab-batch`
 │                           #   (batch.py), `robotlab-replay` (replay.py), `robotlab-magcal`
-│                           #   (magcal.py), `robotlab-imucal` (imucal.py); shared exit
+│                           #   (magcal.py), `robotlab-imucal` (imucal.py),
+│                           #   `robotlab-eval-estimators` (eval_estimators.py); shared exit
 │                           #   statuses and SIGTERM handling (common.py)
 ├── core/                   # Small shared types: frames, gravity, vehicle properties,
 │                           #   measurement samples and every bus payload type
@@ -128,7 +129,8 @@ src/robotlab/
 │   │                       #   runner, estimate-driven state), algorithm_debug.py,
 │   │                       #   run_evaluation.py (metrics.json), replay.py and
 │   │                       #   replay_log.py (robotlab-replay), comparison.py,
-│   │                       #   batch.py (robotlab-batch)
+│   │                       #   batch.py (robotlab-batch), observers.py (extra live
+│   │                       #   estimators), estimator_benchmark.py (scenario benchmark)
 │   ├── common/             # Shared by several robots: run_setup.py (option checks, world),
 │   │                       #   sensor_pipeline.py (error/fault models → recording → bus),
 │   │                       #   gazebo_helpers.py, mission.py (reference clock),
@@ -145,6 +147,7 @@ src/robotlab/
 │   ├── plugins.py          # Plug-in contract test kit (synthetic data, no Gazebo),
 │                           #   including check_wheeled_controller, check_legged_controller
 │   ├── scenarios.py        # Estimator scenario suite: scenarios, sensor selection, scores
+│   ├── candidates.py       # Estimator candidates (options, sensors, limits) for the suite
 │   ├── synthetic_scene.py  # Ray-cast ground + boxes for synthetic ray sensors
 │   ├── synthetic_sensors.py  # Truth → bus payloads for every sensor stream
 │   └── trajectories.py     # Truth trajectories (hover, straight, circle)
@@ -223,9 +226,11 @@ Put the code in `estimation/` or `control/` (or any importable package)
 with tests in `tests/unit/<package>/` that call
 `robotlab.testing.plugins.check_estimator` (with `FilterEstimator` and
 its options for a filter) or `check_controller`, and add estimators to the
-[scenario suite](7_experiments.md#estimator-scenario-suite). Develop estimators against recorded runs with
+[scenario suite](7_experiments.md#estimator-scenario-suite)
+(`robotlab-eval-estimators` compares them there). Develop estimators against recorded runs with
 `robotlab-replay` (several at once for a comparison table), then confirm
-in Gazebo and with batches.
+in Gazebo, side by side as
+[observers](7_experiments.md#observer-estimators), and with batches.
 At the algorithm boundary use the bus samples (decoded measurements with
 explicit timestamps and frames) and the `AlgorithmContext`; never simulator
 messages, viewer state, or hidden truth.

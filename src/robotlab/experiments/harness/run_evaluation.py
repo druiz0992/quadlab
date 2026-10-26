@@ -37,7 +37,9 @@ class RunEvaluation:
     ``tracking_reference(position, velocity, quaternion)``, when given (a
     controller's optional method, see control/interface.py), replaces the
     mission reference for tracking errors; ``metrics.json`` records which
-    one was used under ``control.tracking_reference``.
+    one was used under ``control.tracking_reference``. Observer estimators
+    (observers.py, ``add_observer``) are scored on the same truth with the
+    same settings, under ``observers.<name>`` (only when there are any).
     """
 
     def __init__(
@@ -49,14 +51,12 @@ class RunEvaluation:
         true_biases: BiasSource | None = None,
         tracking_reference: TrackingReference | None = None,
     ) -> None:
-        algorithms = settings["algorithms"]
+        self._settings_algorithms = settings["algorithms"]
         self.truth = TruthHistory()
-        self.estimation = EstimationMetrics(
-            self.truth,
-            rate_hz=algorithms["evaluation_rate_hz"],
-            start_s=algorithms["evaluation_start_s"],
-            true_biases=true_biases,
-        )
+        self._true_biases = true_biases
+        self.estimation = self._new_metrics()
+        self.observers: dict[str, EstimationMetrics] = {}
+        self.observer_estimates: dict[str, int] = {}
         self.control = ControlMetrics(weight_n)
         self._mission = mission
         self._tracking_reference = tracking_reference
@@ -64,6 +64,22 @@ class RunEvaluation:
         self._log = log_vector
         self._first_ns: int | None = None
         self.estimates = 0
+
+    def _new_metrics(self) -> EstimationMetrics:
+        algorithms = self._settings_algorithms
+        return EstimationMetrics(
+            self.truth,
+            rate_hz=algorithms["evaluation_rate_hz"],
+            start_s=algorithms["evaluation_start_s"],
+            true_biases=self._true_biases,
+        )
+
+    def add_observer(self, name: str) -> None:
+        """Score observer ``name`` too; ValueError if it already exists."""
+        if name in self.observers:
+            raise ValueError(f"Observer {name!r} is already scored")
+        self.observers[name] = self._new_metrics()
+        self.observer_estimates[name] = 0
 
     def on_truth(
         self,
@@ -97,6 +113,8 @@ class RunEvaluation:
         for scored in self.estimation.process():
             values = {k: v for k, v in scored.items() if k != "sim_time_s"}
             self._log("evaluation/estimation", list(values.values()), list(values))
+        for metrics in self.observers.values():
+            metrics.process()
         return errors
 
     def _reference(
@@ -120,6 +138,15 @@ class RunEvaluation:
         for innovation in innovations:
             self.estimation.add_nis(innovation.name, innovation.nis, innovation.dof)
 
+    def on_observer_estimate(self, name: str, sample: Sample[EstimatedState]) -> None:
+        self.observer_estimates[name] += 1
+        self.observers[name].add_estimate(sample.sim_time_ns, sample.payload)
+
+    def on_observer_innovations(self, name: str, innovations: list[Innovation]) -> None:
+        metrics = self.observers[name]
+        for innovation in innovations:
+            metrics.add_nis(innovation.name, innovation.nis, innovation.dof)
+
     def on_command(self, record: Mapping[str, Any]) -> None:
         if self._first_ns is None or record.get("warmup"):
             return
@@ -129,8 +156,13 @@ class RunEvaluation:
         )
 
     def summary(self) -> dict[str, Any]:
+        observers = {
+            name: metrics.summary() if self.observer_estimates[name] else None
+            for name, metrics in self.observers.items()
+        }
         return dict(
             estimation=self.estimation.summary() if self.estimates else None,
+            **({"observers": observers} if observers else {}),
             control=dict(
                 self.control.summary(),
                 tracking_reference=(

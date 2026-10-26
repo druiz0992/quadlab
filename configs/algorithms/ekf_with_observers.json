@@ -1,0 +1,20 @@
+{
+  "extends": "ekf_observer.json",
+  "algorithms": {
+    "observers": [
+      {
+        "name": "imu_example",
+        "estimator": "filter",
+        "estimator_options": {
+          "filter": "robotlab.estimation.examples.imu_gps_filter:ImuGpsFilter",
+          "filter_options": {"initial_position_m": [0, 0, 1]}
+        }
+      },
+      {
+        "name": "complementary",
+        "estimator": "robotlab.estimation.examples.complementary_estimator:ComplementaryEstimator",
+        "estimator_options": {"initial_position_m": [0, 0, 1]}
+      }
+    ]
+  }
+}

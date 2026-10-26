@@ -255,6 +255,43 @@ def test_ekf_in_the_loop_tracks_like_truth_control(tmp_path):
     assert truth["health"]["verdict"] == "ok"
 
 
+def test_observers_leave_the_primary_unchanged(tmp_path):
+    """Observer estimators run beside the EKF on the same deliveries: the
+    EKF's outputs are byte-identical to a run without them."""
+    layers = ["configs/sensors/sensor_errors.json", "configs/missions/square.json"]
+    alone, observed = fly_concurrently(
+        [
+            (tmp_path / "alone", layers + ["configs/algorithms/ekf_observer.json"], 12),
+            (
+                tmp_path / "observed",
+                layers + ["configs/algorithms/ekf_with_observers.json"],
+                12,
+            ),
+        ]
+    )
+    run_dir = tmp_path / "observed" / "run"
+    assert (run_dir / "estimates.jsonl").read_bytes() == (
+        tmp_path / "alone" / "run" / "estimates.jsonl"
+    ).read_bytes()
+    assert observed["metrics"]["estimation"] == alone["metrics"]["estimation"]
+    observers = observed["metrics"]["observers"]
+    # Verified 2026-10-26: EKF 1.56 m, IMU example 2.18 m, complementary
+    # 1.62 m position RMSE (sensor_errors GPS bias dominates all three).
+    assert observers["imu_example"]["errors"]["position_m"]["rmse"] == pytest.approx(
+        2.18, abs=0.05
+    )
+    assert observers["complementary"]["errors"]["position_m"]["rmse"] == pytest.approx(
+        1.62, abs=0.05
+    )
+    for name, entry in observed["algorithms"]["observers"].items():
+        lines = (run_dir / "observers" / name / "estimates.jsonl").read_text()
+        assert entry["estimates"] == len(lines.splitlines()) > 2000
+    assert (
+        "| primary | imu_example | complementary |"
+        in (run_dir / "comparison.md").read_text()
+    )
+
+
 def test_esc_telemetry_matches_commanded_speeds(tmp_path, monkeypatch):
     reports = capture(
         monkeypatch, "log_vector", "esc/rotor_speed_rad_s", lambda v, *a: list(v)

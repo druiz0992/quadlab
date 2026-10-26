@@ -57,6 +57,7 @@ from ..multirotor.mission_loop import (
     STARTUP_TIMEOUT_WALL_S,
     lockstep_stepper,
 )
+from ..harness.observers import write_comparison
 from ..harness.replay_log import estimate_record
 from ..common.exit_reason import final_exit_reason
 from ..common.schedule import next_due_ns
@@ -180,6 +181,10 @@ class WheeledMissionLoop:
 
     def _open_files(self, stack: ExitStack) -> None:
         output = self.parts.output
+        observers = self.parts.stack.observers
+        if observers is not None:
+            observers.attach(output, self.parts.evaluation)
+            stack.callback(observers.close)
         names = dict(
             gazebo="gazebo.log",
             telemetry="telemetry.jsonl",
@@ -229,6 +234,7 @@ class WheeledMissionLoop:
         self.parts.debug.close()
         metrics = self.parts.evaluation.summary()
         (output / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+        write_comparison(output, metrics, self.settings["algorithms"]["estimator"])
         self.summary = build_wheeled_summary(self, metrics)
         (output / "summary.json").write_text(json.dumps(self.summary, indent=2) + "\n")
         self.parts.recorder.close()

@@ -120,8 +120,10 @@ def _state_source(settings: dict[str, Any], stack: Any) -> str:
 def _algorithms(settings: dict[str, Any], stack: Any) -> dict[str, Any]:
     algorithms = settings["algorithms"]
     estimator, controller = stack.estimator, stack.controller
+    observers = stack.observers
     return dict(
         estimator=algorithms["estimator"] or None,
+        **({"observers": observers.summary()} if observers is not None else {}),
         controller=algorithms["controller"] or "manual",
         estimator_summary=estimator.summary() if estimator is not None else None,
         max_estimate_age_ms=(

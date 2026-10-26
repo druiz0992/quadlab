@@ -33,6 +33,7 @@ controller only receives it when `control_state_source` is `truth`.
 | `evaluation_rate_hz` | 50 | Rate at which estimates are scored |
 | `evaluation_start_s` | 2 | Estimates in the first seconds are not scored (convergence) |
 | `record_bus` | off | Record bus deliveries and truth for offline replay: `off`, `light` (all streams but camera and lidar), `all` ([Offline replay](#offline-replay)) |
+| `observers` | [] | Extra estimators run beside `estimator`, scored but never driving control: `{"name", "estimator", "estimator_options"}` each ([Observer estimators](#observer-estimators)) |
 
 Plug-ins are constructed as `cls(context, options)`.
 `context` is an `AlgorithmContext` (`core/algorithms.py`):
@@ -170,6 +171,33 @@ filter's prior.
 `--drone configs/algorithms/ekf_observer.json`, which runs the same filter
 on the sensor bus, scored and replayable.
 
+### Observer estimators
+
+`algorithms.observers` runs several estimators in one live run. Each
+entry names an estimator exactly like `estimator` (built-in, `filter`, or
+`package.module:Class`, with `estimator_options`; `gps_imu_ekf` without
+options uses the `ekf` section) and a unique `name` (letters, digits,
+`_`, `-`; not `primary`). Every observer gets the same bus deliveries
+as the primary, after it, serially on the mission thread, and is scored
+on the same truth; only the primary drives control, Rerun, and the health
+verdict, and its outputs are byte-identical with or without observers
+(verified in lockstep; `tests/integration/test_gazebo_regression.py`).
+`estimator` may be "" to run observers only. Outputs:
+
+| Output | Content |
+| --- | --- |
+| `observers/<name>/estimates.jsonl` | As `estimates.jsonl` |
+| `metrics.json` `observers.<name>` | As the `estimation` section |
+| `summary.json` `algorithms.observers.<name>` | Spec, estimate count, `estimator_summary` |
+| `algorithm-debug.jsonl` | Observer entries under `observers/<name>/` |
+| `comparison.md` | Primary and observers side by side (best error in bold) |
+
+`configs/algorithms/ekf_with_observers.json` adds the IMU and
+complementary examples to `ekf_observer.json`. On the 12 s lockstep square
+with `sensor_errors.json` the position RMSE was 1.56 m (EKF), 2.18 m (IMU
+example), and 1.62 m (complementary). Observers are not recorded for
+replay; replay them with `robotlab-replay --estimator`.
+
 ### Writing a plug-in: examples and the contract test kit
 
 Start from an example; they are short and commented, and pass the kit. A
@@ -304,10 +332,30 @@ expressed in the estimate's body frame, so heading errors show up in it. The est
 the explicit start state a test may declare as priors.
 
 `tests/unit/estimation/test_estimator_scenarios.py` runs every scenario for
-every entry of `CANDIDATES`. A `Candidate` has an options builder,
-per-scenario limits, its `sensors`, and optionally an NIS band of 0.7–1.3.
-To add your filter, add a `Candidate`; a new scenario fails until every
-candidate declares limits. Verified scores (seeded, so exact; IMU and GPS):
+every entry of `CANDIDATES` (`robotlab/testing/candidates.py`). A
+`Candidate` has an options builder, per-scenario limits, its `sensors`,
+and optionally an NIS band of 0.7–1.3 (`consistent`). To make your filter
+a regression test, add a `Candidate` there; a new scenario fails until
+every candidate declares limits. To score it without a test, use the
+benchmark:
+
+```bash
+robotlab-eval-estimators --list                       # candidates and scenarios
+robotlab-eval-estimators --output outputs/bench       # all candidates, all scenarios
+robotlab-eval-estimators --output outputs/bench-mine --candidates mypkg.bench:CANDIDATES \
+  --candidate gps_imu_ekf --candidate my_ekf --scenario circle --check
+```
+
+`--candidates module:NAME` loads a `dict[str, Candidate]` of your own;
+`--candidate` and `--scenario` narrow the run (default: all). The output
+directory (fresh) gets `benchmark.md` (also printed: a status overview,
+then one table per scenario with the lowest error in bold) and
+`benchmark.json` (every report and violation). Each cell's status is
+`pass`, `fail` (limits or NIS band violated), `unchecked` (no limits for
+that scenario), `skipped` (sensors the vehicle lacks), or `error` (a
+`ValueError` or contract violation; the rest still runs). `--check` exits
+with status 1 on any `fail` or `error`. All built-in candidates on all
+scenarios take about 65 s. Verified scores (seeded, so exact; IMU and GPS):
 
 | Scenario | `gps_imu_ekf` position RMSE / tilt RMSE / NIS | `complementary` position RMSE / max error |
 | --- | --- | --- |

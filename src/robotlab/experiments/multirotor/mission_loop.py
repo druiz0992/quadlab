@@ -44,6 +44,7 @@ from .keyboard_flight import apply_keyboard_effects
 from ..common.loop_timing import LoopTiming
 from .rotor_loop import RotorControlLoop
 from .rotor_mission import RotorMission, RotorMissionParts
+from ..harness.observers import write_comparison
 from ..harness.replay_log import estimate_record
 from ..common.exit_reason import final_exit_reason
 from .run_summary import build_summary
@@ -236,6 +237,10 @@ class MissionLoop:
 
     def _open_files(self, stack: ExitStack) -> RunFiles:
         output, parts = self.parts.output, self.parts
+        observers = parts.stack.observers
+        if observers is not None:
+            observers.attach(output, parts.evaluation)
+            stack.callback(observers.close)
 
         def open_file(name: str) -> TextIO:
             return stack.enter_context((output / name).open("w"))
@@ -360,6 +365,7 @@ class MissionLoop:
         self.parts.debug.close()
         metrics = self.parts.evaluation.summary()
         (output / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+        write_comparison(output, metrics, self.settings["algorithms"]["estimator"])
         self.summary = build_summary(self, metrics)
         (output / "summary.json").write_text(json.dumps(self.summary, indent=2) + "\n")
         self.parts.recorder.close()

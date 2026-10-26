@@ -426,3 +426,29 @@ def test_rover_crosses_the_ditch_field(tmp_path):
         # The body sinks by most of the ditch depth near the floor.
         assert ride - p[near, 2].min() > 0.6 * depth
     assert p[-1, 2] == pytest.approx(ride, abs=0.01)
+
+
+def test_observer_estimator_runs_beside_the_primary(tmp_path):
+    """The wheeled loop feeds observers too: the same filter as observer
+    reproduces the primary's estimates exactly."""
+    odometry = {
+        "filter": "robotlab.estimation.examples.wheel_odometry_filter:WheelOdometryFilter"
+    }
+    layer = {
+        **CRUISE,
+        "algorithms": {
+            **CRUISE["algorithms"],
+            "estimator": "filter",
+            "estimator_options": odometry,
+            "observers": [
+                {"name": "twin", "estimator": "filter", "estimator_options": odometry}
+            ],
+        },
+    }
+    summary, _ = drive(tmp_path, "car", layer, 3.0, "worlds/airfield.json")
+    run_dir = tmp_path / "run"
+    primary = (run_dir / "estimates.jsonl").read_bytes()
+    assert (run_dir / "observers" / "twin" / "estimates.jsonl").read_bytes() == primary
+    assert summary["algorithms"]["observers"]["twin"]["estimates"] >= 290
+    assert summary["metrics"]["observers"]["twin"] == summary["metrics"]["estimation"]
+    assert (run_dir / "comparison.md").exists()

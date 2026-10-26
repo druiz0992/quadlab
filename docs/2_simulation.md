@@ -518,6 +518,7 @@ robotlab --headless --target 8 0 1 --duration 10 --output outputs/collision   # 
 | `commands.jsonl` | Rotor-control records: requested thrusts, motor-speed targets, setpoints, saturation, command IDs, accepted thrusts, expiry, tick/state/release times |
 | `command-events.jsonl` | Command publication, supersession, expiry, stop, and failure events |
 | `estimates.jsonl` | Estimator plug-in state, covariance, and provenance |
+| `observers/<name>/estimates.jsonl`, `comparison.md` | Observer estimators' estimates and the primary-vs-observers table (`algorithms.observers`, [7 Experiments](7_experiments.md#observer-estimators)) |
 | `wind-commands.jsonl` | Published dynamic wind targets (random/scheduled wind) |
 | `replay.jsonl` | Bus deliveries and truth for `robotlab-replay` (`algorithms.record_bus`) |
 | `algorithm-debug.jsonl` | Plug-in debug series (`context.log`), only when a plug-in logs |

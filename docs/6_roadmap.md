@@ -21,6 +21,7 @@ document and update the status below.
 | Magnetometer, downward rangefinder, synthetic optical flow, multi-channel 3D lidar | Implemented ([3 Configuration](3_configuration.md#magnetometer-sensorsmagnetometer)) |
 | Camera intrinsics, optical frame, and sensor extrinsics in the algorithm context | Implemented ([7 Experiments](7_experiments.md#algorithm-plug-ins-algorithms)) |
 | Estimator scenario suite: every sensor stream, flown multirotor trajectories, partial estimates, ATE/RPE drift metrics | Implemented ([7 Experiments](7_experiments.md#estimator-scenario-suite)) |
+| Shared filter math (state layout, measurement models, Kalman update); observer estimators beside the primary in live runs; `robotlab-eval-estimators` scenario benchmark | Implemented ([5 Estimation](5_estimation.md#shared-building-blocks), [7 Experiments](7_experiments.md#observer-estimators)) |
 | Camera calibration errors (estimator-side intrinsics differing from the simulated camera) | Future |
 | Procedural textures (`color`, `texture`, `ground_texture`, visual-only markings); textured yard with a lidar-degenerate corridor | Implemented ([2 Simulation](2_simulation.md#json-scenes)) |
 | MuJoCo biped backend core (`--robot biped`, MJCF loading, IMU and joint encoders on the bus, fall health) | Implemented ([9 Bipeds](9_bipeds.md)) |

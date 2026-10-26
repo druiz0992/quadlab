@@ -206,6 +206,16 @@ COMPARISON_METRICS = (
 )
 
 
+def comparison_directions() -> dict[str, str]:
+    """Errors are better lower (``increase`` = worse); NEES is unmarked
+    (consistent means equal to its degrees of freedom, not minimal)."""
+    return {
+        m: "increase"
+        for m in COMPARISON_METRICS
+        if m.startswith(("errors.", "trajectory."))
+    }
+
+
 def estimator_label(spec: str, taken: set[str]) -> str:
     """Directory/column name for an estimator spec (unique within ``taken``)."""
     base = spec.rpartition(":")[2] or spec
@@ -242,11 +252,6 @@ def compare_estimators(
         metrics = json.loads((output / label / "metrics.json").read_text())
         estimation = metrics["estimation"] or {}
         columns[label] = {m: stats([lookup(estimation, m)]) for m in COMPARISON_METRICS}
-    directions = {
-        m: "increase"
-        for m in COMPARISON_METRICS
-        if m.startswith(("errors.", "trajectory."))
-    }
-    table = comparison_markdown(columns, COMPARISON_METRICS, directions)
+    table = comparison_markdown(columns, COMPARISON_METRICS, comparison_directions())
     (output / "comparison.md").write_text(table)
     return table

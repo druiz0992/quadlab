@@ -10,7 +10,8 @@ existing configuration sections as options (``ekf``, ``controller``) unless
 options are given.
 
 The runner dispatches bus samples to the estimator serially on the mission
-thread, in delivery order. ``EstimateStateSource`` turns the latest estimate
+thread, in delivery order, then to the ``algorithms.observers`` estimators
+(observers.py), which never drive control. ``EstimateStateSource`` turns the latest estimate
 into the controller's state when ``control_state_source`` is "estimate":
 position, velocity, and attitude from the estimate; body rates from the
 latest delivered gyro sample (rotated by the declared IMU mount) minus the
@@ -43,6 +44,7 @@ from ...core.track import Track
 from ...core.wheeled_vehicle import WheeledProperties
 from ...estimation.interface import Innovation, StateEstimator
 from ...sensors.bus import STREAMS, SensorBus
+from .observers import ObserverSet, build_observers
 
 BUILTIN_ESTIMATORS = {
     # Any RecursiveFilter: estimator_options.filter = "package.module:Class".
@@ -124,11 +126,24 @@ def build_context(
 def build_estimator(
     settings: Mapping[str, Any], context: AlgorithmContext
 ) -> StateEstimator | None:
+    """The primary estimator (``algorithms.estimator``), or None."""
     algorithms = settings["algorithms"]
-    spec = algorithms["estimator"]
-    if not spec:
+    if not algorithms["estimator"]:
         return None
-    options = algorithms["estimator_options"]
+    return build_named_estimator(
+        settings, algorithms["estimator"], algorithms["estimator_options"], context
+    )
+
+
+def build_named_estimator(
+    settings: Mapping[str, Any],
+    spec: str,
+    options: Mapping[str, Any],
+    context: AlgorithmContext,
+) -> StateEstimator:
+    """Estimator ``spec`` with ``options`` (``gps_imu_ekf`` without options
+    uses the ``ekf`` section); ValueError for an invalid plug-in or one that
+    needs disabled sensors."""
     if spec == "gps_imu_ekf":
         imu = context.sensors.get("imu")
         calibration = None if imu is None else imu.calibration
@@ -186,11 +201,20 @@ def build_controller(
 
 
 class AlgorithmRunner:
-    """Deliver bus samples to the estimator; collect estimates and NIS."""
+    """Deliver bus samples to the estimator; collect estimates and NIS.
 
-    def __init__(self, bus: SensorBus, estimator: StateEstimator | None) -> None:
+    ``observers`` (observers.py) get every delivery after the primary.
+    """
+
+    def __init__(
+        self,
+        bus: SensorBus,
+        estimator: StateEstimator | None,
+        observers: ObserverSet | None = None,
+    ) -> None:
         self.bus = bus
         self.estimator = estimator
+        self.observers = observers
         self._inputs = set(estimator.inputs) if estimator is not None else set()
         self._last_estimate: Sample[EstimatedState] | None = None
         self.handler_errors = 0
@@ -204,6 +228,7 @@ class AlgorithmRunner:
         delivered = self.bus.advance(now_ns)
         estimates: list[Sample[EstimatedState]] = []
         if self.estimator is None:
+            self._observe(delivered)
             return delivered, estimates, []
         for kind, sample in delivered:
             if kind not in self._inputs:
@@ -213,7 +238,13 @@ class AlgorithmRunner:
             if latest is not None and latest is not self._last_estimate:
                 estimates.append(latest)
                 self._last_estimate = latest
-        return delivered, estimates, self.estimator.drain_innovations()
+        innovations = self.estimator.drain_innovations()
+        self._observe(delivered)
+        return delivered, estimates, innovations
+
+    def _observe(self, delivered: list[tuple[str, Sample]]) -> None:
+        if self.observers is not None and delivered:
+            self.observers.deliver(delivered)
 
     @property
     def latest_estimate(self) -> Sample[EstimatedState] | None:
@@ -274,9 +305,11 @@ class EstimateStateSource:
 class AlgorithmStack:
     """The plug-ins of one run and how they are wired.
 
-    ``bus`` and ``runner`` exist only with an estimator; ``estimate_source``
-    only when the controller flies on the estimate; ``controller`` only in
-    rotor-thrust mode.
+    ``bus`` and ``runner`` exist only with an estimator or observers;
+    ``estimate_source`` only when the controller flies on the estimate;
+    ``controller`` only in rotor-thrust mode; ``observers`` only when
+    ``algorithms.observers`` lists any (attach them to the run's outputs
+    and evaluation before the first delivery).
     """
 
     context: AlgorithmContext
@@ -285,6 +318,7 @@ class AlgorithmStack:
     runner: AlgorithmRunner | None
     estimate_source: EstimateStateSource | None
     controller: RotorController | None
+    observers: ObserverSet | None = None
 
 
 def build_algorithm_stack(
@@ -309,12 +343,17 @@ def build_algorithm_stack(
         settings, vehicle, reference, bus_kinds, log, wheeled, track
     )
     estimator = build_estimator(settings, context)
+    observers = build_observers(
+        settings,
+        context,
+        lambda spec, options, own: build_named_estimator(settings, spec, options, own),
+    )
     bus = (
         SensorBus(settings["sensor_timing"], bus_kinds)
-        if estimator or need_bus
+        if estimator or observers or need_bus
         else None
     )
-    runner = AlgorithmRunner(bus, estimator) if bus is not None else None
+    runner = AlgorithmRunner(bus, estimator, observers) if bus is not None else None
     estimate_source = (
         EstimateStateSource(
             context.sensors["imu"].mount_quaternion_xyzw,
@@ -324,4 +363,6 @@ def build_algorithm_stack(
         else None
     )
     controller = build_controller(settings, context) if rotor_mode else None
-    return AlgorithmStack(context, estimator, bus, runner, estimate_source, controller)
+    return AlgorithmStack(
+        context, estimator, bus, runner, estimate_source, controller, observers
+    )

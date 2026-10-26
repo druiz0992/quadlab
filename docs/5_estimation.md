@@ -145,7 +145,9 @@ rolling speeds, position and yaw corrected by GPS). Check a filter with
 `check_estimator(FilterEstimator, options)`, the scenario suite, and
 `robotlab-replay ... --estimator filter --set
 'algorithms.estimator_options={...}'` (one estimator per replay when it
-needs its own options). On the 10 s lockstep square with sensor errors the
+needs its own options); compare filters on the synthetic scenarios with
+`robotlab-eval-estimators` and live, beside the EKF, as
+[observers](7_experiments.md#observer-estimators). On the 10 s lockstep square with sensor errors the
 IMU example replayed with 2.0 m position and 0.85° attitude RMSE (EKF: 1.6 m,
 1.3°); it estimates no biases, so it drifts on longer runs. On the
 `car_circle` scenario the wheel-odometry example scored 2 cm position
